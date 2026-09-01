@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/cyberspace_authoring/AuthoringStudio.gd" id="1_studio"]
+
+[node name="AuthoringStudio" type="MarginContainer"]
+custom_minimum_size = Vector2(960, 520)
+theme_override_constants/margin_left = 8
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 8
+theme_override_constants/margin_bottom = 8
+script = ExtResource("1_studio")
+

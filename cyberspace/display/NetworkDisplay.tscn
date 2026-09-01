@@ -1,0 +1,442 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://cyberspace/display/NetworkDisplay.gd" id="1_display"]
+
+[sub_resource type="StyleBoxFlat" id="Style_panel"]
+bg_color = Color(0.008, 0.025, 0.045, 0.94)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.12, 0.58, 0.7, 0.55)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="NetworkDisplay" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_display")
+
+[node name="Void" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.002, 0.008, 0.018, 1)
+show_behind_parent = true
+
+[node name="LinkLayer" type="Node2D" parent="."]
+unique_name_in_owner = true
+
+[node name="NodeLayer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Header" type="VBoxContainer" parent="."]
+visible = false
+layout_mode = 0
+offset_left = 28.0
+offset_top = 18.0
+offset_right = 650.0
+offset_bottom = 74.0
+mouse_filter = 2
+
+[node name="LocationLabel" type="Label" parent="Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "CURRENT HOST  //  INITIALIZING"
+
+[node name="ResourceLabel" type="Label" parent="Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.6)
+theme_override_font_sizes/font_size = 12
+text = "TRAVERSAL UNITS  --"
+
+[node name="StatusLabel" type="Label" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -260.0
+offset_top = -174.0
+offset_right = 260.0
+offset_bottom = -146.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
+theme_override_font_sizes/font_size = 14
+text = "SELECT A CONNECTED HOST"
+horizontal_alignment = 1
+
+[node name="ScanButton" type="Button" parent="."]
+visible = false
+unique_name_in_owner = true
+layout_mode = 0
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -67.0
+offset_right = -28.0
+offset_bottom = -28.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "SCAN LOCAL [1]"
+
+[node name="ServiceList" type="VBoxContainer" parent="."]
+visible = false
+unique_name_in_owner = true
+layout_mode = 0
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 28.0
+offset_top = -150.0
+offset_right = 238.0
+offset_bottom = -28.0
+grow_vertical = 0
+
+[node name="Title" type="Label" parent="ServiceList"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.65)
+theme_override_font_sizes/font_size = 11
+text = "LOCAL SERVICES // RIGHT CLICK GRAPH TO SCAN"
+
+[node name="TopBar" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 14.0
+anchor_right = 1.0
+offset_right = -16.0
+offset_bottom = 82.0
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="Margin" type="MarginContainer" parent="TopBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 8
+
+[node name="Columns" type="HBoxContainer" parent="TopBar/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 28
+
+[node name="TraceLabel" type="Label" parent="TopBar/Margin/Columns"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.302, 0.424, 1)
+theme_override_font_sizes/font_size = 17
+text = "TRACE 000"
+
+[node name="TickLabel" type="Label" parent="TopBar/Margin/Columns"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
+text = "TICK 000000"
+
+[node name="ObjectiveLabel" type="Label" parent="TopBar/Margin/Columns"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
+text = "OBJECTIVE // LOCATE AND EXTRACT FILE INDEX"
+horizontal_alignment = 1
+
+[node name="RiskLabel" type="Label" parent="TopBar/Margin/Columns"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
+text = "DEPTH 0  RISK 000"
+
+[node name="LeftPanel" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 94.0
+offset_right = 264.0
+anchor_bottom = 1.0
+offset_bottom = -154.0
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="Margin" type="MarginContainer" parent="LeftPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="Readout" type="VBoxContainer" parent="LeftPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="LeftPanel/Margin/Readout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.65)
+text = "CURRENT NODE"
+
+[node name="CurrentName" type="Label" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "--"
+autowrap_mode = 2
+
+[node name="CurrentType" type="Label" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "TYPE // --"
+
+[node name="CurrentSecurity" type="Label" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SECURITY // --"
+
+[node name="CurrentAuthority" type="Label" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "AUTHORITY // --"
+
+[node name="Divider" type="HSeparator" parent="LeftPanel/Margin/Readout"]
+layout_mode = 2
+
+[node name="ServicesLabel" type="Label" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SERVICES\n  NO DATA"
+autowrap_mode = 2
+
+[node name="ServiceButtons" type="VBoxContainer" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="LocalScanButton" type="Button" parent="LeftPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "[R] SCAN CURRENT"
+
+[node name="RightPanel" type="PanelContainer" parent="."]
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -304.0
+offset_top = 94.0
+offset_right = -16.0
+anchor_bottom = 1.0
+offset_bottom = -154.0
+grow_horizontal = 0
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="Margin" type="MarginContainer" parent="RightPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 12
+
+[node name="Readout" type="VBoxContainer" parent="RightPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="RightPanel/Margin/Readout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 0.75)
+text = "TARGET / SIGNAL"
+
+[node name="TargetTitle" type="Label" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
+theme_override_font_sizes/font_size = 17
+text = "NO TARGET"
+autowrap_mode = 2
+
+[node name="TargetDetails" type="Label" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(245, 100)
+layout_mode = 2
+text = "Select a node, service, signal, or link."
+autowrap_mode = 2
+
+[node name="TargetCost" type="Label" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.75)
+text = "ACTION COST // --"
+
+[node name="ActionButtons" type="HBoxContainer" parent="RightPanel/Margin/Readout"]
+layout_mode = 2
+
+[node name="ConfirmButton" type="Button" parent="RightPanel/Margin/Readout/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "[ENTER] EXECUTE"
+
+[node name="TargetScanButton" type="Button" parent="RightPanel/Margin/Readout/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "[R] SCAN"
+
+[node name="KnownEntities" type="VBoxContainer" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ConfrontationActions" type="GridContainer" parent="RightPanel/Margin/Readout"]
+layout_mode = 2
+columns = 3
+
+[node name="AttackButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ATTACK"
+
+[node name="DisruptButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "DISRUPT"
+
+[node name="SpoofButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SPOOF"
+
+[node name="HideButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "HIDE"
+
+[node name="ScrambleButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SCRAMBLE"
+
+[node name="RetreatButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RETREAT"
+
+[node name="BreakLockButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "BREAK LOCK"
+
+[node name="RedirectButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REDIRECT"
+
+[node name="ExploitButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "EXPLOIT"
+
+[node name="ExtractButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "EXTRACT"
+
+[node name="WaitButton" type="Button" parent="RightPanel/Margin/Readout/ConfrontationActions"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "WAIT"
+
+[node name="EventFeed" type="Label" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.65)
+theme_override_font_sizes/font_size = 10
+text = "EVENT FEED\n> SESSION READY"
+autowrap_mode = 2
+
+[node name="BottomBar" type="PanelContainer" parent="."]
+layout_mode = 0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 16.0
+offset_top = -138.0
+offset_right = -16.0
+offset_bottom = -14.0
+grow_vertical = 0
+theme_override_styles/panel = SubResource("Style_panel")
+
+[node name="Margin" type="MarginContainer" parent="BottomBar"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="Rows" type="VBoxContainer" parent="BottomBar/Margin"]
+layout_mode = 2
+
+[node name="Header" type="HBoxContainer" parent="BottomBar/Margin/Rows"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="BottomBar/Margin/Rows/Header"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
+text = "LOADED PROGRAMS"
+
+[node name="RamLabel" type="Label" parent="BottomBar/Margin/Rows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
+text = "RAM 03 / 08"
+
+[node name="ProgramCostLabel" type="Label" parent="BottomBar/Margin/Rows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
+text = "    ACTION COST --"
+
+[node name="Programs" type="HBoxContainer" parent="BottomBar/Margin/Rows"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Program1" type="Button" parent="BottomBar/Margin/Rows/Programs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[1] SCANNER"
+
+[node name="Program2" type="Button" parent="BottomBar/Margin/Rows/Programs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[2] SPOOF"
+
+[node name="Program3" type="Button" parent="BottomBar/Margin/Rows/Programs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[3] GHOST"
+
+[node name="Program4" type="Button" parent="BottomBar/Margin/Rows/Programs"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[4] DECRYPT"

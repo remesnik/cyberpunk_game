@@ -1,0 +1,122 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://debug/DebugOverlay.gd" id="1_debug"]
+
+[node name="DebugOverlay" type="CanvasLayer"]
+script = ExtResource("1_debug")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -404.0
+offset_top = 16.0
+offset_right = -16.0
+offset_bottom = 704.0
+grow_horizontal = 0
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+
+[node name="Readout" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+
+[node name="Title" type="Label" parent="Panel/Margin/Readout"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
+text = "ACTION CLOCK // F3"
+
+[node name="TickLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CYBER TICK: 000"
+
+[node name="RealtimeLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.97, 0.77, 1)
+text = "REALTIME SESSION: 00:00.00"
+
+[node name="PausePolicyLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.72, 1, 1)
+theme_override_font_sizes/font_size = 10
+text = "PAUSE POLICY: GAMEPLAY // CYBER ACTIVE // REALTIME ACTIVE // AUDIO ACTIVE"
+
+[node name="ActionLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "LAST ACTION  NONE"
+
+[node name="CostLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ACTION COST  0  //  TIME SPENT  0"
+
+[node name="EventsLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 42)
+layout_mode = 2
+text = "EVENTS (0)\n--"
+autowrap_mode = 2
+
+[node name="RealtimeProcessesLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 58)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.97, 0.77, 1)
+theme_override_font_sizes/font_size = 10
+text = "MEATSPACE PROCESSES // REALTIME\n--"
+
+[node name="DualPressureLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 72)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.55, 0.32, 1)
+theme_override_font_sizes/font_size = 10
+text = "DUAL PRESSURE // INDEPENDENT CLOCKS\nCYBER  TICK 000\nREAL   GUARD ARRIVAL IN 42.00s"
+autowrap_mode = 2
+
+[node name="TimelineColumns" type="HBoxContainer" parent="Panel/Margin/Readout"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="CyberTimelineLabel" type="Label" parent="Panel/Margin/Readout/TimelineColumns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
+theme_override_font_sizes/font_size = 9
+text = "CYBERSPACE EVENTS\n--"
+autowrap_mode = 2
+
+[node name="MeatspaceTimelineLabel" type="Label" parent="Panel/Margin/Readout/TimelineColumns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(170, 100)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.55, 0.32, 1)
+theme_override_font_sizes/font_size = 9
+text = "MEATSPACE EVENTS\n--"
+autowrap_mode = 2
+
+[node name="IceLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 54)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
+theme_override_font_sizes/font_size = 11
+text = "ICE TRUTH  |  PLAYER KNOWLEDGE\n--"
+autowrap_mode = 2
+
+[node name="WorldKnowledgeLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(350, 82)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.78)
+theme_override_font_sizes/font_size = 10
+text = "TRUE WORLD  |  PLAYER KNOWLEDGE\n--"

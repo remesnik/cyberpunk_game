@@ -1,0 +1,86 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/AlarmMonitor.gd" id="1_alarm"]
+
+[sub_resource type="StyleBoxFlat" id="Style_alarm"]
+bg_color = Color(0.025, 0.012, 0.018, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.3, 0.42, 0.72)
+
+[node name="AlarmMonitor" type="PanelContainer"]
+visible = false
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = 200.0
+offset_top = 94.0
+offset_right = 530.0
+offset_bottom = 304.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("Style_alarm")
+script = ExtResource("1_alarm")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Rows" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 5
+
+[node name="SummaryLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.42, 1)
+text = "ALARM MONITOR // ACTIVE 00"
+
+[node name="AlarmSelector" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="DetailLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 82)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
+text = "NO ALARM ENDPOINTS DISCOVERED"
+
+[node name="Commands" type="GridContainer" parent="Margin/Rows"]
+layout_mode = 2
+columns = 3
+
+[node name="AcknowledgeButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ACK"
+
+[node name="SilenceButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SILENCE"
+
+[node name="BypassButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "BYPASS"
+
+[node name="RestoreButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RESTORE"
+
+[node name="TriggerButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "TRIGGER"
+
+[node name="RecordButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RECORD LOG"

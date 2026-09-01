@@ -1,0 +1,64 @@
+; Engine configuration file.
+; Edit through Godot when possible.
+config_version=5
+
+[application]
+
+config/name="Cyberspace"
+run/main_scene="res://Main.tscn"
+
+[autoload]
+
+PausePolicy="*res://core/PausePolicy.gd"
+Game="*res://autoload/Game.gd"
+EventBus="*res://autoload/EventBus.gd"
+Debug="*res://autoload/Debug.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/window_width_override=1280
+window/size/window_height_override=720
+window/stretch/mode="canvas_items"
+
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/cyberspace_authoring/plugin.cfg")
+
+[input]
+
+interact={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":69)]
+}
+primary_action={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"button_index":1)]
+}
+secondary_action={
+"deadzone": 0.5,
+"events": [Object(InputEventMouseButton,"button_index":2)]
+}
+program_menu={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194308)]
+}
+network_map={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":77)]
+}
+pause={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194305)]
+}
+debug_toggle={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":4194330)]
+}
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+environment/defaults/default_clear_color=Color(0.004, 0.008, 0.02, 1)

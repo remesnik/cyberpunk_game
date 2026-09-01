@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="AuthoringEditorState" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://addons/cyberspace_authoring/editor_state/AuthoringEditorState.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+document_path = "res://data/authoring/server_facility_infiltration.tres"
+active_workspace = &"OPERATION"
+graph_positions = {&"PUBLIC_GATEWAY":Vector2(40,180),&"CORP_ROUTER":Vector2(270,180),&"SECURITY_NET":Vector2(500,180),&"CAMERA_SERVER":Vector2(760,20),&"ACCESS_CONTROL":Vector2(760,130),&"PBX_SERVER":Vector2(760,240),&"ALARM_CONTROLLER":Vector2(760,350)}
+graph_zoom = 1.0
+graph_scroll = Vector2(0,0)
+preview_profile = &"NEW_PLAYER"
+preview_realtime_speed = 1.0

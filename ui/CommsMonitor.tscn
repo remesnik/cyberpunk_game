@@ -1,0 +1,127 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/CommsMonitor.gd" id="1_monitor"]
+
+[sub_resource type="StyleBoxFlat" id="Style_monitor"]
+bg_color = Color(0.008, 0.025, 0.045, 0.96)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.31, 0.91, 0.7, 0.72)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
+
+[node name="CommsMonitor" type="PanelContainer"]
+visible = false
+custom_minimum_size = Vector2(330, 400)
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.0
+anchor_right = 0.5
+offset_left = -165.0
+offset_top = 94.0
+offset_right = 165.0
+offset_bottom = 494.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("Style_monitor")
+script = ExtResource("1_monitor")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Rows" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.97, 0.77, 1)
+text = "COMMS MONITOR"
+
+[node name="ChannelLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.34, 0.91, 1, 1)
+text = "NO CHANNEL"
+
+[node name="StatusLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
+text = "OFFLINE"
+
+[node name="AccessLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.72, 0.78, 1)
+theme_override_font_sizes/font_size = 10
+text = "MONITOR --\nINTERCEPT --\nRECORD --\nINJECT --"
+
+[node name="Transcript" type="RichTextLabel" parent="Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(300, 92)
+layout_mode = 2
+size_flags_vertical = 3
+bbcode_enabled = true
+scroll_following = true
+
+[node name="Controls" type="GridContainer" parent="Margin/Rows"]
+layout_mode = 2
+columns = 3
+
+[node name="MonitorButton" type="Button" parent="Margin/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MONITOR"
+
+[node name="ListenButton" type="Button" parent="Margin/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "LISTEN"
+
+[node name="StopButton" type="Button" parent="Margin/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "STOP"
+
+[node name="RecordButton" type="Button" parent="Margin/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RECORD"
+
+[node name="MarkButton" type="Button" parent="Margin/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "MARK"
+
+[node name="InjectButton" type="Button" parent="Margin/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "INJECT"
+
+[node name="OutboundTitle" type="Label" parent="Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.49, 0.97, 0.77, 1)
+text = "OUTBOUND // AUTHORED PBX TARGETS"
+
+[node name="OutboundTarget" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="OutboundChoice" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CallButton" type="Button" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "CALL // REALTIME"

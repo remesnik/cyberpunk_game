@@ -1,0 +1,91 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/PhysicalTeamMonitor.gd" id="1_team"]
+
+[sub_resource type="StyleBoxFlat" id="Style_team"]
+bg_color = Color(0.008, 0.022, 0.035, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(1, 0.8, 0.4, 0.72)
+
+[node name="PhysicalTeamMonitor" type="PanelContainer"]
+visible = false
+layout_mode = 0
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -366.0
+offset_top = 94.0
+offset_right = -140.0
+offset_bottom = 404.0
+grow_horizontal = 2
+theme_override_styles/panel = SubResource("Style_team")
+script = ExtResource("1_team")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Rows" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Title" type="Label" parent="Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
+text = "PHYSICAL TEAM MONITOR"
+
+[node name="TeamSelector" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Details" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.85, 0.88, 1)
+theme_override_font_sizes/font_size = 11
+text = "NO TEAM CONTACTS"
+
+[node name="EncounterLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.45, 0.36, 1)
+theme_override_font_sizes/font_size = 10
+text = "DOOR_12 // APPROACHING"
+
+[node name="RecordButton" type="Button" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "RECORD TELEMETRY"
+
+[node name="Decisions" type="GridContainer" parent="Margin/Rows"]
+layout_mode = 2
+columns = 2
+
+[node name="WaitButton" type="Button" parent="Margin/Rows/Decisions"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "WAIT"
+
+[node name="ForceButton" type="Button" parent="Margin/Rows/Decisions"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "FORCE ENTRY"
+
+[node name="AbortButton" type="Button" parent="Margin/Rows/Decisions"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "ABORT"
+
+[node name="AlternateButton" type="Button" parent="Margin/Rows/Decisions"]
+unique_name_in_owner = true
+layout_mode = 2
+disabled = true
+text = "ALT ROUTE"

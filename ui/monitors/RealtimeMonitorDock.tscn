@@ -1,0 +1,52 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/monitors/RealtimeMonitorDock.gd" id="1_dock"]
+
+[node name="RealtimeMonitorDock" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_dock")
+
+[node name="LeftDock" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 0
+offset_left = 276.0
+offset_top = 94.0
+offset_right = 584.0
+offset_bottom = 620.0
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="RightDock" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -644.0
+offset_top = 94.0
+offset_right = -316.0
+offset_bottom = 620.0
+grow_horizontal = 0
+mouse_filter = 2
+theme_override_constants/separation = 5
+
+[node name="BottomDock" type="HBoxContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 276.0
+offset_top = -430.0
+offset_right = -316.0
+offset_bottom = -150.0
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 5
+

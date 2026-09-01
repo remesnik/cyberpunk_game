@@ -1,0 +1,76 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/EquipmentOrderPanel.gd" id="1_orders"]
+
+[sub_resource type="StyleBoxFlat" id="Style_orders"]
+bg_color = Color(0.012, 0.018, 0.034, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.62, 0.4, 1, 0.72)
+
+[node name="EquipmentOrderPanel" type="PanelContainer"]
+layout_mode = 0
+offset_left = 16.0
+offset_top = 300.0
+offset_right = 264.0
+offset_bottom = 566.0
+theme_override_styles/panel = SubResource("Style_orders")
+script = ExtResource("1_orders")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 8
+
+[node name="Rows" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 4
+
+[node name="Title" type="Label" parent="Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.55, 1, 1)
+text = "EQUIPMENT ORDERING // FICTIONAL"
+
+[node name="CreditsLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "FICTIONAL CREDITS // 1000"
+
+[node name="VendorOption" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="EquipmentOption" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="DestinationOption" type="OptionButton" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="OrderRow" type="HBoxContainer" parent="Margin/Rows"]
+layout_mode = 2
+
+[node name="QuantitySpin" type="SpinBox" parent="Margin/Rows/OrderRow"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 1.0
+max_value = 5.0
+value = 1.0
+
+[node name="OrderButton" type="Button" parent="Margin/Rows/OrderRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "PLACE ORDER"
+
+[node name="TrackingLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.85, 0.88, 1)
+theme_override_font_sizes/font_size = 9
+text = "ACTIVE ORDERS\n--"

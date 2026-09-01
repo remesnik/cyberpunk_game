@@ -1,0 +1,12 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://cyberspace/display/NodeVisual.gd" id="1_node"]
+
+[node name="NodeVisual" type="Control"]
+custom_minimum_size = Vector2(210, 132)
+layout_mode = 3
+anchors_preset = 0
+offset_right = 210.0
+offset_bottom = 132.0
+mouse_filter = 0
+script = ExtResource("1_node")
