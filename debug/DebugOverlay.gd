@@ -12,11 +12,13 @@ extends CanvasLayer
 @onready var dual_pressure_label: Label = %DualPressureLabel
 @onready var cyber_timeline_label: Label = %CyberTimelineLabel
 @onready var meatspace_timeline_label: Label = %MeatspaceTimelineLabel
+@onready var close_button: Button = %CloseButton
 
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = Debug.overlay_visible
+	close_button.pressed.connect(_close_overlay)
 	EventBus.debug_visibility_changed.connect(_on_visibility_changed)
 	EventBus.action_resolved.connect(_on_action_resolved)
 	EventBus.session_started.connect(_update_ice_debug)
@@ -35,6 +37,10 @@ func _process(_delta: float) -> void:
 
 func _on_visibility_changed(is_visible: bool) -> void:
 	visible = is_visible
+
+
+func _close_overlay() -> void:
+	Debug.set_overlay_visible(false)
 
 func _on_action_resolved(request: ActionRequest, result: ActionResult) -> void:
 	tick_label.text = "CYBER TICK: %03d" % Game.action_clock.current_tick

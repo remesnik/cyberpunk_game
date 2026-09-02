@@ -1,0 +1,109 @@
+[gd_resource type="Resource" script_class="CreditsData" load_steps=21 format=3]
+
+[ext_resource type="Script" path="res://ui/frontend/credits_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://ui/frontend/credit_section.gd" id="2_section"]
+[ext_resource type="Script" path="res://ui/frontend/credit_entry.gd" id="3_entry"]
+
+[sub_resource type="Resource" id="Entry_development"]
+script = ExtResource("3_entry")
+name = "Adam Sangwin-Remesnik"
+role = "Creator / Developer"
+optional_note = "Credited in project copyright as Adam \"Brute\" Sangwin-Remesnik."
+
+[sub_resource type="Resource" id="Section_development"]
+script = ExtResource("2_section")
+heading = "DEVELOPMENT"
+entries = Array[Resource]([SubResource("Entry_development")])
+
+[sub_resource type="Resource" id="Entry_design"]
+script = ExtResource("3_entry")
+name = "Adam Sangwin-Remesnik"
+role = "Game and systems design"
+
+[sub_resource type="Resource" id="Section_design"]
+script = ExtResource("2_section")
+heading = "DESIGN"
+entries = Array[Resource]([SubResource("Entry_design")])
+
+[sub_resource type="Resource" id="Entry_godot"]
+script = ExtResource("3_entry")
+name = "Godot Engine"
+role = "Game engine"
+optional_url = "https://godotengine.org/"
+optional_note = "Licensed under the MIT License."
+
+[sub_resource type="Resource" id="Section_engine"]
+script = ExtResource("2_section")
+heading = "ENGINE"
+entries = Array[Resource]([SubResource("Entry_godot")])
+
+[sub_resource type="Resource" id="Entry_blender"]
+script = ExtResource("3_entry")
+name = "Blender"
+role = "Modeling / art tool"
+optional_url = "https://www.blender.org/"
+
+[sub_resource type="Resource" id="Section_art_tools"]
+script = ExtResource("2_section")
+heading = "MODELING / ART TOOLS"
+entries = Array[Resource]([SubResource("Entry_blender")])
+
+[sub_resource type="Resource" id="Entry_bitwig"]
+script = ExtResource("3_entry")
+name = "Bitwig Studio"
+role = "Audio production tool"
+optional_url = "https://www.bitwig.com/"
+
+[sub_resource type="Resource" id="Section_audio_tools"]
+script = ExtResource("2_section")
+heading = "AUDIO TOOLS"
+entries = Array[Resource]([SubResource("Entry_bitwig")])
+
+[sub_resource type="Resource" id="Entry_gdscript"]
+script = ExtResource("3_entry")
+name = "GDScript"
+role = "Runtime and editor-tool scripting"
+optional_url = "https://docs.godotengine.org/"
+
+[sub_resource type="Resource" id="Section_third_party"]
+script = ExtResource("2_section")
+heading = "THIRD-PARTY SOFTWARE"
+entries = Array[Resource]([SubResource("Entry_gdscript")])
+
+[sub_resource type="Resource" id="Entry_thanks"]
+script = ExtResource("3_entry")
+name = "Early players and collaborators"
+role = "Testing and feedback"
+
+[sub_resource type="Resource" id="Section_thanks"]
+script = ExtResource("2_section")
+heading = "SPECIAL THANKS"
+entries = Array[Resource]([SubResource("Entry_thanks")])
+
+[sub_resource type="Resource" id="Entry_project_license"]
+script = ExtResource("3_entry")
+name = "Game source and original content"
+role = "Proprietary"
+optional_note = "Copyright Adam \"Brute\" Sangwin-Remesnik. All rights reserved."
+
+[sub_resource type="Resource" id="Entry_godot_license"]
+script = ExtResource("3_entry")
+name = "Godot Engine"
+role = "MIT License"
+optional_url = "https://godotengine.org/license/"
+optional_note = "Godot attribution and license information can be updated independently of the scene."
+
+[sub_resource type="Resource" id="Section_licenses"]
+script = ExtResource("2_section")
+heading = "LICENSES"
+entries = Array[Resource]([SubResource("Entry_project_license"), SubResource("Entry_godot_license")])
+
+[resource]
+script = ExtResource("1_data")
+record_id = &"CYBERSPACE_CREDITS"
+display_title = "CREDITS"
+revision = "BUILD RECORD // 2026"
+sections = Array[Resource]([SubResource("Section_development"), SubResource("Section_design"), SubResource("Section_engine"), SubResource("Section_art_tools"), SubResource("Section_audio_tools"), SubResource("Section_third_party"), SubResource("Section_thanks"), SubResource("Section_licenses")])
+end_event_enabled = true
+end_event_lines = [{"delay":0.0,"text":"CONNECTION TERMINATED.","style":&"STATUS"},{"delay":1.6,"text":"...","style":&"SYSTEM"},{"delay":3.0,"text":"UNKNOWN NODE DETECTED","style":&"WARNING"}]
+end_event_return_prompt = "PRESS BACK TO RETURN"

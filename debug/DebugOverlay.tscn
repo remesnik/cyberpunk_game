@@ -28,6 +28,13 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
 text = "ACTION CLOCK // F3"
 
+[node name="CloseButton" type="Button" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "CLOSE DEBUG PANEL"
+tooltip_text = "Hide this development-only overlay. F3 can show it again."
+
 [node name="TickLabel" type="Label" parent="Panel/Margin/Readout"]
 unique_name_in_owner = true
 layout_mode = 2

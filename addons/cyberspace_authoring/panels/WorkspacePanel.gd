@@ -45,5 +45,4 @@ func _show_mode() -> void:
 	if _active.has_signal("document_changed"): _active.document_changed.connect(document_changed.emit)
 	if _active is NetworkGraphWorkspace: _active.set_models(document, editor_state)
 	elif _active.has_method("set_document"): _active.set_document(document)
-	if _active is AuthoringContentWorkspace and _mode == &"CONTENT": _active.set_collections([&"graffiti", &"flavor_text", &"services"] as Array[StringName])
-
+	if _active is AuthoringContentWorkspace and _mode == &"CONTENT": _active.set_collections([&"program_definitions", &"rewards", &"hidden_caches", &"objectives", &"graffiti", &"flavor_text", &"services"] as Array[StringName])

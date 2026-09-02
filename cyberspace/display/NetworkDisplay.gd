@@ -42,6 +42,10 @@ const AMBER := Color("ffc857")
 @onready var exploit_button: Button = %ExploitButton
 @onready var extract_button: Button = %ExtractButton
 @onready var wait_button: Button = %WaitButton
+@onready var doorstop_button: Button = %DoorstopButton
+@onready var doorstop_confirmation: ConfirmationDialog = %DoorstopConfirmation
+@onready var jack_out_button: Button = %JackOutButton
+@onready var doorstop_state_label: Label = %DoorstopStateLabel
 
 var graph: NetworkGraph
 var position_model: PlayerNetworkPosition
@@ -54,6 +58,7 @@ var target_order: Array[StringName] = []
 var selected_target_id: StringName = &""
 var event_lines: PackedStringArray = ["> SESSION READY"]
 var _transition_active := false
+var _pending_doorstop_instance_id: StringName = &""
 
 func _ready() -> void:
 	resized.connect(_on_resized)
@@ -62,6 +67,7 @@ func _ready() -> void:
 	EventBus.network_position_changed.connect(_on_position_changed)
 	EventBus.network_display_update_requested.connect(_on_display_update_requested)
 	EventBus.action_resolved.connect(_on_action_resolved)
+	EventBus.game_domain_changed.connect(_on_game_domain_changed)
 	scan_button.pressed.connect(_on_scan_pressed)
 	local_scan_button.pressed.connect(_on_scan_pressed)
 	confirm_button.pressed.connect(_confirm_selected_target)
@@ -80,6 +86,9 @@ func _ready() -> void:
 	exploit_button.pressed.connect(_submit_mission_action.bind(ActionRequest.ActionType.EXPLOIT))
 	extract_button.pressed.connect(_submit_mission_action.bind(ActionRequest.ActionType.TRANSFER))
 	wait_button.pressed.connect(_submit_wait)
+	doorstop_confirmation.confirmed.connect(_confirm_doorstop_deployment)
+	doorstop_confirmation.canceled.connect(_cancel_doorstop_deployment)
+	jack_out_button.pressed.connect(_jack_out_through_doorstop)
 	if Game.session_active:
 		_on_session_started()
 	queue_redraw()
@@ -149,6 +158,7 @@ func _rebuild_neighborhood() -> void:
 	_rebuild_known_entities(current_id, contacts)
 	_update_current_panel(current_view)
 	_update_top_bar()
+	_update_program_bar()
 	_clear_target_panel()
 
 func _add_node_visual(node_view: Dictionary, center: Vector2, current: bool, selectable: bool) -> void:
@@ -210,6 +220,15 @@ func _rebuild_known_entities(current_node_id: StringName, contacts: Array[Dictio
 		known_entities.add_child(button)
 		var ice_target := {"kind": &"ICE", "contact_id": contact_id}
 		target_views[contact_id] = {"kind": &"ICE", "title": record.get("display_name", "SECURITY PROCESS"), "ice": record, "confrontation_target": ice_target, "scan_target": {"kind": ScanSystem.ICE_SIGNAL, "contact_id": contact_id}}
+		target_order.append(contact_id)
+	for hacker: Dictionary in knowledge.get_visible_hackers_at(locally_known_nodes):
+		var contact_id: StringName = hacker.contact_id
+		var button := Button.new()
+		button.text = "HACKER // %s [%s]" % [String(hacker.get("callsign", hacker.get("display_name", "REMOTE"))), "LOCAL" if hacker.get("node_id", &"") == current_node_id else "ADJACENT"]
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.pressed.connect(func() -> void: _select_target(contact_id))
+		known_entities.add_child(button)
+		target_views[contact_id] = {"kind": &"HACKER", "title": hacker.get("callsign", "REMOTE HACKER"), "hacker": hacker}
 		target_order.append(contact_id)
 
 func _on_node_selected(node_id: StringName) -> void:
@@ -312,6 +331,11 @@ func _select_target(target_id: StringName) -> void:
 		details.append("POSITION // %s" % String(ice.get("node_id", "UNKNOWN")))
 		details.append("STATE // %s" % IceState.label(int(ice.get("state", IceState.Value.DORMANT))))
 		details.append("KNOWLEDGE // %s" % KnowledgeLevel.label(int(ice.get("level", KnowledgeLevel.Value.UNKNOWN))))
+	elif kind == &"HACKER":
+		var hacker: Dictionary = view.hacker
+		details.append("POSITION // %s" % String(hacker.get("node_id", "UNKNOWN")))
+		details.append("RELATION // %s" % String(hacker.get("relationship", "UNKNOWN")))
+		details.append("FACTION // %s" % String(hacker.get("faction", "UNKNOWN")))
 	else:
 		details.append("IDENTITY // UNRESOLVED")
 		details.append("SCAN REQUIRED")
@@ -375,12 +399,82 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			else: _scan_selected_target()
 		KEY_BACKSPACE:
 			_clear_target_panel()
-		KEY_1, KEY_2, KEY_3, KEY_4:
+		KEY_J:
+			_jack_out_through_doorstop()
+		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
 			_on_program_selected(int(event.physical_keycode - KEY_1 + 1))
 
 func _on_program_selected(slot: int) -> void:
+	if slot == 5:
+		_request_doorstop_confirmation()
+		return
 	var names := ["SCANNER", "SPOOF", "GHOST", "DECRYPT"]
 	status_label.text = "PROGRAM SLOT %d // %s SELECTED" % [slot, names[slot - 1]]
+
+
+func _request_doorstop_confirmation() -> void:
+	var installed := Game.installed_doorstop_instance_ids()
+	if installed.is_empty():
+		status_label.text = "DOORSTOP UNAVAILABLE // NO INSTALLED COPY"
+		Game.notify_doorstop_invalid("No Doorstop copy is installed in the active deck.")
+		_flash_status()
+		return
+	_pending_doorstop_instance_id = installed[0]
+	Game.set_modal_action_selection_unresolved(true)
+	var node := graph.get_node(position_model.current_node_id) if graph != null and position_model != null else null
+	var node_label := node.display_name if node != null else String(position_model.current_node_id)
+	doorstop_confirmation.dialog_text = "DEPLOY DOORSTOP?\nDisposable Backdoor Utility\n\nAnchor temporary backdoor to:\n%s\n\nTHIS COPY WILL BE DESTROYED.\nJacking back in consumes and closes the route." % node_label
+	doorstop_confirmation.popup_centered(Vector2i(500, 240))
+
+
+func _confirm_doorstop_deployment() -> void:
+	# Confirmation resolves the modal before authoritative deployment validation.
+	Game.set_modal_action_selection_unresolved(false)
+	var instance_id := _pending_doorstop_instance_id
+	_pending_doorstop_instance_id = &""
+	var result := Game.request_doorstop_deployment(instance_id)
+	status_label.text = "DOORSTOP DEPLOYED // RETURN ROUTE ARMED" if result.success else "DOORSTOP DENIED // %s" % result.reason.to_upper()
+	if not result.success:
+		_flash_status()
+	_update_program_bar()
+
+
+func _cancel_doorstop_deployment() -> void:
+	_pending_doorstop_instance_id = &""
+	Game.set_modal_action_selection_unresolved(false)
+	status_label.text = "DOORSTOP DEPLOYMENT CANCELLED"
+
+
+func _update_program_bar() -> void:
+	if doorstop_button == null:
+		return
+	var installed := Game.installed_doorstop_instance_ids()
+	if not installed.is_empty():
+		var instance := Game.program_inventory.get_instance(installed[0])
+		doorstop_button.text = "[5] DOORSTOP %s // DISPOSABLE" % instance.definition.version
+	else:
+		doorstop_button.text = "[5] DOORSTOP // NO COPY INSTALLED"
+	doorstop_button.tooltip_text = "Disposable Backdoor Utility. Deployment destroys one specific copy."
+	doorstop_button.disabled = installed.is_empty()
+	var anchor := Game.doorstop_controller.get_anchor(Game.intrusion_run_id) if Game.doorstop_controller != null else null
+	jack_out_button.disabled = anchor == null or not anchor.active
+	if anchor != null and anchor.active:
+		var node := Game.network_graph.get_node(anchor.cyberspace_node_id)
+		doorstop_state_label.text = "BACKDOOR ACTIVE // %s // ONE RETURN" % (node.display_name.to_upper() if node != null else anchor.cyberspace_node_id)
+	else:
+		doorstop_state_label.text = "BACKDOOR // CLOSED"
+
+
+func _jack_out_through_doorstop() -> void:
+	var result: Dictionary = Game.jack_out_through_doorstop()
+	if not result.success:
+		status_label.text = "JACK OUT DENIED // %s" % String(result.reason).to_upper()
+		Game.notify_doorstop_invalid(result.reason)
+		_flash_status()
+
+
+func _on_game_domain_changed(_previous_domain: int, current_domain: int) -> void:
+	visible = current_domain == Game.GameDomain.CYBERSPACE
 
 func _submit_selected_confrontation(action_type: ActionRequest.ActionType) -> void:
 	if selected_target_id == &"" or not target_views.has(selected_target_id):
@@ -471,6 +565,7 @@ func _event_description(event: Dictionary) -> String:
 		&"PLAYER_SIGNAL_ACQUIRED": return "ICE ACQUIRED PLAYER SIGNAL"
 		&"PLAYER_DETECTED": return "ICE DETECTION CONFIRMED"
 		&"TRACE_UPDATED": return "TRACE %+d // TOTAL %d" % [int(event.get("increase", 0)), int(event.get("trace", 0))]
+		&"DOORSTOP_DEPLOYED": return "DOORSTOP ARMED // %s" % event.get("node_id", &"UNKNOWN")
 		&"ICE_INTEGRITY_DAMAGED": return "ICE PROCESS DAMAGED // %d REMAINS" % int(event.get("remaining", 0))
 		_: return String(event.get("type", &"NETWORK EVENT")).replace("_", " ")
 

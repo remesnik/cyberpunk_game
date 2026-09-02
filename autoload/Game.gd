@@ -36,6 +36,17 @@ const OperationPressureManagerScript := preload("res://core/operations/Operation
 const OperationPressureDefinitionScript := preload("res://core/operations/OperationPressureDefinition.gd")
 const EvidenceArchiveScript := preload("res://core/evidence/EvidenceArchive.gd")
 const RealtimeStoryRouterScript := preload("res://core/story/RealtimeStoryRouter.gd")
+const ProgramInventoryScript := preload("res://programs/ProgramInventory.gd")
+const ProgramLoadoutScript := preload("res://programs/ProgramLoadout.gd")
+const ProgramInstanceScript := preload("res://programs/ProgramInstance.gd")
+const DoorstopDefinitionScript := preload("res://programs/doorstop/DoorstopDefinition.gd")
+const DoorstopControllerScript := preload("res://programs/doorstop/DoorstopController.gd")
+const IntrusionSessionScript := preload("res://core/intrusion/IntrusionSession.gd")
+const MeatspaceManagementScript := preload("res://core/meatspace/MeatspaceManagement.gd")
+const DoorstopSuspensionPolicyScript := preload("res://programs/doorstop/DoorstopSuspensionPolicy.gd")
+const SuspendedIntrusionAdvancerScript := preload("res://programs/doorstop/SuspendedIntrusionAdvancer.gd")
+
+enum GameDomain { CYBERSPACE, MEATSPACE }
 
 var session_active := false
 var network_graph: NetworkGraph
@@ -63,6 +74,7 @@ var story_graffiti: Array[Dictionary] = []
 var realtime_event_log: Array[Dictionary] = []
 var last_video_action_result: VideoFeedActionResult
 var ice_controller: IceController
+var hacker_npc_manager: HackerNPCManager
 var scan_system: ScanSystem
 var last_scan_result: ScanResult
 var progression_controller: GraphProgressionController
@@ -77,6 +89,26 @@ var confrontation_controller: ConfrontationController
 var last_confrontation_result: ConfrontationResult
 var mission: Variant
 var facility_scenario: FacilityOperationScenario
+var program_inventory: ProgramInventory
+var program_loadout: ProgramLoadout
+var doorstop_controller: DoorstopController
+var intrusion_run_id: StringName = &""
+var unresolved_modal_action_selection := false
+var jack_out_prohibited := false
+var _intrusion_sequence := 0
+var intrusion_session: IntrusionSession
+var game_domain: GameDomain = GameDomain.CYBERSPACE
+var meatspace_management: MeatspaceManagement
+var doorstop_programming_definition: DoorstopDefinition
+var doorstop_suspension_policy: DoorstopSuspensionPolicy
+var suspended_intrusion_advancer: SuspendedIntrusionAdvancer
+var suspended_security_level := 0
+var temporary_cyberspace_effects: Array[Dictionary] = []
+var suspended_intrusion_events: Array[Dictionary] = []
+var suspended_replacement_ice_factory: Callable
+var suspended_node_process_advancer: Callable
+var doorstop_acquisition_help_shown := false
+var doorstop_deployment_help_shown := false
 
 
 func start_session() -> void:
@@ -100,9 +132,15 @@ func start_session() -> void:
 	_create_debug_realtime_timeline()
 	_create_debug_operation_pressure()
 	_create_debug_realtime_story()
+	_create_program_loadout()
 	ice_controller = IceController.new(network_graph, player_network_position, player_knowledge)
 	FacilityOperationFactory.populate_ice(ice_controller)
 	player_knowledge.detect_ice(&"FACILITY_SENTINEL_01")
+	hacker_npc_manager = HackerNPCManager.new()
+	hacker_npc_manager.name = "HackerNPCManager"
+	add_child(hacker_npc_manager)
+	hacker_npc_manager.configure(network_graph, player_network_position, player_knowledge)
+	hacker_npc_manager.display_update_requested.connect(EventBus.network_display_update_requested.emit)
 	scan_system = ScanSystem.new(network_graph, player_network_position, player_knowledge, ice_controller, realtime_process_manager.endpoints, realtime_process_manager.processes)
 	progression_controller = GraphProgressionController.new(network_graph, player_network_position, player_knowledge)
 	resource_state = PlayerResourceState.new()
@@ -123,6 +161,46 @@ func start_session() -> void:
 	EventBus.session_started.emit()
 
 
+func _create_program_loadout() -> void:
+	_intrusion_sequence += 1
+	intrusion_run_id = StringName("INTRUSION_%06d" % _intrusion_sequence)
+	intrusion_session = IntrusionSessionScript.new(intrusion_run_id)
+	game_domain = GameDomain.CYBERSPACE
+	program_inventory = ProgramInventoryScript.new()
+	program_inventory.instance_added.connect(_on_program_instance_added)
+	program_loadout = ProgramLoadoutScript.new(5)
+	var standard = DoorstopDefinitionScript.new(&"DOORSTOP_STANDARD", "Doorstop", "1.0")
+	doorstop_programming_definition = standard
+	standard.rarity = &"UNCOMMON"
+	standard.programming_recipe = {&"MEMORY_SHARD": 2, &"ROUTING_KERNEL": 1}
+	standard.programming_requirements = {&"capability": &"ROOTKIT"}
+	standard.programming_duration = 4.0
+	var reserve = DoorstopDefinitionScript.new(&"DOORSTOP_GHOST", "Doorstop Ghost", "2.0")
+	reserve.rarity = &"RARE"
+	reserve.programming_recipe = {&"MEMORY_SHARD": 3, &"ROUTING_KERNEL": 1, &"GHOST_SIGNATURE": 1}
+	reserve.programming_requirements = {&"capability": &"GHOST"}
+	reserve.programming_duration = 8.0
+	reserve.trace_modifiers = {&"deployment_trace": -1}
+	reserve.security_modifiers = {&"suspicion": 0}
+	program_inventory.add_instance(ProgramInstanceScript.new(&"DOORSTOP_INSTANCE_001", standard))
+	program_inventory.add_instance(ProgramInstanceScript.new(&"DOORSTOP_INSTANCE_002", standard))
+	program_inventory.add_instance(ProgramInstanceScript.new(&"DOORSTOP_GHOST_INSTANCE_001", reserve))
+	program_loadout.install(&"DOORSTOP_INSTANCE_001", program_inventory)
+	doorstop_controller = DoorstopControllerScript.new(program_inventory, program_loadout)
+	doorstop_suspension_policy = DoorstopSuspensionPolicyScript.forgiving()
+	suspended_intrusion_advancer = SuspendedIntrusionAdvancerScript.new()
+	suspended_security_level = 0
+	temporary_cyberspace_effects.clear()
+	suspended_intrusion_events.clear()
+	suspended_replacement_ice_factory = Callable()
+	suspended_node_process_advancer = Callable()
+	meatspace_management = MeatspaceManagementScript.new()
+	meatspace_management.configure(program_inventory, program_loadout, equipment_order_manager, realtime_world_clock)
+	meatspace_management.software_programming.add_resource(&"MEMORY_SHARD", 12)
+	meatspace_management.software_programming.add_resource(&"ROUTING_KERNEL", 6)
+	meatspace_management.software_programming.add_resource(&"GHOST_SIGNATURE", 2)
+
+
 func end_session() -> void:
 	session_active = false
 	if realtime_world_clock != null:
@@ -133,6 +211,9 @@ func end_session() -> void:
 	action_clock = null
 	cyberspace_clock = null
 	ice_controller = null
+	if hacker_npc_manager != null:
+		hacker_npc_manager.queue_free()
+	hacker_npc_manager = null
 	scan_system = null
 	last_scan_result = null
 	progression_controller = null
@@ -146,6 +227,23 @@ func end_session() -> void:
 	confrontation_controller = null
 	last_confrontation_result = null
 	mission = null
+	program_inventory = null
+	program_loadout = null
+	doorstop_controller = null
+	intrusion_run_id = &""
+	intrusion_session = null
+	game_domain = GameDomain.CYBERSPACE
+	meatspace_management = null
+	doorstop_programming_definition = null
+	doorstop_suspension_policy = null
+	suspended_intrusion_advancer = null
+	suspended_security_level = 0
+	temporary_cyberspace_effects.clear()
+	suspended_intrusion_events.clear()
+	suspended_replacement_ice_factory = Callable()
+	suspended_node_process_advancer = Callable()
+	unresolved_modal_action_selection = false
+	jack_out_prohibited = false
 	if facility_scenario != null:
 		facility_scenario.queue_free()
 		facility_scenario = null
@@ -601,6 +699,8 @@ func request_traversal(destination_node_id: StringName) -> ActionResult:
 func request_action(request: ActionRequest) -> ActionResult:
 	if not session_active or action_clock == null:
 		return ActionResult.new(false, 0, "No active simulation clock.")
+	if intrusion_session == null or intrusion_session.lifecycle != IntrusionSession.Lifecycle.ACTIVE or game_domain != GameDomain.CYBERSPACE:
+		return ActionResult.new(false, 0, "Cyberspace intrusion is not active.")
 	if not PausePolicy.allows_cyberspace_actions():
 		return ActionResult.new(false, 0, "Cyberspace actions are frozen during %s." % PausePolicy.mode_label())
 	var result := action_clock.resolve_action(request, _validate_action, _apply_action)
@@ -657,6 +757,259 @@ func request_video_feed_action(feed_id: StringName, command: VideoFeedActionDefi
 		return ActionResult.new(false, 0, "Unknown video feed command.")
 	return request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.USE_PROGRAM, {"feed_id": feed_id, "command": command}, definition.cyber_cost, {"system": &"VIDEO_FEED"}))
 
+
+func set_modal_action_selection_unresolved(unresolved: bool) -> void:
+	unresolved_modal_action_selection = unresolved
+
+
+func set_jack_out_prohibited(prohibited: bool) -> void:
+	jack_out_prohibited = prohibited
+
+
+func request_doorstop_deployment(program_instance_id: StringName) -> ActionResult:
+	var result := request_action(ActionRequest.new(
+		&"PLAYER",
+		ActionRequest.ActionType.USE_PROGRAM,
+		{"program_instance_id": program_instance_id},
+		1,
+		{"system": &"DOORSTOP"}
+	))
+	if not result.success:
+		notify_doorstop_invalid(result.reason)
+	return result
+
+
+func notify_doorstop_invalid(reason: String) -> void:
+	_emit_doorstop_feedback(&"INVALID", "DOORSTOP UNAVAILABLE", reason)
+
+
+func _on_program_instance_added(instance: ProgramInstance) -> void:
+	if instance == null or not instance.definition is DoorstopDefinition:
+		return
+	var help := ""
+	if not doorstop_acquisition_help_shown:
+		doorstop_acquisition_help_shown = true
+		help = "DOORSTOP is a disposable emergency backdoor. Install a specific copy in your deck, deploy it at a network node, then burn that copy to hold one temporary return route. Existing trace and network consequences remain."
+	_emit_doorstop_feedback(&"ACQUIRED", "DOORSTOP ACQUIRED", "%s %s // Disposable Backdoor Utility" % [instance.definition.display_name, instance.definition.version], help)
+
+
+func _emit_doorstop_feedback(kind: StringName, title: String, message: String, help_text: String = "") -> void:
+	EventBus.doorstop_feedback.emit({"kind": kind, "title": title, "message": message, "help_text": help_text})
+
+
+func installed_doorstop_instance_ids() -> Array[StringName]:
+	var result: Array[StringName] = []
+	if program_loadout == null or program_inventory == null:
+		return result
+	for instance_id: StringName in program_loadout.installed_instance_ids:
+		var instance := program_inventory.get_instance(instance_id)
+		if instance != null and instance.definition is DoorstopDefinition:
+			result.append(instance_id)
+	return result
+
+
+func _doorstop_deployment_context() -> Dictionary:
+	var node_id := player_network_position.current_node_id if player_network_position != null else &""
+	return {
+		"node_id": node_id,
+		"node_is_valid": network_graph != null and network_graph.get_node(node_id) != null,
+		"node_transition_unresolved": player_network_position == null or player_network_position.is_transitioning,
+		"modal_action_unresolved": unresolved_modal_action_selection,
+		"jack_out_prohibited": jack_out_prohibited,
+	}
+
+
+func jack_out_through_doorstop() -> Dictionary:
+	if not session_active or intrusion_session == null:
+		return {"success": false, "reason": "No active intrusion."}
+	if intrusion_session.lifecycle != IntrusionSession.Lifecycle.ACTIVE:
+		return {"success": false, "reason": "Intrusion is not active."}
+	if player_network_position == null or player_network_position.is_transitioning:
+		return {"success": false, "reason": "Cannot Jack Out during a node transition."}
+	if unresolved_modal_action_selection:
+		return {"success": false, "reason": "Resolve the current modal or action selection first."}
+	if jack_out_prohibited:
+		return {"success": false, "reason": "This encounter prohibits Jack Out."}
+	var anchor := doorstop_controller.get_anchor(intrusion_run_id) if doorstop_controller != null else null
+	if anchor == null or not anchor.active:
+		return {"success": false, "reason": "No active Doorstop return point exists."}
+	var previous_lifecycle: int = intrusion_session.lifecycle
+	var state := _capture_intrusion_resume_state(anchor)
+	var realtime_marker: float = float(realtime_world_clock.elapsed_seconds) if realtime_world_clock != null else 0.0
+	var suspension: Dictionary = intrusion_session.suspend_at_doorstop(anchor, realtime_marker, state)
+	if not suspension.success:
+		return suspension
+	var previous_domain: int = game_domain
+	game_domain = GameDomain.MEATSPACE
+	EventBus.intrusion_lifecycle_changed.emit(intrusion_run_id, previous_lifecycle, intrusion_session.lifecycle)
+	EventBus.game_domain_changed.emit(previous_domain, game_domain)
+	_emit_doorstop_feedback(&"SUSPENDED", "CONNECTION SUSPENDED", "Backdoor remains open.\nReturn node: %s" % anchor.cyberspace_node_id)
+	return {
+		"success": true,
+		"reason": "Intrusion suspended. Doorstop return route remains active.",
+		"lifecycle": intrusion_session.lifecycle,
+		"domain": game_domain,
+		"anchor": anchor,
+	}
+
+
+func advance_suspended_security_time(seconds: float) -> bool:
+	return advance_suspended_intrusion(seconds).get("success", false)
+
+
+func configure_doorstop_suspension_policy(policy: DoorstopSuspensionPolicy, replacement_ice_factory: Callable = Callable(), node_process_advancer: Callable = Callable()) -> bool:
+	if policy == null:
+		return false
+	doorstop_suspension_policy = policy
+	suspended_replacement_ice_factory = replacement_ice_factory
+	suspended_node_process_advancer = node_process_advancer
+	return true
+
+
+func advance_suspended_intrusion(elapsed_seconds: float = -1.0) -> Dictionary:
+	if intrusion_session == null or suspended_intrusion_advancer == null:
+		return {"success": false, "reason": "No suspended intrusion service is available."}
+	var elapsed := elapsed_seconds
+	if elapsed < 0.0:
+		var now: float = float(realtime_world_clock.elapsed_seconds) if realtime_world_clock != null else intrusion_session.suspension_advanced_through
+		elapsed = maxf(0.0, now - intrusion_session.suspension_advanced_through)
+	var result := suspended_intrusion_advancer.advance_suspended_intrusion(intrusion_session, doorstop_suspension_policy, elapsed, {
+		"trace": trace_level,
+		"alarm_manager": physical_alarm_manager,
+		"ice_controller": ice_controller,
+		"security_level": suspended_security_level,
+		"temporary_effects": temporary_cyberspace_effects,
+		"spawn_replacement_ice": suspended_replacement_ice_factory,
+		"advance_node_processes": Callable(self, "_advance_suspended_node_processes"),
+	})
+	if result.success:
+		trace_level = int(result.trace)
+		suspended_security_level = int(result.security_level)
+		temporary_cyberspace_effects.assign(result.temporary_effects)
+		suspended_intrusion_events.append_array(result.events)
+		intrusion_session.suspension_advanced_through += elapsed
+	return result
+
+
+func _spawn_suspended_replacement_ice(_index: int) -> void:
+	if suspended_replacement_ice_factory.is_valid():
+		suspended_replacement_ice_factory.call(_index)
+
+
+func _advance_suspended_node_processes(seconds: float, node_id: StringName) -> void:
+	if suspended_node_process_advancer.is_valid():
+		suspended_node_process_advancer.call(seconds, node_id)
+	suspended_intrusion_events.append({"type": &"NODE_LOCAL_PROCESS_TIME", "seconds": seconds, "node_id": node_id})
+
+
+func suspended_doorstop_view() -> Dictionary:
+	if intrusion_session == null or not intrusion_session.can_resume_through_doorstop():
+		return {}
+	var anchor := intrusion_session.suspended_anchor
+	return {
+		"intrusion_run_id": intrusion_run_id,
+		"target_name": "HERMES INTERNAL NETWORK",
+		"return_node_id": anchor.cyberspace_node_id,
+		"deployed_at": anchor.deployment_marker,
+		"suspended_at": intrusion_session.suspended_at_realtime,
+	}
+
+
+func jack_back_in_through_doorstop() -> Dictionary:
+	if intrusion_session == null or game_domain != GameDomain.MEATSPACE:
+		return {"success": false, "reason": "No suspended Doorstop intrusion is available."}
+	if intrusion_session.lifecycle != IntrusionSession.Lifecycle.SUSPENDED_AT_DOORSTOP:
+		return {"success": false, "reason": "Intrusion is not suspended at Doorstop."}
+	var session_anchor := intrusion_session.suspended_anchor
+	var controller_anchor := doorstop_controller.get_anchor(intrusion_run_id) if doorstop_controller != null else null
+	if session_anchor == null or not session_anchor.active or controller_anchor != session_anchor:
+		return {"success": false, "reason": "Doorstop return route is missing or no longer belongs to this intrusion."}
+	if session_anchor.intrusion_run_id != intrusion_run_id:
+		return {"success": false, "reason": "Doorstop belongs to a different intrusion."}
+	if session_anchor.cyberspace_node_id != intrusion_session.resume_state.get("doorstop_node_id", &""):
+		return {"success": false, "reason": "Doorstop return node does not match the suspended intrusion."}
+	var consequence_result := advance_suspended_intrusion()
+	if not consequence_result.success:
+		return consequence_result
+	var previous_lifecycle: int = intrusion_session.lifecycle
+	var current_loadout: Array[StringName] = program_loadout.installed_instance_ids.duplicate()
+	var resume: Dictionary = intrusion_session.resume_through_doorstop(session_anchor, current_loadout)
+	if not resume.success:
+		return resume
+	var return_node_id: StringName = resume.node_id
+	if network_graph == null or network_graph.get_node(return_node_id) == null:
+		intrusion_session.lifecycle = previous_lifecycle
+		return {"success": false, "reason": "Doorstop return node is no longer valid."}
+	# The anchor is authoritative; callers cannot supply or select a destination.
+	player_network_position.relocate(return_node_id)
+	if not doorstop_controller.complete_return(intrusion_run_id, true):
+		intrusion_session.lifecycle = previous_lifecycle
+		return {"success": false, "reason": "Doorstop return route could not be consumed."}
+	intrusion_session.clear_consumed_return_route()
+	var previous_domain: int = game_domain
+	game_domain = GameDomain.CYBERSPACE
+	EventBus.intrusion_lifecycle_changed.emit(intrusion_run_id, previous_lifecycle, intrusion_session.lifecycle)
+	EventBus.game_domain_changed.emit(previous_domain, game_domain)
+	EventBus.network_display_update_requested.emit()
+	_emit_doorstop_feedback(&"REENTRY", "BACKDOOR RE-ENTRY", "Intrusion restored at %s." % return_node_id)
+	_emit_doorstop_feedback(&"CLOSED", "DOORSTOP CLOSED", "Temporary route destroyed. Deploy another Doorstop to create a new emergency exit.")
+	return {"success": true, "reason": "Intrusion resumed at Doorstop.", "node_id": return_node_id}
+
+
+func _capture_intrusion_resume_state(anchor: DoorstopAnchor) -> Dictionary:
+	var ice_state: Dictionary = {}
+	if ice_controller != null:
+		for ice_id in ice_controller.instances:
+			var ice: IceInstance = ice_controller.instances[ice_id]
+			ice_state[ice_id] = {
+				"current_node_id": ice.current_node_id,
+				"target_node_id": ice.target_node_id,
+				"state": ice.state,
+				"alert_level": ice.alert_level,
+				"known_player_position": ice.known_player_position,
+				"last_known_player_position": ice.last_known_player_position,
+			}
+	var link_state: Dictionary = {}
+	for link_id in network_graph.links:
+		var link: NetworkLinkDefinition = network_graph.links[link_id]
+		link_state[link_id] = {"locked": link.locked, "disabled": link.disabled, "hidden": link.hidden, "discovered": link.discovered, "traversal_cost": link.traversal_cost}
+	var alarm_state: Dictionary = {}
+	if physical_alarm_manager != null:
+		for alarm_id in physical_alarm_manager.instances:
+			var alarm: PhysicalAlarmInstance = physical_alarm_manager.instances[alarm_id]
+			alarm_state[alarm_id] = {
+				"state": alarm.state,
+				"detection_enabled": alarm.detection_enabled,
+				"alert_presenting": alarm.alert_presenting,
+				"underlying_condition_active": alarm.underlying_condition_active,
+			}
+	return {
+		"intrusion_run_id": intrusion_run_id,
+		"doorstop_node_id": anchor.cyberspace_node_id,
+		"current_node_id": player_network_position.current_node_id,
+		"previous_node_id": player_network_position.previous_node_id,
+		"cyber_tick": action_clock.current_tick,
+		"trace": trace_level,
+		"player_knowledge": {
+			"nodes": player_knowledge.node_records.duplicate(true),
+			"links": player_knowledge.link_records.duplicate(true),
+			"services": player_knowledge.service_records.duplicate(true),
+			"ice": player_knowledge.ice_records.duplicate(true),
+			"hackers": player_knowledge.hacker_records.duplicate(true),
+			"realtime_endpoints": player_knowledge.realtime_endpoint_records.duplicate(true),
+			"realtime_processes": player_knowledge.realtime_process_records.duplicate(true),
+		},
+		"network_links": link_state,
+		"story_flags": outbound_comms_manager.flags.duplicate(true) if outbound_comms_manager != null else {},
+		"story_router_flags": realtime_story_router.flags.duplicate(true) if realtime_story_router != null else {},
+		"volatile_resources": resource_state.volatile_resources.duplicate(true),
+		"stored_resources": resource_state.stored_resources.duplicate(true),
+		"mission_complete": mission.mission_complete if mission != null else false,
+		"exploited_services": mission.exploited_services.duplicate() if mission != null else [],
+		"ice": ice_state,
+		"alarms": alarm_state,
+	}
+
 func _bind_network_events() -> void:
 	network_graph.traversal_started.connect(EventBus.network_traversal_started.emit)
 	network_graph.traversal_completed.connect(EventBus.network_position_changed.emit)
@@ -665,6 +1018,7 @@ func _bind_network_events() -> void:
 	action_clock.tick_advanced.connect(func(_previous: int, _current: int, amount: int) -> void: EventBus.network_time_advanced.emit(amount))
 	action_clock.action_resolved.connect(EventBus.action_resolved.emit)
 	action_clock.action_resolved.connect(_on_action_resolved_team_support)
+	action_clock.action_resolved.connect(hacker_npc_manager.handle_player_action)
 
 
 func _on_action_resolved_team_support(_request: ActionRequest, result: ActionResult) -> void:
@@ -686,8 +1040,19 @@ func _validate_action(request: ActionRequest) -> Dictionary:
 		return {"success": true, "reason": "", "events": []}
 	match request.action_type:
 		ActionRequest.ActionType.USE_PROGRAM:
-			if request.metadata.get("system", &"") != &"VIDEO_FEED" or not request.target is Dictionary:
+			if not request.target is Dictionary:
 				return {"success": false, "reason": "Program action is malformed.", "events": []}
+			if request.metadata.get("system", &"") == &"DOORSTOP":
+				if doorstop_controller == null or request.cost != 1:
+					return {"success": false, "reason": "Doorstop deployment is unavailable.", "events": []}
+				var doorstop_validation: Dictionary = doorstop_controller.validate_deployment(
+					request.target.get("program_instance_id", &""), intrusion_run_id,
+					player_network_position.current_node_id if player_network_position != null else &"",
+					_doorstop_deployment_context()
+				)
+				return {"success": doorstop_validation.success, "reason": doorstop_validation.reason, "events": []}
+			if request.metadata.get("system", &"") != &"VIDEO_FEED":
+				return {"success": false, "reason": "Unknown program action.", "events": []}
 			var command: VideoFeedActionDefinition.Command = int(request.target.get("command", -1))
 			var video_validation: VideoFeedActionResult = video_feed_manager.validate_action(request.target.get("feed_id", &""), command)
 			if not video_validation.success:
@@ -744,6 +1109,29 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 		return {"success": last_confrontation_result.success, "reason": last_confrontation_result.reason, "events": last_confrontation_result.events}
 	match request.action_type:
 		ActionRequest.ActionType.USE_PROGRAM:
+			if request.metadata.get("system", &"") == &"DOORSTOP":
+				var deployment: Dictionary = doorstop_controller.deploy(
+					request.target.get("program_instance_id", &""), intrusion_run_id,
+					player_network_position.current_node_id, float(action_clock.current_tick),
+					{"trace": trace_level, "previous_node_id": player_network_position.previous_node_id},
+					_doorstop_deployment_context()
+				)
+				if not deployment.success:
+					return {"success": false, "reason": deployment.reason, "events": []}
+				var node := network_graph.get_node(player_network_position.current_node_id)
+				var node_label := node.display_name if node != null else String(player_network_position.current_node_id)
+				var help := ""
+				if not doorstop_deployment_help_shown:
+					doorstop_deployment_help_shown = true
+					help = "This specific Doorstop copy has been destroyed. The open backdoor can suspend this intrusion once and return you to this exact node once. Returning closes the route."
+				_emit_doorstop_feedback(&"DEPLOYED", "DOORSTOP DEPLOYED", "Backdoor anchored to:\n%s" % node_label, help)
+				_emit_doorstop_feedback(&"BURNED", "DOORSTOP INSTANCE BURNED", "%s removed from deck and inventory." % deployment.burned_instance_id)
+				return {"success": true, "reason": deployment.reason, "events": [{
+					"type": &"DOORSTOP_DEPLOYED",
+					"program_instance_id": deployment.burned_instance_id,
+					"node_id": player_network_position.current_node_id,
+					"intrusion_run_id": intrusion_run_id,
+				}]}
 			if request.metadata.get("system", &"") != &"VIDEO_FEED":
 				return {"success": false, "reason": "Unsupported program action.", "events": []}
 			last_video_action_result = video_feed_manager.execute_action(request.target.feed_id, int(request.target.command))

@@ -1,13 +1,20 @@
 class_name CyberspaceContentDocument
 extends Resource
 
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 3
 const COLLECTIONS: Array[StringName] = [
 	&"network_nodes", &"network_links", &"services", &"graffiti", &"flavor_text",
 	&"story_hooks", &"story_bundles", &"story_variables", &"meatspace_locations",
 	&"realtime_endpoints", &"physical_devices", &"comms_channels", &"comms_sessions",
 	&"comms_participants", &"video_feeds", &"alarms", &"physical_teams",
 	&"team_operations", &"equipment", &"vendors", &"equipment_orders", &"realtime_events",
+	&"program_definitions", &"rewards", &"hidden_caches", &"objectives", &"meatspace_interactions",
+	&"hacker_npcs",
+	&"story_sequences",
+	&"ice_definitions", &"ice_instances",
+	&"realtime_processes",
+	&"hacker_reactions",
+	&"tutorial_guidance_rules",
 ]
 
 @export var schema_version: int = SCHEMA_VERSION
@@ -38,6 +45,18 @@ const COLLECTIONS: Array[StringName] = [
 @export var vendors: Array[Dictionary] = []
 @export var equipment_orders: Array[Dictionary] = []
 @export var realtime_events: Array[Dictionary] = []
+@export var program_definitions: Array[Dictionary] = []
+@export var rewards: Array[Dictionary] = []
+@export var hidden_caches: Array[Dictionary] = []
+@export var objectives: Array[Dictionary] = []
+@export var meatspace_interactions: Array[Dictionary] = []
+@export var hacker_npcs: Array[Dictionary] = []
+@export var story_sequences: Array[Dictionary] = []
+@export var ice_definitions: Array[Dictionary] = []
+@export var ice_instances: Array[Dictionary] = []
+@export var realtime_processes: Array[Dictionary] = []
+@export var hacker_reactions: Array[Dictionary] = []
+@export var tutorial_guidance_rules: Array[Dictionary] = []
 
 
 func collection(name: StringName) -> Array[Dictionary]:
@@ -101,4 +120,3 @@ func all_entries() -> Array[Dictionary]:
 			view["_collection"] = collection_name
 			result.append(view)
 	return result
-

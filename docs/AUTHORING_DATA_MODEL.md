@@ -4,6 +4,8 @@
 
 The document stores collections for network nodes and links, services, graffiti, flavor text, story hooks and bundles, physical locations and devices, realtime endpoints, comms, video, alarms, teams and operations, equipment, vendors, orders, and realtime events. Entries use stable IDs and structured dictionaries. Conditions use operator/type/reference/value fields; actions use type/target/value fields. Neither accepts executable script strings or NodePaths.
 
+Schema version 2 adds generic `program_definitions`, `rewards`, `hidden_caches`, `objectives`, and `meatspace_interactions`. Program rewards reference a stable program-definition ID and a typed source rather than embedding runtime objects. This supports node loot, hidden caches, hack rewards, story events, physical interactions, and optional objectives with the same data model. Quantity, probability, repeatability, prerequisite flags, discovery text, and pickup text are authored on the reward entry.
+
 Cross-domain relationships are IDs:
 
 `NetworkNode -> Service -> RealtimeEndpoint -> Process/Device -> MeatspaceLocation`

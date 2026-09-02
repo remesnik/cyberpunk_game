@@ -1,0 +1,112 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://ui/frontend/splash_screen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/frontend/components/background_effect.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://ui/frontend/components/terminal_label.tscn" id="3"]
+
+[node name="SplashScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" parent="." instance=ExtResource("2")]
+unique_name_in_owner = true
+
+[node name="BootBlock" type="MarginContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 80.0
+offset_top = 80.0
+offset_right = -80.0
+offset_bottom = -80.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Stack" type="VBoxContainer" parent="BootBlock"]
+layout_mode = 2
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="BootTitle" type="Label" parent="BootBlock/Stack"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"StatusLabel"
+text = "INITIALIZING INTERFACE..."
+
+[node name="Rule" type="HSeparator" parent="BootBlock/Stack"]
+layout_mode = 2
+
+[node name="StatusText" type="Label" parent="BootBlock/Stack"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(520, 100)
+layout_mode = 2
+theme_type_variation = &"SystemLabel"
+
+[node name="LogoBlock" type="CenterContainer" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="LogoStack" type="VBoxContainer" parent="LogoBlock"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="Logo" type="Label" parent="LogoBlock/LogoStack"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"FrontendHeadingLabel"
+text = "C_YB_RSP_C_"
+horizontal_alignment = 1
+
+[node name="LockStatus" parent="LogoBlock/LogoStack" instance=ExtResource("3")]
+layout_mode = 2
+text = "CONNECTION ESTABLISHED // SESSION READY"
+
+[node name="Skip" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -58.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_type_variation = &"SystemLabel"
+text = "PRESS ANY KEY TO CONTINUE"
+horizontal_alignment = 1
+
+[node name="Interference" type="ColorRect" parent="."]
+unique_name_in_owner = true
+visible = false
+modulate = Color(1, 1, 1, 0.18)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.53, 0.58, 0.48, 1)
+
+[node name="Blackout" type="ColorRect" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0, 0, 0, 1)

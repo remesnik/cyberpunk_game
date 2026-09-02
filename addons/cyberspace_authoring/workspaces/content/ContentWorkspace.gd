@@ -38,12 +38,26 @@ func _refresh() -> void:
 func _add() -> void:
 	if document == null or _collection() == &"": return
 	var id := StringName("%s_%03d" % [String(_collection()).to_upper(), document.collection(_collection()).size() + 1])
-	var entry := {"id": id, "display_name": "New %s" % String(_collection()).replace("_", " ").capitalize(), "title": "New Entry", "text": "", "conditions": [], "actions": [], "tags": [], "author_notes": ""}
+	var entry := _default_entry(_collection(), id)
 	if document.add_entry(_collection(), entry): _refresh(); document_changed.emit(); entry_selected.emit(id)
+
+
+func _default_entry(collection_name: StringName, id: StringName) -> Dictionary:
+	var entry := {"id": id, "display_name": "New %s" % String(collection_name).replace("_", " ").capitalize(), "title": "New Entry", "text": "", "conditions": [], "actions": [], "tags": [], "author_notes": ""}
+	if collection_name == &"program_definitions":
+		entry.merge({"program_type": &"GENERIC", "version": "1.0", "description": "", "rarity": &"COMMON", "programming_recipe": {}, "programming_requirements": {}, "programming_duration": 0.0, "deployment_properties": {}, "trace_modifiers": {}, "security_modifiers": {}}, true)
+	elif collection_name == &"rewards":
+		entry.merge({"reward_type": &"PROGRAM", "program_definition_id": &"", "quantity": 1, "probability": 1.0, "repeatable": false, "prerequisite_flags": [], "source_type": &"NETWORK_NODE", "source_id": &"", "discovery_text": "Software cache discovered.", "pickup_text": "Program acquired.", "optional": true}, true)
+	elif collection_name == &"hidden_caches":
+		entry.merge({"node_id": &"", "hidden": true, "discovery_conditions": [], "reward_ids": []}, true)
+	elif collection_name == &"objectives":
+		entry.merge({"optional": true, "completion_conditions": [], "reward_ids": []}, true)
+	elif collection_name == &"meatspace_interactions":
+		entry.merge({"physical_location_id": &"", "conditions": [], "actions": [], "reward_ids": []}, true)
+	return entry
 
 
 func _remove() -> void:
 	if _list.selected >= 0 and document.remove_entry(_list.get_item_metadata(_list.selected)): _refresh(); document_changed.emit()
 func _select(index: int) -> void:
 	if index >= 0: entry_selected.emit(_list.get_item_metadata(index))
-

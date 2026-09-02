@@ -1,0 +1,120 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/meatspace/MeatspaceManagementPanel.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="Style"]
+bg_color = Color(0.015, 0.02, 0.028, 0.97)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.58, 0.2, 0.85)
+
+[node name="MeatspaceManagementPanel" type="PanelContainer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("Style")
+script = ExtResource("1")
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 2
+theme_override_constants/margin_left = 80
+theme_override_constants/margin_top = 70
+theme_override_constants/margin_right = 80
+theme_override_constants/margin_bottom = 70
+
+[node name="Rows" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.65, 0.25, 1)
+theme_override_font_sizes/font_size = 26
+text = "MEATSPACE // SUSPENDED INTRUSION MANAGEMENT"
+
+[node name="BackdoorLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.35, 0.94, 1, 1)
+theme_override_font_sizes/font_size = 18
+text = "ACTIVE BACKDOOR"
+
+[node name="JackBackInButton" type="Button" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "[JACK BACK IN]"
+
+[node name="HardwareLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="UpgradeButton" type="Button" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "UPGRADE DECK RAM // 100 CR"
+
+[node name="ProgramRows" type="HBoxContainer" parent="Margin/Rows"]
+layout_mode = 2
+
+[node name="InventoryOption" type="OptionButton" parent="Margin/Rows/ProgramRows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="InstallButton" type="Button" parent="Margin/Rows/ProgramRows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "INSTALL"
+
+[node name="LoadoutOption" type="OptionButton" parent="Margin/Rows/ProgramRows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RemoveButton" type="Button" parent="Margin/Rows/ProgramRows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REMOVE"
+
+[node name="ManagementActions" type="HBoxContainer" parent="Margin/Rows"]
+layout_mode = 2
+
+[node name="OrderButton" type="Button" parent="Margin/Rows/ManagementActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ORDER EQUIPMENT"
+
+[node name="ProgramButton" type="Button" parent="Margin/Rows/ManagementActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "PROGRAM DOORSTOP"
+
+[node name="CollectButton" type="Button" parent="Margin/Rows/ManagementActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "COLLECT COMPLETED"
+
+[node name="StoryButton" type="Button" parent="Margin/Rows/ManagementActions"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "CHECK SAFEHOUSE MESSAGES"
+
+[node name="TaskLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SOFTWARE PROGRAMMING\nNO ACTIVE TASKS"
+
+[node name="EventLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.78, 0.35, 1)
+text = "MEATSPACE SYSTEMS READY"

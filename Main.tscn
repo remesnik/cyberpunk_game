@@ -1,18 +1,24 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://core/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/NetworkDisplay.tscn" id="2_display"]
 [ext_resource type="PackedScene" path="res://debug/DebugOverlay.tscn" id="3_debug"]
 [ext_resource type="PackedScene" path="res://ui/EquipmentOrderPanel.tscn" id="8_orders"]
 [ext_resource type="PackedScene" path="res://ui/monitors/RealtimeMonitorDock.tscn" id="9_monitors"]
+[ext_resource type="PackedScene" path="res://ui/meatspace/MeatspaceManagementPanel.tscn" id="10_meatspace"]
+[ext_resource type="PackedScene" path="res://ui/doorstop/DoorstopFeedbackOverlay.tscn" id="11_doorstop_feedback"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
 
 [node name="NetworkDisplay" parent="." instance=ExtResource("2_display")]
 
+[node name="MeatspaceManagementPanel" parent="." instance=ExtResource("10_meatspace")]
+
 [node name="RealtimeMonitorDock" parent="." instance=ExtResource("9_monitors")]
 
 [node name="EquipmentOrderPanel" parent="." instance=ExtResource("8_orders")]
+
+[node name="DoorstopFeedbackOverlay" parent="." instance=ExtResource("11_doorstop_feedback")]
 
 [node name="DebugOverlay" parent="." instance=ExtResource("3_debug")]

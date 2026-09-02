@@ -1,0 +1,56 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/doorstop/DoorstopFeedbackOverlay.gd" id="1"]
+
+[sub_resource type="StyleBoxFlat" id="Style"]
+bg_color = Color(0.02, 0.025, 0.04, 0.96)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(1, 0.35, 0.18, 0.9)
+
+[node name="DoorstopFeedbackOverlay" type="CanvasLayer"]
+layer = 50
+script = ExtResource("1")
+
+[node name="FeedbackPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+offset_left = 390.0
+offset_top = 42.0
+offset_right = 890.0
+offset_bottom = 150.0
+theme_override_styles/panel = SubResource("Style")
+
+[node name="Margin" type="MarginContainer" parent="FeedbackPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 12
+
+[node name="Rows" type="VBoxContainer" parent="FeedbackPanel/Margin"]
+layout_mode = 2
+
+[node name="FeedbackTitle" type="Label" parent="FeedbackPanel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.48, 0.24, 1)
+theme_override_font_sizes/font_size = 20
+text = "DOORSTOP"
+
+[node name="FeedbackMessage" type="Label" parent="FeedbackPanel/Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.65, 0.94, 1, 1)
+text = "Disposable Backdoor Utility"
+
+[node name="FeedbackTimer" type="Timer" parent="."]
+unique_name_in_owner = true
+wait_time = 4.5
+one_shot = true
+
+[node name="HelpDialog" type="AcceptDialog" parent="."]
+unique_name_in_owner = true
+title = "DOORSTOP // DISPOSABLE BACKDOOR UTILITY"
+dialog_text = "Doorstop contextual help."

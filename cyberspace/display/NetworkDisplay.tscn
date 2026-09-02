@@ -302,6 +302,13 @@ size_flags_horizontal = 3
 disabled = true
 text = "[R] SCAN"
 
+[node name="JackOutButton" type="Button" parent="RightPanel/Margin/Readout/ActionButtons"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+disabled = true
+text = "[J] JACK OUT // VIA DOORSTOP"
+
 [node name="KnownEntities" type="VBoxContainer" parent="RightPanel/Margin/Readout"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -417,6 +424,12 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
 text = "    ACTION COST --"
 
+[node name="DoorstopStateLabel" type="Label" parent="BottomBar/Margin/Rows/Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.45, 0.25, 1)
+text = "BACKDOOR // CLOSED"
+
 [node name="Programs" type="HBoxContainer" parent="BottomBar/Margin/Rows"]
 layout_mode = 2
 theme_override_constants/separation = 8
@@ -440,3 +453,15 @@ text = "[3] GHOST"
 layout_mode = 2
 size_flags_horizontal = 3
 text = "[4] DECRYPT"
+
+[node name="DoorstopButton" type="Button" parent="BottomBar/Margin/Rows/Programs"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "[5] DOORSTOP"
+
+[node name="DoorstopConfirmation" type="ConfirmationDialog" parent="."]
+unique_name_in_owner = true
+title = "DOORSTOP"
+dialog_text = "DEPLOY DOORSTOP?\n\nCreates a temporary return route to this node.\nThis copy will be destroyed.\nJacking back in consumes the return route."
+ok_button_text = "DEPLOY AND BURN"

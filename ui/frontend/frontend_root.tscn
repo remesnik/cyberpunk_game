@@ -1,0 +1,46 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://ui/frontend/frontend_root.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/frontend/splash_screen.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://ui/frontend/main_menu.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://ui/frontend/credits_screen.tscn" id="4"]
+[ext_resource type="Theme" path="res://ui/frontend/frontend_theme.tres" id="5_theme"]
+[ext_resource type="PackedScene" path="res://ui/frontend/audio/frontend_audio_controller.tscn" id="6_audio"]
+[ext_resource type="PackedScene" path="res://ui/frontend/transitions/frontend_transition_layer.tscn" id="7_transition"]
+[ext_resource type="PackedScene" path="res://ui/frontend/load_screen.tscn" id="8_load"]
+[ext_resource type="PackedScene" path="res://ui/frontend/settings_screen.tscn" id="9_settings"]
+
+[node name="FrontendRoot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+theme = ExtResource("5_theme")
+
+[node name="FrontendAudio" parent="." instance=ExtResource("6_audio")]
+unique_name_in_owner = true
+
+[node name="SplashScreen" parent="." instance=ExtResource("2")]
+unique_name_in_owner = true
+
+[node name="MainMenu" parent="." instance=ExtResource("3")]
+unique_name_in_owner = true
+visible = false
+
+[node name="CreditsScreen" parent="." instance=ExtResource("4")]
+unique_name_in_owner = true
+visible = false
+
+[node name="LoadScreen" parent="." instance=ExtResource("8_load")]
+unique_name_in_owner = true
+visible = false
+
+[node name="SettingsScreen" parent="." instance=ExtResource("9_settings")]
+unique_name_in_owner = true
+visible = false
+
+[node name="TransitionLayer" parent="." instance=ExtResource("7_transition")]
+unique_name_in_owner = true

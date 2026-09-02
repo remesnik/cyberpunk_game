@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[node name="TerminalLabel" type="Label"]
+theme_type_variation = &"SystemLabel"
+text = "TERMINAL LABEL"
+horizontal_alignment = 1
+autowrap_mode = 2

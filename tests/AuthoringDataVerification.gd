@@ -10,6 +10,7 @@ func _init() -> void:
 	var document = load("res://data/authoring/server_facility_infiltration.tres")
 	_expect(document is CyberspaceContentDocument, "authored scenario loads as a runtime-safe native Resource")
 	_expect(document.network_nodes.size() == 7 and document.find_entry(&"GUARD_PHONE_CALL") != {}, "scenario bundle contains linked cyber and meatspace content")
+	_expect(document.find_entry(&"DOORSTOP_1_2") != {} and document.find_entry(&"PBX_DOORSTOP_REWARD").program_definition_id == &"DOORSTOP_1_2", "authoring document supports a versioned Doorstop cache reward")
 	var issues: Array[Dictionary] = ValidatorScript.new().validate(document)
 	_expect(not issues.any(func(issue): return issue.level == "ERROR"), "VALIDATE ALL finds no errors in the authored scenario")
 
@@ -18,11 +19,15 @@ func _init() -> void:
 	broken.network_links.assign([{"id": &"BROKEN_LINK", "source": &"A", "destination": &"MISSING", "traversal_cost": -1}])
 	broken.realtime_endpoints.assign([{"id": &"BROKEN_ENDPOINT", "network_node_id": &"MISSING", "service_id": &"NO_SERVICE", "physical_location_id": &"NO_LOCATION"}])
 	broken.team_operations.assign([{"id": &"BROKEN_ROUTE", "route": [{"from": &"HERE", "to": &"THERE", "travel_duration_seconds": 0.0}]}])
+	broken.program_definitions.assign([{"id": &"BAD_DOORSTOP", "program_type": &"DOORSTOP", "version": "", "programming_duration": 0.0, "programming_recipe": {&"MEMORY_SHARD": 0}, "burn_on_deploy": false, "one_active_anchor_per_intrusion": false, "return_to_exact_node": false, "destroy_anchor_on_return": false, "suspension_policy": {}}])
+	broken.rewards.assign([{"id": &"BROKEN_PROGRAM_REWARD", "reward_type": &"PROGRAM", "program_definition_id": &"NO_SUCH_PROGRAM", "quantity": 1, "probability": 1.0, "source_type": &"NETWORK_NODE", "source_id": &"A"}])
 	var broken_issues: Array[Dictionary] = ValidatorScript.new().validate(broken)
 	_expect(broken_issues.any(func(issue): return issue.message.contains("Duplicate ID")), "validator catches deliberately duplicated IDs")
 	_expect(broken_issues.any(func(issue): return issue.category == "NETWORK" and issue.level == "ERROR"), "validator catches broken network references")
 	_expect(broken_issues.any(func(issue): return issue.category == "MEATSPACE ENDPOINTS"), "validator catches broken endpoint references")
 	_expect(broken_issues.any(func(issue): return issue.category == "TEAMS"), "validator catches invalid physical routes and durations")
+	_expect(broken_issues.any(func(issue): return issue.category == "PROGRAM REWARDS" and issue.message.contains("missing program ID")), "validator catches invalid program reward IDs")
+	_expect(broken_issues.any(func(issue): return issue.category == "DOORSTOP" and issue.level == "ERROR"), "validator catches invalid Doorstop deployment and return configuration")
 
 	var state = load("res://data/authoring/server_facility_infiltration.editor_state.tres")
 	_expect(state.graph_positions.has(&"CAMERA_SERVER") and not document.get_property_list().any(func(property): return property.name == "graph_positions"), "graph layout remains separate editor-only metadata")

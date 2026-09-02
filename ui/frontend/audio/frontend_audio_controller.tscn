@@ -1,0 +1,20 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/frontend/audio/frontend_audio_controller.gd" id="1"]
+[ext_resource type="Resource" path="res://ui/frontend/audio/frontend_audio_profile.tres" id="2"]
+
+[node name="FrontendAudioController" type="Node"]
+script = ExtResource("1")
+profile = ExtResource("2")
+
+[node name="MenuAmbience" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+
+[node name="CreditsAmbience" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+
+[node name="UICues" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true
+
+[node name="SplashCues" type="AudioStreamPlayer" parent="."]
+unique_name_in_owner = true

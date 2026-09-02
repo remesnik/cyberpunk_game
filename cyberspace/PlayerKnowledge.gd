@@ -7,10 +7,44 @@ signal knowledge_changed
 var node_records: Dictionary = {}
 var link_records: Dictionary = {}
 var ice_records: Dictionary = {}
+var hacker_records: Dictionary = {}
 var service_records: Dictionary = {}
 var realtime_endpoint_records: Dictionary = {}
 var realtime_process_records: Dictionary = {}
 var ice_observations: Array[Dictionary] = []
+
+
+func observe_hacker(actor: HackerNPC) -> void:
+	if actor == null or actor.definition == null:
+		return
+	hacker_records[actor.instance_id] = {
+		"id": actor.instance_id,
+		"contact_id": StringName("HACKER_%s" % actor.instance_id),
+		"display_name": actor.definition.display_name,
+		"callsign": actor.definition.callsign,
+		"faction": actor.definition.faction,
+		"relationship": actor.definition.player_relationship,
+		"node_id": actor.current_node_id,
+		"state": actor.state,
+		"present": true,
+	}
+	knowledge_changed.emit()
+
+
+func mark_hacker_absent(actor_id: StringName) -> void:
+	if not hacker_records.has(actor_id) or not bool(hacker_records[actor_id].get("present", false)):
+		return
+	hacker_records[actor_id]["present"] = false
+	knowledge_changed.emit()
+
+
+func get_visible_hackers_at(node_ids: Array[StringName]) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for record: Dictionary in hacker_records.values():
+		if bool(record.get("present", false)) and node_ids.has(record.get("node_id", &"")):
+			result.append(record.duplicate(true))
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return String(a.get("callsign", "")) < String(b.get("callsign", "")))
+	return result
 
 func get_node_level(node_id: StringName) -> KnowledgeLevel.Value:
 	return int(node_records.get(node_id, {}).get("level", KnowledgeLevel.Value.UNKNOWN))

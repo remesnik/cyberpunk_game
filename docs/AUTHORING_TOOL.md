@@ -31,3 +31,8 @@ Cyberspace Authoring Studio is a Godot 4 editor plugin for creating the game's l
 Runtime-safe authored data lives in `res://data/authoring/` and uses `CyberspaceContentDocument`. Editor UI, layout, selection, preview profiles, validators, and templates live under `res://addons/cyberspace_authoring/`. Runtime systems must never import addon scripts. Realtime definitions express durations in seconds and do not reference or advance `CyberspaceClock`.
 
 See [AUTHORING_DATA_MODEL.md](AUTHORING_DATA_MODEL.md) for schema details and [AUTHORING_TOOL_LIMITATIONS.md](AUTHORING_TOOL_LIMITATIONS.md) for deliberately deferred work.
+## Guided mission sequences
+
+The STORY workspace includes a SEQUENCES tab for composing tutorials and authored missions from generic event nodes. Supported nodes cover remote-hacker presence and movement, dialogue, objective lifecycle, gameplay-event waits, highlights, program rewards, ICE spawning, trace changes, realtime events, conditional branches, escalating optional hints, and completion flags.
+
+Doorstop deployment, suspension, and re-entry are ordinary `WAIT_FOR` nodes using `DOORSTOP_DEPLOYED`, `INTRUSION_SUSPENDED_AT_DOORSTOP`, and `INTRUSION_RESUMED_FROM_DOORSTOP`. They are not tutorial-specific commands. Node dictionaries contain runtime data only; selection, layout, and open panels remain editor-only state.
