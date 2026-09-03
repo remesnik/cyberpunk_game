@@ -39,10 +39,18 @@ func _test_invalid_intrusion_states() -> void:
 
 func _test_successful_deployment_and_copy_isolation() -> void:
 	var deployed_id: StringName = game.installed_doorstop_instance_ids()[0]
+	var original_san_host: StringName = game.player_system_access_node.host_node_id
+	var relocation_target: StringName = game.network_graph.get_visible_connected_nodes(game.player_network_position.current_node_id)[0]
+	game.player_network_position.relocate(relocation_target)
 	var expected_node: StringName = game.player_network_position.current_node_id
 	var trace_before: int = game.trace_level
 	var ice_controller_before: IceController = game.ice_controller
 	var alarm_manager_before: Variant = game.physical_alarm_manager
+	var san_before: SystemAccessNode = game.player_system_access_node
+	var defenses_before: Array[SANDefenseInstance] = san_before.defensive_systems.duplicate()
+	var integrity_before: int = san_before.integrity
+	var old_host: StringName = san_before.host_node_id
+	_expect(old_host == original_san_host and old_host != expected_node, "test deployment begins away from the entry-hosted SAN")
 	var result: ActionResult = game.request_doorstop_deployment(deployed_id)
 	_expect(result.success, "installed Doorstop deploys during an active intrusion")
 	_expect(not game.program_inventory.has_instance(deployed_id) and not game.program_loadout.is_installed(deployed_id), "the activated instance is burned from inventory and loadout")
@@ -50,6 +58,9 @@ func _test_successful_deployment_and_copy_isolation() -> void:
 	var anchor: DoorstopAnchor = game.doorstop_controller.get_anchor(game.intrusion_run_id)
 	_expect(anchor != null and anchor.cyberspace_node_id == expected_node, "anchor records the exact occupied node")
 	_expect(anchor.source_program_instance_id == deployed_id and anchor.intrusion_run_id == game.intrusion_run_id, "anchor records exact instance and intrusion IDs")
+	_expect(anchor.system_access_node_id == san_before.id and game.player_system_access_node == san_before, "Doorstop reuses the intrusion's exact existing SAN")
+	_expect(san_before.host_node_id == expected_node and game.system_access_node_manager.get_active_at(old_host, game.intrusion_run_id).all(func(item): return item.id != san_before.id), "SAN moves to the deployment node and leaves its old host")
+	_expect(san_before.integrity == integrity_before and san_before.defensive_systems == defenses_before, "SAN integrity and installed defense instances move unchanged")
 	_expect(game.trace_level >= trace_before, "deployment does not reset trace")
 	_expect(game.ice_controller == ice_controller_before and game.physical_alarm_manager == alarm_manager_before, "deployment does not reset ICE or alarms")
 

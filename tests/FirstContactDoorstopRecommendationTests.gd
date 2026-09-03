@@ -56,6 +56,7 @@ func _configure_sec_relay_fixture() -> void:
 	game.program_inventory.add_instance(ProgramInstance.new(&"MEATSPACE_UTILITY_INSTANCE", ProgramDefinition.new(&"SERVICE_PROBE", "Service Probe", "1.0")))
 	game.program_loadout.install(&"FIRST_CONTACT_DOORSTOP_INSTANCE", game.program_inventory)
 	game.doorstop_controller = DoorstopController.new(game.program_inventory, game.program_loadout)
+	game.doorstop_controller.configure_system_access_node(game.system_access_node_manager, game.active_player_id)
 	game.doorstop_programming_definition = doorstop
 	game.meatspace_management = MeatspaceManagement.new()
 	game.meatspace_management.configure(game.program_inventory, game.program_loadout, game.equipment_order_manager, game.realtime_world_clock)

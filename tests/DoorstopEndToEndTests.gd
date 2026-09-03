@@ -63,6 +63,7 @@ func _configure_scenario() -> void:
 	game.program_loadout.install(DOORSTOP_A, game.program_inventory)
 	game.program_loadout.install(DOORSTOP_B, game.program_inventory)
 	game.doorstop_controller = DoorstopController.new(game.program_inventory, game.program_loadout)
+	game.doorstop_controller.configure_system_access_node(game.system_access_node_manager, game.active_player_id)
 	game.meatspace_management = MeatspaceManagement.new()
 	game.meatspace_management.configure(game.program_inventory, game.program_loadout, game.equipment_order_manager, game.realtime_world_clock)
 	game.meatspace_management.software_programming.add_resource(&"MEMORY_SHARD", 3)
@@ -91,6 +92,8 @@ func _run_scenario() -> void:
 	game.ice_controller.add_ice(ice)
 	ice.operational = false
 	game.resource_state.add_volatile(&"E2E_LOOT", 1)
+	var movement_history_before: Array[StringName] = game.player_network_position.traversal_history.duplicate()
+	var trail_count_before: int = game.hacker_trail_system.segments.size()
 
 	var deploy_a: ActionResult = game.request_doorstop_deployment(DOORSTOP_A)
 	_expect(deploy_a.success, "Doorstop A deploys at NODE_02")
@@ -100,6 +103,11 @@ func _run_scenario() -> void:
 	_expect(game.program_inventory.has_instance(DOORSTOP_C), "Doorstop C remains owned")
 	var old_anchor: DoorstopAnchor = game.doorstop_controller.get_anchor(game.intrusion_run_id)
 	_expect(old_anchor != null and old_anchor.cyberspace_node_id == NODE_02, "anchor records the exact NODE_02 return point")
+	var persistent_san: SystemAccessNode = game.player_system_access_node
+	var persistent_defenses: Array[SANDefenseInstance] = persistent_san.defensive_systems.duplicate()
+	var persistent_integrity: int = persistent_san.integrity
+	_expect(old_anchor.system_access_node_id == persistent_san.id and persistent_san.host_node_id == NODE_02, "Doorstop relocates the existing SAN to NODE_02")
+	_expect(game.player_network_position.traversal_history == movement_history_before and game.hacker_trail_system.segments.size() == trail_count_before, "SAN relocation does not erase hacker movement history or trail evidence")
 	var trace_at_suspend: int = game.trace_level
 
 	_expect(game.jack_out_through_doorstop().success, "Jack Out suspends through Doorstop")
@@ -124,6 +132,8 @@ func _run_scenario() -> void:
 	_expect(int(game.resource_state.volatile_resources.get(&"E2E_LOOT", 0)) == 1, "acquired loot persists without duplication")
 	_expect(game.intrusion_session.applied_loadout_instance_ids == expected_loadout and expected_loadout.has(UTILITY_PROGRAM), "new meat-space loadout is applied")
 	_expect(not old_anchor.active and game.doorstop_controller.get_anchor(game.intrusion_run_id) == null, "consumed return anchor is destroyed")
+	_expect(game.player_system_access_node == persistent_san and persistent_san.active and persistent_san.host_node_id == NODE_02, "re-entry consumes only Doorstop permission and preserves the relocated SAN")
+	_expect(persistent_san.integrity == persistent_integrity and persistent_san.defensive_systems == persistent_defenses, "re-entry preserves SAN integrity and defense instances")
 	_expect(not game.program_inventory.has_instance(DOORSTOP_A), "Doorstop A is not restored")
 	_expect(game.program_inventory.has_instance(DOORSTOP_B) and game.program_inventory.has_instance(DOORSTOP_C), "Doorstops B and C still exist")
 

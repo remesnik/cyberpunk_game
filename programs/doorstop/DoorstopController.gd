@@ -4,11 +4,17 @@ extends RefCounted
 var inventory: ProgramInventory
 var loadout: ProgramLoadout
 var anchors_by_run: Dictionary = {}
+var san_manager: SystemAccessNodeManager
+var owner_actor_id: StringName
 
 
 func _init(p_inventory: ProgramInventory, p_loadout: ProgramLoadout) -> void:
 	inventory = p_inventory
 	loadout = p_loadout
+
+func configure_system_access_node(p_san_manager: SystemAccessNodeManager, p_owner_actor_id: StringName) -> void:
+	san_manager = p_san_manager
+	owner_actor_id = p_owner_actor_id
 
 
 func deploy(
@@ -24,6 +30,11 @@ func deploy(
 		return validation
 	var instance := inventory.get_instance(program_instance_id)
 	var definition := instance.definition as DoorstopDefinition
+	var san := san_manager.get_for_connection(owner_actor_id, intrusion_run_id)
+	var previous_host_node_id: StringName = san.host_node_id
+	var relocation := san_manager.relocate(san.id, cyberspace_node_id)
+	if not relocation.success:
+		return _failure(relocation.reason)
 	var captured_resume_data := resume_data.duplicate(true)
 	captured_resume_data["destroy_anchor_on_return"] = definition.destroy_anchor_on_return
 	var anchor := DoorstopAnchor.new(
@@ -31,7 +42,8 @@ func deploy(
 		intrusion_run_id,
 		cyberspace_node_id,
 		deployment_marker,
-		captured_resume_data
+		captured_resume_data,
+		san.id
 	)
 	anchors_by_run[intrusion_run_id] = anchor
 	if definition.burn_on_deploy:
@@ -42,6 +54,9 @@ func deploy(
 		"reason": "Doorstop deployed.",
 		"anchor": anchor,
 		"burned_instance_id": program_instance_id if definition.burn_on_deploy else &"",
+		"san": san,
+		"previous_host_node_id": previous_host_node_id,
+		"host_node_id": san.host_node_id,
 	}
 
 
@@ -55,6 +70,11 @@ func validate_deployment(
 		return _failure("Program inventory is unavailable.")
 	if intrusion_run_id.is_empty() or cyberspace_node_id.is_empty():
 		return _failure("Doorstop requires a run and cyberspace node.")
+	if san_manager == null or owner_actor_id.is_empty():
+		return _failure("Doorstop requires an active System Access Node service.")
+	var san := san_manager.get_for_connection(owner_actor_id, intrusion_run_id)
+	if san == null or not san.active:
+		return _failure("No active System Access Node exists for this intrusion.")
 	var instance := inventory.get_instance(program_instance_id)
 	if instance == null:
 		return _failure("Doorstop instance is not owned.")
@@ -69,6 +89,9 @@ func validate_deployment(
 	var existing := get_anchor(intrusion_run_id)
 	if existing != null and existing.active:
 		return _failure("An active Doorstop return point already exists for this intrusion.")
+	if san.host_node_id == cyberspace_node_id:
+		# Legal: deploying at the present SAN host still grants the one-use permission.
+		pass
 	return {"success": true, "reason": "", "anchor": null, "burned_instance_id": &""}
 
 

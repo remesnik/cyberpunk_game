@@ -22,12 +22,18 @@ var action_index := 0
 var _fired_reactions: Dictionary = {}
 var _last_reaction_action: Dictionary = {}
 var tutorial_guidance: RefCounted
+var trail_system: HackerTrailSystem
+var trail_intrusion_id: StringName
+var trail_tick_provider: Callable
 
 
 func configure(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_knowledge: PlayerKnowledge) -> void:
 	graph = p_graph; player_position = p_position; player_knowledge = p_knowledge
 	if player_position != null and not player_position.transition_completed.is_connected(_on_player_moved): player_position.transition_completed.connect(_on_player_moved)
 	refresh_player_observations()
+
+func configure_trails(p_trail_system: HackerTrailSystem, p_intrusion_id: StringName, p_tick_provider: Callable = Callable()) -> void:
+	trail_system = p_trail_system; trail_intrusion_id = p_intrusion_id; trail_tick_provider = p_tick_provider
 
 
 func add_actor(actor: HackerNPC) -> bool:
@@ -38,6 +44,16 @@ func add_actor(actor: HackerNPC) -> bool:
 
 func get_actor(actor_id: StringName) -> HackerNPC:
 	return actors.get(actor_id) as HackerNPC
+
+func detect_trails(actor_id: StringName, tracking_capability: float) -> Array[TrailSegment]:
+	var actor := get_actor(actor_id)
+	if actor == null or not actor.is_network_connected() or trail_system == null: return []
+	return trail_system.detect_trails(tracking_capability, actor.current_node_id, trail_intrusion_id, actor_id)
+
+func follow_trail(actor_id: StringName, tracking_capability: float) -> Dictionary:
+	var actor := get_actor(actor_id)
+	if actor == null or trail_system == null: return {"success": false, "node_path": [], "segments": [], "last_node_id": &""}
+	return trail_system.follow_trail(actor.current_node_id, tracking_capability, trail_intrusion_id, actor_id)
 
 
 func appear(actor_id: StringName, node_id: StringName) -> Dictionary:
@@ -67,6 +83,9 @@ func move_scripted(actor_id: StringName, destination_id: StringName) -> Dictiona
 	if link == null or not link.connects_from(actor.current_node_id) or link.disabled: return _failure("Remote hacker scripted move requires an enabled directed graph link.")
 	var origin := actor.current_node_id
 	actor.previous_node_id = origin; actor.current_node_id = destination_id; actor.movement_history.append(destination_id)
+	if trail_system != null:
+		var tick := int(trail_tick_provider.call()) if trail_tick_provider.is_valid() else action_index
+		trail_system.leave_trail(actor_id, trail_intrusion_id, origin, destination_id, tick)
 	_emit_event(&"HACKER_MOVED", actor_id, {"from_node_id": origin, "node_id": destination_id, "link_id": link.id}); actor_moved.emit(actor_id, origin, destination_id, link.id); refresh_player_observations()
 	return {"success": true, "reason": "Remote hacker moved.", "link_id": link.id}
 

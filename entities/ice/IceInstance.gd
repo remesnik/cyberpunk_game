@@ -15,6 +15,13 @@ var patrol_index := 0
 var integrity: int
 var disrupted_time := 0
 var operational := true
+var trail_target_actor_id: StringName
+var followed_trail_segment_id: StringName
+var trail_last_detected_tick := -1
+var trail_memory_remaining := 0
+var trail_tracking_confidence := 0.0
+var san_attack_progress := 0
+var placement_suspended := false
 
 var detection_capability: int:
 	get: return definition.detection_capability
@@ -30,3 +37,9 @@ func _init(p_instance_id: StringName, p_definition: IceDefinition, p_start_node:
 	home_node = p_start_node
 	state = p_state
 	integrity = definition.maximum_integrity
+
+func forget_trail() -> void:
+	followed_trail_segment_id = &""
+	trail_last_detected_tick = -1
+	trail_memory_remaining = 0
+	trail_tracking_confidence = 0.0

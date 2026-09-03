@@ -9,6 +9,7 @@ var node_type: NodeType
 var security_level: int
 var discovered: bool
 var owner_faction: StringName
+var security_region_id: StringName
 var connected_links: Array[StringName] = []
 var services: Array[Dictionary] = []
 var required_capabilities_all: Array[StringName] = []

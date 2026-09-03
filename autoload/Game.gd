@@ -42,6 +42,10 @@ const ProgramInstanceScript := preload("res://programs/ProgramInstance.gd")
 const DoorstopDefinitionScript := preload("res://programs/doorstop/DoorstopDefinition.gd")
 const DoorstopControllerScript := preload("res://programs/doorstop/DoorstopController.gd")
 const IntrusionSessionScript := preload("res://core/intrusion/IntrusionSession.gd")
+const SystemAccessNodeManagerScript := preload("res://core/intrusion/SystemAccessNodeManager.gd")
+const SANInteractionControllerScript := preload("res://core/intrusion/SANInteractionController.gd")
+const DeckHardwareStateScript := preload("res://core/intrusion/DeckHardwareState.gd")
+const SANPlacementSafetyScript := preload("res://core/intrusion/SANPlacementSafety.gd")
 const MeatspaceManagementScript := preload("res://core/meatspace/MeatspaceManagement.gd")
 const DoorstopSuspensionPolicyScript := preload("res://programs/doorstop/DoorstopSuspensionPolicy.gd")
 const SuspendedIntrusionAdvancerScript := preload("res://programs/doorstop/SuspendedIntrusionAdvancer.gd")
@@ -97,6 +101,16 @@ var unresolved_modal_action_selection := false
 var jack_out_prohibited := false
 var _intrusion_sequence := 0
 var intrusion_session: IntrusionSession
+var system_access_node_manager: SystemAccessNodeManager
+var player_system_access_node: SystemAccessNode
+var san_defense_controller: SANDefenseController
+## Shared entry point for player, NPC, and future multiplayer SAN interactions.
+var san_interaction_controller: SANInteractionController
+var player_deck_hardware: RefCounted
+var san_placement_safety: RefCounted
+var hacker_trail_system: HackerTrailSystem
+var active_player_id: StringName = &"PLAYER"
+var active_deck_id: StringName = &"PLAYER_DECK"
 var game_domain: GameDomain = GameDomain.CYBERSPACE
 var meatspace_management: MeatspaceManagement
 var doorstop_programming_definition: DoorstopDefinition
@@ -133,13 +147,21 @@ func start_session() -> void:
 	_create_debug_operation_pressure()
 	_create_debug_realtime_story()
 	_create_program_loadout()
+	system_access_node_manager = SystemAccessNodeManagerScript.new()
 	ice_controller = IceController.new(network_graph, player_network_position, player_knowledge)
+	ice_controller.configure_trails(hacker_trail_system, intrusion_run_id, active_player_id, system_access_node_manager)
 	FacilityOperationFactory.populate_ice(ice_controller)
+	san_placement_safety = SANPlacementSafetyScript.new(network_graph, ice_controller, player_network_position)
+	system_access_node_manager.configure_placement_safety(san_placement_safety)
+	_create_player_system_access_node()
+	ice_controller.configure_san_attacks(san_defense_controller)
+	ice_controller.register_san_attack_target(player_system_access_node, player_deck_hardware, intrusion_session)
 	player_knowledge.detect_ice(&"FACILITY_SENTINEL_01")
 	hacker_npc_manager = HackerNPCManager.new()
 	hacker_npc_manager.name = "HackerNPCManager"
 	add_child(hacker_npc_manager)
 	hacker_npc_manager.configure(network_graph, player_network_position, player_knowledge)
+	hacker_npc_manager.configure_trails(hacker_trail_system, intrusion_run_id, func() -> int: return action_clock.current_tick)
 	hacker_npc_manager.display_update_requested.connect(EventBus.network_display_update_requested.emit)
 	scan_system = ScanSystem.new(network_graph, player_network_position, player_knowledge, ice_controller, realtime_process_manager.endpoints, realtime_process_manager.processes)
 	progression_controller = GraphProgressionController.new(network_graph, player_network_position, player_knowledge)
@@ -165,6 +187,7 @@ func _create_program_loadout() -> void:
 	_intrusion_sequence += 1
 	intrusion_run_id = StringName("INTRUSION_%06d" % _intrusion_sequence)
 	intrusion_session = IntrusionSessionScript.new(intrusion_run_id)
+	hacker_trail_system = HackerTrailSystem.new()
 	game_domain = GameDomain.CYBERSPACE
 	program_inventory = ProgramInventoryScript.new()
 	program_inventory.instance_added.connect(_on_program_instance_added)
@@ -201,8 +224,55 @@ func _create_program_loadout() -> void:
 	meatspace_management.software_programming.add_resource(&"GHOST_SIGNATURE", 2)
 
 
+func _create_player_system_access_node() -> void:
+	if system_access_node_manager == null:
+		system_access_node_manager = SystemAccessNodeManagerScript.new()
+	player_system_access_node = null
+	if intrusion_session == null or network_graph == null or player_network_position == null:
+		push_error("Cannot create player SAN before intrusion graph and position exist.")
+		return
+	var entry_node_id := player_network_position.current_node_id
+	if network_graph.get_node(entry_node_id) == null:
+		push_error("Cannot host player SAN in an invalid entry node.")
+		return
+	var created_marker: float = float(realtime_world_clock.elapsed_seconds) if realtime_world_clock != null else 0.0
+	var result := system_access_node_manager.create_san(active_player_id, intrusion_run_id, active_deck_id, entry_node_id, created_marker)
+	if not result.success:
+		push_error(String(result.reason))
+		return
+	player_system_access_node = result.san
+	if not intrusion_session.register_system_access_node(player_system_access_node):
+		push_error("Player SAN could not be associated with the intrusion session.")
+	san_defense_controller = SANDefenseController.new()
+	san_defense_controller.owner_alerted.connect(EventBus.san_defense_alert.emit)
+	san_interaction_controller = SANInteractionControllerScript.new(system_access_node_manager, san_defense_controller)
+	player_deck_hardware = DeckHardwareStateScript.new(active_deck_id)
+	if doorstop_controller != null:
+		doorstop_controller.configure_system_access_node(system_access_node_manager, active_player_id)
+	for definition in SANDefenseCatalog.create_defaults():
+		san_defense_controller.install(player_system_access_node, definition, created_marker)
+
+
+func get_player_san_inspection() -> Dictionary:
+	return san_defense_controller.inspection_view(player_system_access_node) if san_defense_controller != null else {}
+
+func get_visible_san_inspections(viewer_actor_id: StringName = active_player_id) -> Array[Dictionary]:
+	var views: Array[Dictionary] = []
+	if system_access_node_manager == null or san_defense_controller == null: return views
+	for san: SystemAccessNode in system_access_node_manager.instances.values():
+		var access_level := SANAccessSession.AccessLevel.NONE
+		if viewer_actor_id != san.owner_player_id and san_interaction_controller != null:
+			var session := san_interaction_controller.get_session(viewer_actor_id, san.id)
+			if session != null: access_level = session.access_level
+		var view := san_defense_controller.display_view(san, viewer_actor_id, access_level)
+		if not view.is_empty(): views.append(view)
+	return views
+
+
 func end_session() -> void:
 	session_active = false
+	if system_access_node_manager != null and player_system_access_node != null:
+		system_access_node_manager.destroy_san(player_system_access_node.id)
 	if realtime_world_clock != null:
 		realtime_world_clock.stop()
 	network_graph = null
@@ -232,6 +302,13 @@ func end_session() -> void:
 	doorstop_controller = null
 	intrusion_run_id = &""
 	intrusion_session = null
+	player_system_access_node = null
+	system_access_node_manager = null
+	san_defense_controller = null
+	san_interaction_controller = null
+	player_deck_hardware = null
+	san_placement_safety = null
+	hacker_trail_system = null
 	game_domain = GameDomain.CYBERSPACE
 	meatspace_management = null
 	doorstop_programming_definition = null
@@ -833,6 +910,9 @@ func jack_out_through_doorstop() -> Dictionary:
 	var anchor := doorstop_controller.get_anchor(intrusion_run_id) if doorstop_controller != null else null
 	if anchor == null or not anchor.active:
 		return {"success": false, "reason": "No active Doorstop return point exists."}
+	var san := system_access_node_manager.get_for_connection(active_player_id, intrusion_run_id) if system_access_node_manager != null else null
+	if san == null or not san.active or anchor.system_access_node_id != san.id or san.host_node_id != anchor.cyberspace_node_id:
+		return {"success": false, "reason": "Doorstop permission no longer matches the active System Access Node."}
 	var previous_lifecycle: int = intrusion_session.lifecycle
 	var state := _capture_intrusion_resume_state(anchor)
 	var realtime_marker: float = float(realtime_world_clock.elapsed_seconds) if realtime_world_clock != null else 0.0
@@ -906,10 +986,12 @@ func suspended_doorstop_view() -> Dictionary:
 	if intrusion_session == null or not intrusion_session.can_resume_through_doorstop():
 		return {}
 	var anchor := intrusion_session.suspended_anchor
+	var san := system_access_node_manager.get_san(anchor.system_access_node_id) if system_access_node_manager != null else null
 	return {
 		"intrusion_run_id": intrusion_run_id,
 		"target_name": "HERMES INTERNAL NETWORK",
-		"return_node_id": anchor.cyberspace_node_id,
+		"return_node_id": san.host_node_id if san != null and san.active else &"",
+		"system_access_node_id": anchor.system_access_node_id,
 		"deployed_at": anchor.deployment_marker,
 		"suspended_at": intrusion_session.suspended_at_realtime,
 	}
@@ -926,8 +1008,11 @@ func jack_back_in_through_doorstop() -> Dictionary:
 		return {"success": false, "reason": "Doorstop return route is missing or no longer belongs to this intrusion."}
 	if session_anchor.intrusion_run_id != intrusion_run_id:
 		return {"success": false, "reason": "Doorstop belongs to a different intrusion."}
-	if session_anchor.cyberspace_node_id != intrusion_session.resume_state.get("doorstop_node_id", &""):
-		return {"success": false, "reason": "Doorstop return node does not match the suspended intrusion."}
+	var san := system_access_node_manager.get_for_connection(active_player_id, intrusion_run_id) if system_access_node_manager != null else null
+	if san == null or not san.active or san.id != session_anchor.system_access_node_id:
+		return {"success": false, "reason": "The suspended intrusion's System Access Node is unavailable."}
+	if san.host_node_id != session_anchor.cyberspace_node_id or san.host_node_id != intrusion_session.resume_state.get("doorstop_node_id", &""):
+		return {"success": false, "reason": "System Access Node host does not match the suspended intrusion."}
 	var consequence_result := advance_suspended_intrusion()
 	if not consequence_result.success:
 		return consequence_result
@@ -936,7 +1021,7 @@ func jack_back_in_through_doorstop() -> Dictionary:
 	var resume: Dictionary = intrusion_session.resume_through_doorstop(session_anchor, current_loadout)
 	if not resume.success:
 		return resume
-	var return_node_id: StringName = resume.node_id
+	var return_node_id: StringName = san.host_node_id
 	if network_graph == null or network_graph.get_node(return_node_id) == null:
 		intrusion_session.lifecycle = previous_lifecycle
 		return {"success": false, "reason": "Doorstop return node is no longer valid."}
@@ -1126,11 +1211,15 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 					help = "This specific Doorstop copy has been destroyed. The open backdoor can suspend this intrusion once and return you to this exact node once. Returning closes the route."
 				_emit_doorstop_feedback(&"DEPLOYED", "DOORSTOP DEPLOYED", "Backdoor anchored to:\n%s" % node_label, help)
 				_emit_doorstop_feedback(&"BURNED", "DOORSTOP INSTANCE BURNED", "%s removed from deck and inventory." % deployment.burned_instance_id)
+				EventBus.network_display_update_requested.emit()
 				return {"success": true, "reason": deployment.reason, "events": [{
 					"type": &"DOORSTOP_DEPLOYED",
 					"program_instance_id": deployment.burned_instance_id,
 					"node_id": player_network_position.current_node_id,
 					"intrusion_run_id": intrusion_run_id,
+					"san_id": deployment.san.id,
+					"previous_san_host_node_id": deployment.previous_host_node_id,
+					"san_host_node_id": deployment.host_node_id,
 				}]}
 			if request.metadata.get("system", &"") != &"VIDEO_FEED":
 				return {"success": false, "reason": "Unsupported program action.", "events": []}
@@ -1142,6 +1231,8 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 			var result := network_graph.apply_traversal(player_network_position, StringName(request.target), player_knowledge.link_records.keys())
 			var move_events: Array[Dictionary] = [{"type": &"PLAYER_MOVED", "target": request.target}]
 			if result.error == NetworkGraph.TraversalError.OK:
+				var trail_strength := san_defense_controller.trail_multiplier(player_system_access_node) if san_defense_controller != null else 1.0
+				hacker_trail_system.leave_trail(active_player_id, intrusion_run_id, origin, StringName(request.target), action_clock.current_tick + request.cost, trail_strength)
 				player_knowledge.observe_traversal(network_graph, origin, StringName(request.target))
 				move_events.append_array(progression_controller.on_node_entered(StringName(request.target)))
 				var recovered := failure_controller.recover_at(player_network_position.current_node_id)
@@ -1202,6 +1293,7 @@ func request_transfer(target: Dictionary) -> ActionResult:
 	return request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.TRANSFER, target.duplicate(true), 3))
 
 func _update_network_systems(tick: int, _request: ActionRequest) -> Array[Dictionary]:
+	if hacker_trail_system != null: hacker_trail_system.decay_trails(tick)
 	return [{"type": &"NETWORK_SYSTEMS_UPDATED", "tick": tick}, deep_exploration.update(trace_level)]
 
 func commit_resources_at_anchor() -> Dictionary:

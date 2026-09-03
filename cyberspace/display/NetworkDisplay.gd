@@ -2,6 +2,7 @@ class_name NetworkDisplay
 extends Control
 
 const NODE_SCENE := preload("res://cyberspace/display/NodeVisual.tscn")
+const SAN_SCENE := preload("res://cyberspace/display/SANVisual.tscn")
 const LinkVisualScript := preload("res://cyberspace/display/LinkVisual.gd")
 const CYAN := Color("48e8ff")
 const AMBER := Color("ffc857")
@@ -52,6 +53,7 @@ var position_model: PlayerNetworkPosition
 var knowledge: PlayerKnowledge
 var node_visuals: Dictionary = {}
 var link_visuals: Dictionary = {}
+var san_visuals: Dictionary = {}
 var scan_targets: Dictionary = {}
 var target_views: Dictionary = {}
 var target_order: Array[StringName] = []
@@ -68,6 +70,7 @@ func _ready() -> void:
 	EventBus.network_display_update_requested.connect(_on_display_update_requested)
 	EventBus.action_resolved.connect(_on_action_resolved)
 	EventBus.game_domain_changed.connect(_on_game_domain_changed)
+	EventBus.san_defense_alert.connect(_on_san_defense_alert)
 	scan_button.pressed.connect(_on_scan_pressed)
 	local_scan_button.pressed.connect(_on_scan_pressed)
 	confirm_button.pressed.connect(_confirm_selected_target)
@@ -111,6 +114,7 @@ func _rebuild_neighborhood() -> void:
 		child.queue_free()
 	node_visuals.clear()
 	link_visuals.clear()
+	san_visuals.clear()
 	scan_targets.clear()
 	target_views.clear()
 	target_order.clear()
@@ -230,6 +234,27 @@ func _rebuild_known_entities(current_node_id: StringName, contacts: Array[Dictio
 		known_entities.add_child(button)
 		target_views[contact_id] = {"kind": &"HACKER", "title": hacker.get("callsign", "REMOTE HACKER"), "hacker": hacker}
 		target_order.append(contact_id)
+	for san_view: Dictionary in Game.get_visible_san_inspections():
+		if not locally_known_nodes.has(san_view.get("host_node_id", &"")): continue
+		var san_id: StringName = san_view.id
+		var button := Button.new()
+		button.text = "SAN // %s [%s]" % [String(san_view.get("owner_label", "UNKNOWN")), String(san_view.get("visual_state", "UNKNOWN"))]
+		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		button.pressed.connect(func() -> void: _select_target(san_id))
+		known_entities.add_child(button)
+		target_views[san_id] = {"kind": &"SAN", "title": "SYSTEM ACCESS NODE", "san": san_view}
+		target_order.append(san_id)
+		_add_san_visual(san_view)
+
+func _add_san_visual(san_view: Dictionary) -> void:
+	var host := node_visuals.get(san_view.get("host_node_id", &"")) as NodeVisual
+	if host == null: return
+	var visual: Control = SAN_SCENE.instantiate() as Control
+	host.add_child(visual)
+	visual.position = Vector2(host.size.x - visual.size.x - 5.0, 2.0)
+	visual.configure(san_view)
+	visual.selected.connect(_select_target)
+	san_visuals[san_view.id] = visual
 
 func _on_node_selected(node_id: StringName) -> void:
 	if _transition_active:
@@ -336,6 +361,21 @@ func _select_target(target_id: StringName) -> void:
 		details.append("POSITION // %s" % String(hacker.get("node_id", "UNKNOWN")))
 		details.append("RELATION // %s" % String(hacker.get("relationship", "UNKNOWN")))
 		details.append("FACTION // %s" % String(hacker.get("faction", "UNKNOWN")))
+	elif kind == &"SAN":
+		var san: Dictionary = view.san
+		details.clear()
+		details.append("SYSTEM ACCESS NODE")
+		details.append("OWNER: %s" % String(san.get("owner_label", "UNKNOWN")))
+		var raw_link := String(san.get("deck_link_state", "UNKNOWN"))
+		details.append("LINK: %s" % ("ACTIVE" if raw_link == "LINKED" else raw_link))
+		details.append("INTEGRITY: %s" % ("%d%%" % int(san.integrity_percent) if san.has("integrity_percent") else "UNKNOWN"))
+		details.append("STATE: %s" % String(san.get("visual_state", "UNKNOWN")).replace("_", " "))
+		var defense_lines: PackedStringArray = []
+		for defense: Dictionary in san.get("defenses", []): defense_lines.append(String(defense.display_name).to_upper())
+		details.append("\nDEFENSE")
+		details.append("\n".join(defense_lines) if not defense_lines.is_empty() else "UNKNOWN" if not san.get("is_local", false) else "NONE")
+		details.append("\nDECK LINK")
+		details.append("CONNECTED" if raw_link == "LINKED" else raw_link)
 	else:
 		details.append("IDENTITY // UNRESOLVED")
 		details.append("SCAN REQUIRED")
@@ -544,6 +584,12 @@ func _append_action_events(request: ActionRequest, result: ActionResult) -> void
 		event_lines.append("> %s" % _event_description(event))
 	while event_lines.size() > 8:
 		event_lines.remove_at(0)
+	event_feed.text = "EVENT FEED\n%s" % "\n".join(event_lines)
+
+func _on_san_defense_alert(event: Dictionary) -> void:
+	status_label.text = "WATCHDOG ALERT // SAN INTERACTION DETECTED"
+	event_lines.append("> WATCHDOG // %s CONTACT" % String(event.get("interacting_actor_id", "UNKNOWN")))
+	while event_lines.size() > 8: event_lines.remove_at(0)
 	event_feed.text = "EVENT FEED\n%s" % "\n".join(event_lines)
 
 func _event_description(event: Dictionary) -> String:

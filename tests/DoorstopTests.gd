@@ -20,7 +20,7 @@ func _test_burns_only_activated_instance() -> void:
 	var second := ProgramInstance.new(&"PROGRAM_INSTANCE_002", definition)
 	_expect(inventory.add_instance(first) and inventory.add_instance(second), "copies with unique instance IDs can coexist")
 	_expect(loadout.install(first.instance_id, inventory) and loadout.install(second.instance_id, inventory), "individual copies can be installed")
-	var controller := DoorstopController.new(inventory, loadout)
+	var controller := _controller(inventory, loadout, &"RUN_01", &"ENTRY")
 	var result := controller.deploy(first.instance_id, &"RUN_01", &"AUTH_SERVER", 17.0, {"trace": 12}, _valid_context(&"AUTH_SERVER"))
 	_expect(result.success, "installed Doorstop deploys")
 	_expect(not inventory.has_instance(first.instance_id) and not loadout.is_installed(first.instance_id), "activated instance is removed from inventory and loadout")
@@ -41,7 +41,7 @@ func _test_variants_and_unique_ids_remain_distinct() -> void:
 	inventory.add_instance(old_copy)
 	inventory.add_instance(new_copy)
 	loadout.install(new_copy.instance_id, inventory)
-	var result := DoorstopController.new(inventory, loadout).deploy(new_copy.instance_id, &"RUN_02", &"FILE_SERVER", 3.5, {}, _valid_context(&"FILE_SERVER"))
+	var result := _controller(inventory, loadout, &"RUN_02", &"ENTRY").deploy(new_copy.instance_id, &"RUN_02", &"FILE_SERVER", 3.5, {}, _valid_context(&"FILE_SERVER"))
 	_expect(result.success and inventory.has_instance(old_copy.instance_id), "burning one version leaves another version untouched")
 	_expect(not inventory.has_instance(new_copy.instance_id), "the selected variant instance alone is burned")
 	_expect(not inventory.add_instance(ProgramInstance.new(old_copy.instance_id, v2)), "duplicate physical instance IDs are rejected")
@@ -53,7 +53,7 @@ func _test_rejects_unowned_and_non_doorstop_instances() -> void:
 	var ordinary := ProgramInstance.new(&"SCANNER_01", ProgramDefinition.new(&"SCANNER", "Scanner", "1.0"))
 	inventory.add_instance(ordinary)
 	loadout.install(ordinary.instance_id, inventory)
-	var controller := DoorstopController.new(inventory, loadout)
+	var controller := _controller(inventory, loadout, &"RUN", &"ENTRY")
 	_expect(not controller.deploy(&"MISSING", &"RUN", &"NODE", 0.0, {}, _valid_context(&"NODE")).success, "an unowned instance cannot deploy")
 	_expect(not controller.deploy(ordinary.instance_id, &"RUN", &"NODE", 0.0, {}, _valid_context(&"NODE")).success, "a non-Doorstop program cannot deploy")
 	_expect(inventory.has_instance(ordinary.instance_id), "failed deployment never consumes an instance")
@@ -70,6 +70,13 @@ func _doorstop(id: StringName, version: String) -> DoorstopDefinition:
 
 func _valid_context(node_id: StringName) -> Dictionary:
 	return {"node_id": node_id, "node_is_valid": true, "node_transition_unresolved": false, "modal_action_unresolved": false, "jack_out_prohibited": false}
+
+func _controller(inventory: ProgramInventory, loadout: ProgramLoadout, run_id: StringName, host_node_id: StringName) -> DoorstopController:
+	var manager := SystemAccessNodeManager.new()
+	manager.create_san(&"PLAYER", run_id, &"DECK", host_node_id)
+	var controller := DoorstopController.new(inventory, loadout)
+	controller.configure_system_access_node(manager, &"PLAYER")
+	return controller
 
 
 func _expect(condition: bool, description: String) -> void:

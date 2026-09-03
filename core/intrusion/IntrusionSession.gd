@@ -11,10 +11,19 @@ var suspended_security_elapsed := 0.0
 var suspension_advanced_through := -1.0
 var resume_state: Dictionary = {}
 var applied_loadout_instance_ids: Array[StringName] = []
+var system_access_nodes_by_owner: Dictionary = {}
 
 
 func _init(p_id: StringName) -> void:
 	id = p_id
+
+func register_system_access_node(san: SystemAccessNode) -> bool:
+	if san == null or san.intrusion_id != id or system_access_nodes_by_owner.has(san.owner_player_id): return false
+	system_access_nodes_by_owner[san.owner_player_id] = san
+	return true
+
+func get_system_access_node(owner_player_id: StringName) -> SystemAccessNode:
+	return system_access_nodes_by_owner.get(owner_player_id) as SystemAccessNode
 
 
 func suspend_at_doorstop(anchor: DoorstopAnchor, realtime_marker: float, state: Dictionary) -> Dictionary:
@@ -64,6 +73,16 @@ func complete_normally(completion_data: Dictionary = {}) -> Dictionary:
 		return {"success": false, "reason": "An active Doorstop route must be resolved before normal completion."}
 	lifecycle = Lifecycle.COMPLETED
 	return {"success": true, "reason": "Intrusion completed normally.", "completion_data": completion_data.duplicate(true)}
+
+func abort(reason := "Intrusion aborted.", abort_data: Dictionary = {}) -> Dictionary:
+	if lifecycle == Lifecycle.COMPLETED or lifecycle == Lifecycle.ABORTED or lifecycle == Lifecycle.FAILED:
+		return {"success": false, "reason": "Intrusion has already ended."}
+	if suspended_anchor != null and suspended_anchor.active:
+		suspended_anchor.invalidate()
+	suspended_anchor = null
+	resume_state.clear()
+	lifecycle = Lifecycle.ABORTED
+	return {"success": true, "reason": reason, "abort_data": abort_data.duplicate(true)}
 
 
 func lifecycle_label() -> String:
