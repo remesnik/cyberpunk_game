@@ -45,6 +45,7 @@ const IntrusionSessionScript := preload("res://core/intrusion/IntrusionSession.g
 const MeatspaceManagementScript := preload("res://core/meatspace/MeatspaceManagement.gd")
 const DoorstopSuspensionPolicyScript := preload("res://programs/doorstop/DoorstopSuspensionPolicy.gd")
 const SuspendedIntrusionAdvancerScript := preload("res://programs/doorstop/SuspendedIntrusionAdvancer.gd")
+const SystemAccessNodeControllerScript := preload("res://core/san/SystemAccessNodeController.gd")
 
 enum GameDomain { CYBERSPACE, MEATSPACE }
 
@@ -92,6 +93,7 @@ var facility_scenario: FacilityOperationScenario
 var program_inventory: ProgramInventory
 var program_loadout: ProgramLoadout
 var doorstop_controller: DoorstopController
+var san_controller: RefCounted
 var intrusion_run_id: StringName = &""
 var unresolved_modal_action_selection := false
 var jack_out_prohibited := false
@@ -187,6 +189,10 @@ func _create_program_loadout() -> void:
 	program_inventory.add_instance(ProgramInstanceScript.new(&"DOORSTOP_GHOST_INSTANCE_001", reserve))
 	program_loadout.install(&"DOORSTOP_INSTANCE_001", program_inventory)
 	doorstop_controller = DoorstopControllerScript.new(program_inventory, program_loadout)
+	san_controller = SystemAccessNodeControllerScript.new(network_graph, player_knowledge, &"PLAYER")
+	san_controller.create_san(&"PLAYER", intrusion_run_id, &"ACTIVE_DECK", player_network_position.current_node_id, float(action_clock.current_tick))
+	san_controller.san_relocated.connect(_on_san_relocated)
+	doorstop_controller.configure_san_controller(san_controller)
 	doorstop_suspension_policy = DoorstopSuspensionPolicyScript.forgiving()
 	suspended_intrusion_advancer = SuspendedIntrusionAdvancerScript.new()
 	suspended_security_level = 0
@@ -208,6 +214,7 @@ func end_session() -> void:
 	network_graph = null
 	player_network_position = null
 	player_knowledge = null
+	san_controller = null
 	action_clock = null
 	cyberspace_clock = null
 	ice_controller = null
@@ -1019,6 +1026,10 @@ func _bind_network_events() -> void:
 	action_clock.action_resolved.connect(EventBus.action_resolved.emit)
 	action_clock.action_resolved.connect(_on_action_resolved_team_support)
 	action_clock.action_resolved.connect(hacker_npc_manager.handle_player_action)
+
+func _on_san_relocated(san: RefCounted, previous_node_id: StringName, current_node_id: StringName) -> void:
+	EventBus.network_display_update_requested.emit()
+	EventBus.san_relocated.emit(san.id, previous_node_id, current_node_id)
 
 
 func _on_action_resolved_team_support(_request: ActionRequest, result: ActionResult) -> void:

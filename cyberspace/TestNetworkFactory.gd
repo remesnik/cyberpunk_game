@@ -38,6 +38,7 @@ static func create_player(starting_points := 10) -> PlayerNetworkPosition:
 static func create_player_knowledge(graph: NetworkGraph) -> PlayerKnowledge:
 	var knowledge := PlayerKnowledge.new()
 	knowledge.reveal_node(graph.get_node(PUBLIC_GATEWAY), KnowledgeLevel.Value.SCANNED)
+	knowledge.mark_node_visited(graph.get_node(PUBLIC_GATEWAY), &"INITIAL_POSITION")
 	knowledge.reveal_node(graph.get_node(ROUTER_A), KnowledgeLevel.Value.IDENTIFIED)
 	knowledge.reveal_link(graph.get_link(&"GATEWAY_ROUTER"), KnowledgeLevel.Value.SCANNED)
 	# Prior intelligence detects several contacts without exposing their identities.

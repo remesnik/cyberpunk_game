@@ -94,6 +94,8 @@ func _move_once(ice: IceInstance, events: Array[Dictionary]) -> bool:
 		return false
 	var origin := ice.current_node_id
 	ice.current_node_id = destination
+	if player_knowledge.ice_records.has(ice.instance_id) and player_knowledge.ice_records[ice.instance_id].get("node_id", &"") == origin:
+		player_knowledge.mark_ice_position_stale(ice.instance_id)
 	var player_can_infer := _graph_distance(destination, player_position.current_node_id) <= 1 or _graph_distance(origin, player_position.current_node_id) <= 1
 	if player_can_infer:
 		player_knowledge.add_observation(&"ROUTE_ACTIVITY", &"")

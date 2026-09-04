@@ -3,6 +3,8 @@ extends Control
 
 const NODE_SCENE := preload("res://cyberspace/display/NodeVisual.tscn")
 const LinkVisualScript := preload("res://cyberspace/display/LinkVisual.gd")
+const DEFAULT_VISUALIZATION_CONFIG := preload("res://cyberspace/display/cyberspace_visualization_config.tres")
+const DEFAULT_ACCESSIBILITY_CONFIG := preload("res://ui/frontend/accessibility/frontend_accessibility_config.tres")
 const CYAN := Color("48e8ff")
 const AMBER := Color("ffc857")
 
@@ -46,6 +48,10 @@ const AMBER := Color("ffc857")
 @onready var doorstop_confirmation: ConfirmationDialog = %DoorstopConfirmation
 @onready var jack_out_button: Button = %JackOutButton
 @onready var doorstop_state_label: Label = %DoorstopStateLabel
+@onready var security_level_legend: Control = %SecurityLevelLegend
+@onready var capability_glossary: Control = %CapabilityGlossary
+@export var visualization_config: Resource = DEFAULT_VISUALIZATION_CONFIG
+@export var accessibility_config: Resource = DEFAULT_ACCESSIBILITY_CONFIG
 
 var graph: NetworkGraph
 var position_model: PlayerNetworkPosition
@@ -59,8 +65,13 @@ var selected_target_id: StringName = &""
 var event_lines: PackedStringArray = ["> SESSION READY"]
 var _transition_active := false
 var _pending_doorstop_instance_id: StringName = &""
+var _knowledge_view_history: Dictionary = {}
+var _graph_zoom := 1.0
+var _visible_node_count := 1
 
 func _ready() -> void:
+	security_level_legend.set_visualization_config(visualization_config)
+	capability_glossary.set_visualization_config(visualization_config)
 	resized.connect(_on_resized)
 	EventBus.session_started.connect(_on_session_started)
 	EventBus.network_traversal_started.connect(_on_traversal_started)
@@ -68,6 +79,7 @@ func _ready() -> void:
 	EventBus.network_display_update_requested.connect(_on_display_update_requested)
 	EventBus.action_resolved.connect(_on_action_resolved)
 	EventBus.game_domain_changed.connect(_on_game_domain_changed)
+	EventBus.san_relocated.connect(_on_san_relocated)
 	scan_button.pressed.connect(_on_scan_pressed)
 	local_scan_button.pressed.connect(_on_scan_pressed)
 	confirm_button.pressed.connect(_confirm_selected_target)
@@ -99,6 +111,15 @@ func set_models(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_know
 	knowledge = p_knowledge
 	_rebuild_neighborhood()
 
+func apply_accessibility(config: Resource) -> void:
+	if config != null:
+		accessibility_config = config
+	for visual: NodeVisual in node_visuals.values():
+		visual.set_reduced_animation(_reduced_animation_enabled())
+
+func _reduced_animation_enabled() -> bool:
+	return accessibility_config != null and bool(accessibility_config.get("reduced_animation"))
+
 func _on_session_started() -> void:
 	set_models(Game.network_graph, Game.player_network_position, Game.player_knowledge)
 
@@ -126,16 +147,28 @@ func _rebuild_neighborhood() -> void:
 	var map_top := 96.0
 	var map_bottom := size.y - 154.0
 	var center := Vector2((map_left + map_right) * 0.5, (map_top + map_bottom) * 0.5)
-	_add_node_visual(current_view, center, true, false)
-
 	var contacts := knowledge.get_local_contacts(current_id)
 	var total_slots := contacts.size()
+	_visible_node_count = total_slots + 1
+	var detail_level: int = visualization_config.detail_level_for(_graph_zoom, _visible_node_count)
+	var current_radius: float = visualization_config.radius_for_lod(true, detail_level)
+	var connected_radius: float = visualization_config.radius_for_lod(false, detail_level)
+	_add_node_visual(current_view, center, true, false)
+	var required_orbit: float = visualization_config.minimum_center_spacing / maxf(0.45, 2.0 * sin(PI / maxf(3.0, float(total_slots))))
+	var orbit_x: float = maxf(visualization_config.preferred_horizontal_orbit, required_orbit)
+	var orbit_y: float = maxf(visualization_config.preferred_vertical_orbit, required_orbit * 0.72)
+	orbit_x = minf(orbit_x, maxf(0.0, (map_right - map_left) * 0.5 - visualization_config.visual_size().x * 0.5 - visualization_config.map_edge_padding))
+	orbit_y = minf(orbit_y, maxf(0.0, (map_bottom - map_top) * 0.5 - visualization_config.visual_size().y * 0.5 - visualization_config.map_edge_padding))
 	var slot := 0
 	for contact in contacts:
-		var angle := _slot_angle(slot, maxi(total_slots, 1))
-		var visual_position := center + Vector2(cos(angle) * minf((map_right - map_left) * 0.31, 245.0), sin(angle) * minf((map_bottom - map_top) * 0.31, 155.0))
+		var visual_position: Vector2
+		if total_slots <= visualization_config.close_density_limit:
+			var angle := _slot_angle(slot, maxi(total_slots, 1))
+			visual_position = center + Vector2(cos(angle) * orbit_x, sin(angle) * orbit_y)
+		else:
+			visual_position = _dense_contact_position(slot, total_slots, Rect2(Vector2(map_left, map_top), Vector2(map_right - map_left, map_bottom - map_top)), center)
 		if contact.kind == &"NODE":
-			_add_link_visual(contact.contact_id, center, visual_position, false)
+			_add_link_visual(contact.contact_id, center, visual_position, false, current_radius, connected_radius)
 			_add_node_visual(contact.node, visual_position, false, true)
 			scan_targets[contact.node.id] = {"kind": ScanSystem.NODE, "node_id": contact.node.id}
 			scan_targets[contact.contact_id] = {"kind": ScanSystem.LINK, "contact_id": contact.contact_id}
@@ -144,7 +177,7 @@ func _rebuild_neighborhood() -> void:
 			target_order.append(contact.node.id)
 		else:
 			var fragment_position := center.lerp(visual_position, 0.72)
-			_add_link_visual(contact.contact_id, center, fragment_position, true)
+			_add_link_visual(contact.contact_id, center, fragment_position, true, current_radius, connected_radius)
 			_add_unknown_visual(fragment_position, "UNKNOWN NODE" if contact.kind == &"UNKNOWN_NODE" else "UNKNOWN SIGNAL", contact.contact_id)
 			scan_targets[contact.contact_id] = {"kind": ScanSystem.LINK, "contact_id": contact.contact_id}
 			target_views[contact.contact_id] = {"kind": contact.kind, "title": "UNKNOWN NODE" if contact.kind == &"UNKNOWN_NODE" else "UNKNOWN SIGNAL", "scan_target": scan_targets[contact.contact_id]}
@@ -164,28 +197,60 @@ func _rebuild_neighborhood() -> void:
 func _add_node_visual(node_view: Dictionary, center: Vector2, current: bool, selectable: bool) -> void:
 	var visual := NODE_SCENE.instantiate() as NodeVisual
 	node_layer.add_child(visual)
+	visual.apply_visualization_config(visualization_config)
+	visual.set_reduced_animation(_reduced_animation_enabled())
+	visual.set_view_context(_graph_zoom, _visible_node_count)
 	visual.position = center - visual.size * 0.5
 	var node_id: StringName = node_view.get("id", &"")
 	visual.configure_view(node_view, current, selectable, _security_visible_at(node_id))
+	if _knowledge_view_history.has(node_id):
+		visual.play_knowledge_resolution(_knowledge_view_history[node_id])
+	_knowledge_view_history[node_id] = node_view.duplicate(true)
 	visual.selected.connect(_on_node_selected)
 	visual.scan_requested.connect(_on_scan_target_requested)
+	visual.capability_selected.connect(_on_node_capability_selected)
 	node_visuals[node_id] = visual
 
 func _add_unknown_visual(center: Vector2, unknown_title: String, contact_id: StringName) -> void:
 	var visual := NODE_SCENE.instantiate() as NodeVisual
 	node_layer.add_child(visual)
+	visual.apply_visualization_config(visualization_config)
+	visual.set_reduced_animation(_reduced_animation_enabled())
+	visual.set_view_context(_graph_zoom, _visible_node_count)
 	visual.position = center - visual.size * 0.5
 	visual.configure_unknown(contact_id)
 	visual.title = unknown_title
 	visual.scan_requested.connect(_on_scan_target_requested)
 
-func _add_link_visual(link_id: StringName, start: Vector2, finish: Vector2, unknown: bool) -> void:
+func _add_link_visual(link_id: StringName, start: Vector2, finish: Vector2, unknown: bool, start_radius: float, finish_radius: float) -> void:
 	var visual := LinkVisualScript.new() as LinkVisual
 	link_layer.add_child(visual)
-	visual.configure(link_id, start, finish, unknown)
+	var clipped_start := _hex_endpoint(start, finish, start_radius + visualization_config.endpoint_clearance)
+	var clipped_finish := _hex_endpoint(finish, start, finish_radius + visualization_config.endpoint_clearance)
+	visual.configure(link_id, clipped_start, clipped_finish, unknown, visualization_config)
+	visual.set_view_context(_graph_zoom, _visible_node_count, visualization_config)
 	visual.scan_requested.connect(_on_scan_target_requested)
 	visual.selected.connect(_select_target)
 	link_visuals[link_id] = visual
+
+func _hex_endpoint(center: Vector2, toward: Vector2, radius: float) -> Vector2:
+	var direction := (toward - center).normalized()
+	if direction == Vector2.ZERO: return center
+	var ray_end := center + direction * radius * 3.0
+	var nearest := ray_end
+	var nearest_distance := INF
+	var vertices := PackedVector2Array()
+	for index in 6:
+		var angle := -PI * 0.5 + TAU * float(index) / 6.0
+		vertices.append(center + Vector2(cos(angle), sin(angle)) * radius)
+	for index in 6:
+		var hit: Variant = Geometry2D.segment_intersects_segment(center, ray_end, vertices[index], vertices[(index + 1) % 6])
+		if hit is Vector2:
+			var distance := center.distance_to(hit)
+			if distance < nearest_distance:
+				nearest = hit
+				nearest_distance = distance
+	return nearest
 
 func _rebuild_services(current_node_id: StringName) -> void:
 	for child in service_list.get_children():
@@ -236,6 +301,30 @@ func _on_node_selected(node_id: StringName) -> void:
 		return
 	_select_target(node_id)
 
+func _on_node_capability_selected(node_id: StringName, capability_type: int) -> void:
+	var definition: Resource = visualization_config.capability_catalog.definition_for(capability_type)
+	if definition == null:
+		return
+	selected_target_id = &""
+	for visual_id in node_visuals:
+		(node_visuals[visual_id] as NodeVisual).set_destination_emphasis(visual_id == node_id)
+	target_title.text = "%s // %s" % [String(definition.display_name).to_upper(), String(node_id)]
+	var count: int = int(knowledge.get_known_node_capability_counts(node_id).get(capability_type, 1))
+	var details: PackedStringArray = [String(definition.tooltip_description), "DISCOVERED // %d" % int(count)]
+	var matching_services: PackedStringArray = []
+	for service: Dictionary in knowledge.get_services_at(node_id):
+		if (service.get("capability_types", []) as Array).has(capability_type):
+			matching_services.append(String(service.get("display_name", "KNOWN SERVICE")))
+	if not matching_services.is_empty():
+		details.append("KNOWN SERVICES")
+		for service_name in matching_services: details.append("  %s" % service_name)
+	target_details.text = "\n".join(details)
+	target_cost.text = "CAPABILITY FILTER // ACTIVE"
+	program_cost_label.text = "    INSPECTION // %s" % String(definition.display_name).to_upper()
+	confirm_button.disabled = true
+	target_scan_button.disabled = true
+	status_label.text = "NODE INSPECTOR // CAPABILITY FILTERED"
+
 func _on_scan_pressed() -> void:
 	if _transition_active or position_model == null:
 		return
@@ -266,11 +355,11 @@ func _on_traversal_started(_from_id: StringName, to_id: StringName, link_id: Str
 	var destination := node_visuals.get(to_id) as NodeVisual
 	if destination != null:
 		destination.set_destination_emphasis(true)
-		var tween := create_tween().set_loops(2)
-		tween.tween_property(destination, "scale", Vector2(1.1, 1.1), 0.12)
-		tween.tween_property(destination, "scale", Vector2.ONE, 0.12)
 
 func _on_position_changed(_from_id: StringName, _to_id: StringName, _link_id: StringName) -> void:
+	if _reduced_animation_enabled():
+		_finish_transition()
+		return
 	var tween := create_tween()
 	tween.tween_interval(0.5)
 	tween.tween_callback(_finish_transition)
@@ -283,6 +372,11 @@ func _on_display_update_requested() -> void:
 	if not _transition_active:
 		_rebuild_neighborhood()
 
+func _on_san_relocated(_san_id: StringName, _previous_node_id: StringName, current_node_id: StringName) -> void:
+	var visual := node_visuals.get(current_node_id) as NodeVisual
+	if visual != null:
+		visual.play_san_arrival()
+
 func _on_resized() -> void:
 	queue_redraw()
 	if not _transition_active:
@@ -294,6 +388,47 @@ func _flash_status() -> void:
 
 func _slot_angle(index: int, count: int) -> float:
 	return -PI * 0.5 + TAU * float(index) / float(count)
+
+func _dense_contact_position(index: int, count: int, map_rect: Rect2, center: Vector2) -> Vector2:
+	var aspect := map_rect.size.x / maxf(map_rect.size.y, 1.0)
+	var columns := maxi(2, int(ceil(sqrt(float(count + 1) * aspect))))
+	var rows := maxi(2, int(ceil(float(count + 1) / float(columns))))
+	var center_column := columns / 2
+	var center_row := rows / 2
+	var cell_index := index
+	var reserved_index := center_row * columns + center_column
+	if cell_index >= reserved_index: cell_index += 1
+	var column := cell_index % columns
+	var row := cell_index / columns
+	var cell_size := Vector2(map_rect.size.x / float(columns), map_rect.size.y / float(rows))
+	var position := map_rect.position + Vector2((float(column) + 0.5) * cell_size.x, (float(row) + 0.5) * cell_size.y)
+	# The current node retains the exact visual center; its reserved grid cell
+	# keeps dense contacts from being placed on top of it.
+	if position.distance_to(center) < minf(cell_size.x, cell_size.y) * 0.35:
+		position.x += cell_size.x * 0.42
+	return position
+
+func set_graph_zoom(value: float) -> void:
+	var next_zoom := clampf(value, 0.3, 1.25)
+	if is_equal_approx(next_zoom, _graph_zoom): return
+	_graph_zoom = next_zoom
+	_rebuild_neighborhood()
+
+func graph_detail_level() -> int:
+	return visualization_config.detail_level_for(_graph_zoom, _visible_node_count)
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not visible or not event is InputEventMouseButton or not event.pressed:
+		return
+	var graph_rect := Rect2(Vector2(276.0, 94.0), Vector2(maxf(0.0, size.x - 592.0), maxf(0.0, size.y - 248.0)))
+	if not graph_rect.has_point(event.position):
+		return
+	if event.button_index == MOUSE_BUTTON_WHEEL_UP:
+		set_graph_zoom(_graph_zoom + 0.1)
+		get_viewport().set_input_as_handled()
+	elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		set_graph_zoom(_graph_zoom - 0.1)
+		get_viewport().set_input_as_handled()
 
 func _security_visible_at(node_id: StringName) -> bool:
 	if knowledge.knows_security_at(node_id):

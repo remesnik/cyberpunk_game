@@ -1,0 +1,139 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://debug/visualization/NodeVisualizationLab.gd" id="1"]
+
+[node name="NodeVisualizationLab" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Controls" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -278.0
+grow_horizontal = 0
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="Controls"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 14
+
+[node name="Options" type="VBoxContainer" parent="Controls/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="Title" type="Label" parent="Controls/Margin/Options"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "NODE VISUALIZATION LAB"
+
+[node name="Help" type="Label" parent="Controls/Margin/Options"]
+layout_mode = 2
+text = "Production NodeVisual state controls"
+
+[node name="KnowledgeToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+button_pressed = true
+text = "PLAYER KNOWLEDGE"
+
+[node name="LevelToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "LEVEL KNOWN"
+
+[node name="ScanToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SCANNED"
+
+[node name="CapabilityToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CAPABILITIES DISCOVERED"
+
+[node name="SanToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SAN PRESENT"
+
+[node name="IceToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ICE PRESENT"
+
+[node name="ObjectiveToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "OBJECTIVE"
+
+[node name="CompromiseToggle" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "COMPROMISED"
+
+[node name="SecurityLabel" type="Label" parent="Controls/Margin/Options"]
+layout_mode = 2
+text = "SECURITY LEVEL"
+
+[node name="SecurityLevel" type="SpinBox" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+max_value = 5.0
+value = 3.0
+
+[node name="ReducedAnimation" type="CheckButton" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "REDUCED ANIMATION"
+
+[node name="ZoomLabel" type="Label" parent="Controls/Margin/Options"]
+layout_mode = 2
+text = "VIEW ZOOM / LOD"
+
+[node name="ZoomSlider" type="HSlider" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+min_value = 0.3
+max_value = 1.25
+step = 0.05
+value = 1.0
+
+[node name="LodReadout" type="Label" parent="Controls/Margin/Options"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "ZOOM 1.00 // LOD CLOSE"
+
+[node name="PreviewCanvas" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = -278.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="LinkLayer" type="Node2D" parent="PreviewCanvas"]
+unique_name_in_owner = true
+
+[node name="NodeLayer" type="Control" parent="PreviewCanvas"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1

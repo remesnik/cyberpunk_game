@@ -1,0 +1,155 @@
+[gd_resource type="Resource" script_class="NodeCapabilityCatalog" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://cyberspace/display/NodeCapabilityCatalog.gd" id="1"]
+[ext_resource type="Script" path="res://cyberspace/display/NodeCapabilityDefinition.gd" id="2"]
+
+[sub_resource type="Resource" id="IO"]
+script = ExtResource("2")
+capability_type = 0
+display_name = "IO"
+glyph = "IO"
+tooltip_description = "Bidirectional network or device interface."
+source_tags = Array[StringName]([&"IO", &"ROUTING", &"RELAY", &"ENTRY", &"EXIT", &"COMMUNICATIONS", &"COMMS", &"VOIP", &"RADIO", &"PHONE"])
+priority = 100
+preferred_socket = 10
+
+[sub_resource type="Resource" id="Feed"]
+script = ExtResource("2")
+capability_type = 1
+display_name = "FEED"
+glyph = "FD"
+tooltip_description = "Live video, audio, telemetry, or sensor stream."
+source_tags = Array[StringName]([&"FEED", &"VIDEO", &"CAMERA", &"AUDIO"])
+priority = 70
+preferred_socket = 7
+
+[sub_resource type="Resource" id="Datastore"]
+script = ExtResource("2")
+capability_type = 2
+display_name = "Datastore"
+glyph = "DS"
+tooltip_description = "Files, archives, or stored data available."
+source_tags = Array[StringName]([&"DATA", &"DATASTORE", &"FILE", &"ARCHIVE"])
+priority = 90
+preferred_socket = 9
+
+[sub_resource type="Resource" id="Database"]
+script = ExtResource("2")
+capability_type = 3
+display_name = "Database"
+glyph = "DB"
+tooltip_description = "Structured data service detected."
+source_tags = Array[StringName]([&"DATABASE", &"DB"])
+priority = 80
+preferred_socket = 8
+
+[sub_resource type="Resource" id="Meatspace"]
+script = ExtResource("2")
+capability_type = 4
+display_name = "MEAT SPACE"
+glyph = "MS"
+tooltip_description = "Can affect or observe the physical world."
+palette_role = 1
+source_tags = Array[StringName]([&"MEATSPACE", &"PHYSICAL", &"VIDEO", &"CAMERA", &"ALARM", &"SENSOR", &"ACCESS_CONTROL"])
+priority = 40
+preferred_socket = 4
+
+[sub_resource type="Resource" id="Communications"]
+script = ExtResource("2")
+capability_type = 5
+display_name = "Communications"
+glyph = "CM"
+tooltip_description = "Voice, radio, messaging, or call routing."
+source_tags = Array[StringName]([&"COMMUNICATIONS", &"COMMS", &"VOIP", &"RADIO", &"PHONE"])
+priority = 60
+preferred_socket = 6
+
+[sub_resource type="Resource" id="Control"]
+script = ExtResource("2")
+capability_type = 6
+display_name = "CONTROL"
+glyph = "CT"
+tooltip_description = "Actuator or controllable system detected."
+palette_role = 1
+source_tags = Array[StringName]([&"CONTROL_SYSTEM", &"CONTROL", &"VIDEO", &"CAMERA", &"ALARM", &"ACCESS_CONTROL"])
+priority = 50
+preferred_socket = 5
+
+[sub_resource type="Resource" id="Security"]
+script = ExtResource("2")
+capability_type = 7
+display_name = "Security"
+glyph = "SC"
+tooltip_description = "Security infrastructure or enforcement service."
+palette_role = 2
+source_tags = Array[StringName]([&"SECURITY", &"ALARM", &"ACCESS_CONTROL"])
+priority = 20
+preferred_socket = 2
+
+[sub_resource type="Resource" id="Ice"]
+script = ExtResource("2")
+capability_type = 8
+display_name = "ICE"
+glyph = "IC"
+tooltip_description = "Known defensive ICE process."
+palette_role = 3
+source_tags = Array[StringName]([&"ICE"])
+priority = 30
+preferred_socket = 3
+
+[sub_resource type="Resource" id="Software"]
+script = ExtResource("2")
+capability_type = 9
+display_name = "Software"
+glyph = "SW"
+tooltip_description = "Program, package, or executable resource."
+source_tags = Array[StringName]([&"SOFTWARE", &"PROGRAM", &"LOOT", &"CACHE"])
+priority = 110
+preferred_socket = 1
+
+[sub_resource type="Resource" id="Credentials"]
+script = ExtResource("2")
+capability_type = 10
+display_name = "Credentials"
+glyph = "CR"
+tooltip_description = "Credential or authentication material."
+palette_role = 2
+source_tags = Array[StringName]([&"CREDENTIALS", &"AUTH", &"IDENTITY"])
+priority = 120
+preferred_socket = 0
+
+[sub_resource type="Resource" id="Process"]
+script = ExtResource("2")
+capability_type = 11
+display_name = "Active Process"
+glyph = "PR"
+tooltip_description = "Known process currently executing."
+source_tags = Array[StringName]([&"ACTIVE_PROCESS", &"PROCESS", &"DAEMON"])
+priority = 130
+preferred_socket = 1
+
+[sub_resource type="Resource" id="San"]
+script = ExtResource("2")
+capability_type = 12
+display_name = "SAN"
+glyph = "SAN"
+tooltip_description = "System Access Node or active deck connection."
+palette_role = 4
+source_tags = Array[StringName]([&"SYSTEM_ACCESS_NODE", &"SAN"])
+priority = 0
+preferred_socket = 0
+
+[sub_resource type="Resource" id="Objective"]
+script = ExtResource("2")
+capability_type = 13
+display_name = "Objective"
+glyph = "OBJ"
+tooltip_description = "Mission-relevant system or interaction."
+palette_role = 5
+source_tags = Array[StringName]([&"OBJECTIVE"])
+priority = 10
+preferred_socket = 11
+
+[resource]
+script = ExtResource("1")
+definitions = Array[Resource]([SubResource("IO"), SubResource("Feed"), SubResource("Datastore"), SubResource("Database"), SubResource("Meatspace"), SubResource("Communications"), SubResource("Control"), SubResource("Security"), SubResource("Ice"), SubResource("Software"), SubResource("Credentials"), SubResource("Process"), SubResource("San"), SubResource("Objective")])

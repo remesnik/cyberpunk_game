@@ -1,6 +1,8 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://cyberspace/display/NetworkDisplay.gd" id="1_display"]
+[ext_resource type="PackedScene" path="res://cyberspace/display/SecurityLevelLegend.tscn" id="2_legend"]
+[ext_resource type="PackedScene" path="res://cyberspace/display/CapabilityGlossary.tscn" id="3_glossary"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.008, 0.025, 0.045, 0.94)
@@ -47,6 +49,22 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
+
+[node name="SecurityLevelLegend" parent="." instance=ExtResource("2_legend")]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 276.0
+offset_top = 94.0
+offset_right = 430.0
+offset_bottom = 130.0
+
+[node name="CapabilityGlossary" parent="." instance=ExtResource("3_glossary")]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 438.0
+offset_top = 94.0
+offset_right = 648.0
+offset_bottom = 130.0
 
 [node name="Header" type="VBoxContainer" parent="."]
 visible = false

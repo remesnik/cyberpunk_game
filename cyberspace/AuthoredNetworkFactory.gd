@@ -11,7 +11,9 @@ static func build(document: CyberspaceContentDocument, entry_node_id: StringName
 			var definition: Dictionary = services.get(service_id, {})
 			var vulnerabilities: Array[StringName] = []
 			vulnerabilities.assign(definition.get("vulnerabilities", []))
-			node.add_service(service_id, definition.get("display_name", service_id), int(definition.get("security_level", data.get("security_level", 0))), vulnerabilities)
+			var tags: Array[StringName] = []
+			tags.assign(definition.get("tags", []))
+			node.add_service(service_id, definition.get("display_name", service_id), int(definition.get("security_level", data.get("security_level", 0))), vulnerabilities, tags, definition.get("capability_types", []))
 		graph.add_node(node)
 	for data: Dictionary in document.network_links:
 		var link := NetworkLinkDefinition.new(data.id, data.source, data.destination, bool(data.get("one_way", false)), bool(data.get("hidden", false)), bool(data.get("locked", false)), bool(data.get("disabled", false)), bool(data.get("discovered", not bool(data.get("hidden", false)))), int(data.get("traversal_cost", 1)), int(data.get("authority_requirement", 0)), data.get("capability_requirement", &""))
@@ -21,6 +23,7 @@ static func build(document: CyberspaceContentDocument, entry_node_id: StringName
 	for data: Dictionary in document.network_nodes:
 		var level := _knowledge_level(data.get("starting_discovery_state", &"UNKNOWN"))
 		if level > KnowledgeLevel.Value.UNKNOWN: knowledge.reveal_node(graph.get_node(data.id), level)
+	knowledge.mark_node_visited(graph.get_node(entry_node_id), &"INITIAL_POSITION")
 	return {"graph": graph, "position": position, "knowledge": knowledge}
 
 static func _node_type(value: StringName) -> NetworkNodeDefinition.NodeType:

@@ -29,8 +29,8 @@ func add_connected_link(link_id: StringName) -> void:
 	if not connected_links.has(link_id):
 		connected_links.append(link_id)
 
-func add_service(service_id: StringName, service_name: String, service_security: int, vulnerabilities: Array[StringName] = []) -> void:
-	services.append({"id": service_id, "display_name": service_name, "security_level": maxi(service_security, 0), "vulnerabilities": vulnerabilities.duplicate()})
+func add_service(service_id: StringName, service_name: String, service_security: int, vulnerabilities: Array[StringName] = [], tags: Array[StringName] = [], capability_types: Array = []) -> void:
+	services.append({"id": service_id, "display_name": service_name, "security_level": maxi(service_security, 0), "vulnerabilities": vulnerabilities.duplicate(), "tags": tags.duplicate(), "capability_types": capability_types.duplicate()})
 
 func access_requirements_met(capabilities: Array[StringName], credentials: Array[StringName]) -> bool:
 	for requirement in required_capabilities_all:

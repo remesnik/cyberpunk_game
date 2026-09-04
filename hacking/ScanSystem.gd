@@ -72,7 +72,9 @@ func _discover(kind: StringName, objective_id: StringName, depth: int) -> Array[
 	var discoveries: Array[Dictionary] = []
 	if kind in [CURRENT_NODE, NODE]:
 		var node := graph.get_node(objective_id)
-		var level := KnowledgeLevel.Value.IDENTIFIED if depth == 1 else KnowledgeLevel.Value.SCANNED
+		# Identity and scan-detail discoveries are separate so level/content facts
+		# can also arrive independently from story, comms, or another hacker.
+		var level := KnowledgeLevel.Value.IDENTIFIED
 		discoveries.append({"entity_kind": &"NODE", "entity_id": node.id, "level": level, "identity": node.display_name, "node_type": node.node_type})
 		if depth >= 2:
 			discoveries.append({"entity_kind": &"NODE_DETAILS", "entity_id": node.id, "owner": node.owner_faction, "security_level": node.security_level})
