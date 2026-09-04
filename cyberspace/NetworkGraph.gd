@@ -7,15 +7,38 @@ signal traversal_completed(from_node_id: StringName, to_node_id: StringName, lin
 signal display_update_requested
 
 enum TraversalError { OK, INVALID_SOURCE, INVALID_DESTINATION, NOT_CONNECTED, HIDDEN_LINK, LOCKED_LINK, DISABLED_LINK, AUTHORITY_REQUIRED, CAPABILITY_REQUIRED, INSUFFICIENT_POINTS, ALREADY_TRANSITIONING }
+const LEGACY_UNASSIGNED_SPHERE_ID := &"LEGACY_UNASSIGNED_SPHERE"
 
 var nodes: Dictionary = {}
 var links: Dictionary = {}
+var spheres: Dictionary = {}
+var security_sleeves: Dictionary = {}
+
+func add_sphere(sphere: SphereDefinition) -> bool:
+	if sphere == null or sphere.id == &"" or spheres.has(sphere.id): return false
+	spheres[sphere.id] = sphere
+	return true
+
+func add_security_sleeve(sleeve: SecuritySleeve) -> bool:
+	if sleeve == null or sleeve.id == &"" or security_sleeves.has(sleeve.id): return false
+	for node_id in sleeve.current_members:
+		if not nodes.has(node_id): return false
+	security_sleeves[sleeve.id] = sleeve
+	return true
 
 func add_node(node: NetworkNodeDefinition) -> bool:
-	if node.id == &"" or nodes.has(node.id):
+	if node.id == &"" or nodes.has(node.id) or (node.sphere_id != &"" and not spheres.has(node.sphere_id)):
 		return false
+	if node.sphere_id == &"":
+		_ensure_legacy_sphere()
+		node.sphere_id = LEGACY_UNASSIGNED_SPHERE_ID
 	nodes[node.id] = node
+	if node.sphere_id != &"": (spheres[node.sphere_id] as SphereDefinition).register_node(node.id)
 	return true
+
+func _ensure_legacy_sphere() -> void:
+	if not spheres.has(LEGACY_UNASSIGNED_SPHERE_ID):
+		add_sphere(SphereDefinition.new(LEGACY_UNASSIGNED_SPHERE_ID, "Legacy / Unassigned Sphere", [], &""))
 
 func add_link(link: NetworkLinkDefinition) -> bool:
 	if link.id == &"" or links.has(link.id) or not nodes.has(link.source) or not nodes.has(link.destination):
@@ -30,6 +53,42 @@ func get_node(node_id: StringName) -> NetworkNodeDefinition:
 
 func get_link(link_id: StringName) -> NetworkLinkDefinition:
 	return links.get(link_id) as NetworkLinkDefinition
+
+func get_sphere(sphere_id: StringName) -> SphereDefinition:
+	return spheres.get(sphere_id) as SphereDefinition
+
+func get_security_sleeve(sleeve_id: StringName) -> SecuritySleeve:
+	return security_sleeves.get(sleeve_id) as SecuritySleeve
+
+func sphere_for_node(node_id: StringName) -> SphereDefinition:
+	var node := get_node(node_id)
+	return get_sphere(node.sphere_id) if node != null and node.sphere_id != &"" else null
+
+func get_sphere_for_node(node_id: StringName) -> SphereDefinition:
+	return sphere_for_node(node_id)
+
+func get_nodes_in_sphere(sphere_id: StringName) -> Array[StringName]:
+	var sphere := get_sphere(sphere_id)
+	return sphere.node_ids.duplicate() if sphere != null else []
+
+func validate_structure() -> Array[Dictionary]:
+	var issues: Array[Dictionary] = []
+	for node: NetworkNodeDefinition in nodes.values():
+		if node.sphere_id != &"" and not spheres.has(node.sphere_id):
+			issues.append({"category": &"SPHERE", "entity_id": node.id, "reason": "Node references nonexistent sphere."})
+		elif node.sphere_id != &"" and not (spheres[node.sphere_id] as SphereDefinition).contains_node(node.id):
+			issues.append({"category": &"SPHERE", "entity_id": node.id, "reason": "Sphere membership is not reciprocal."})
+	for sphere: SphereDefinition in spheres.values():
+		if sphere.original_security_sleeve_id != &"" and not security_sleeves.has(sphere.original_security_sleeve_id):
+			issues.append({"category": &"SPHERE", "entity_id": sphere.id, "reason": "Original Security Sleeve does not exist."})
+		for node_id in sphere.node_ids:
+			var member := get_node(node_id)
+			if member == null: issues.append({"category": &"SPHERE", "entity_id": sphere.id, "reason": "Sphere contains nonexistent node.", "node_id": node_id})
+			elif member.sphere_id != sphere.id: issues.append({"category": &"SPHERE", "entity_id": member.id, "reason": "Node belongs to a different sphere."})
+	for sleeve: SecuritySleeve in security_sleeves.values():
+		for node_id in sleeve.current_members:
+			if not nodes.has(node_id): issues.append({"category": &"SECURITY_SLEEVE", "entity_id": sleeve.id, "reason": "Current member node does not exist.", "node_id": node_id})
+	return issues
 
 func get_visible_connected_nodes(from_node_id: StringName) -> Array[StringName]:
 	var result: Array[StringName] = []

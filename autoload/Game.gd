@@ -46,6 +46,7 @@ const MeatspaceManagementScript := preload("res://core/meatspace/MeatspaceManage
 const DoorstopSuspensionPolicyScript := preload("res://programs/doorstop/DoorstopSuspensionPolicy.gd")
 const SuspendedIntrusionAdvancerScript := preload("res://programs/doorstop/SuspendedIntrusionAdvancer.gd")
 const SystemAccessNodeControllerScript := preload("res://core/san/SystemAccessNodeController.gd")
+const CurrentSphereTrackerScript := preload("res://cyberspace/spheres/CurrentSphereTracker.gd")
 
 enum GameDomain { CYBERSPACE, MEATSPACE }
 
@@ -53,6 +54,7 @@ var session_active := false
 var network_graph: NetworkGraph
 var player_network_position: PlayerNetworkPosition
 var player_knowledge: PlayerKnowledge
+var sphere_tracker: CurrentSphereTracker
 var action_clock: ActionClock
 var cyberspace_clock: ActionClock
 var realtime_world_clock: Variant
@@ -119,6 +121,9 @@ func start_session() -> void:
 	network_graph = FacilityOperationFactory.create_graph()
 	player_network_position = FacilityOperationFactory.create_player()
 	player_knowledge = FacilityOperationFactory.create_knowledge(network_graph)
+	sphere_tracker = CurrentSphereTrackerScript.new(network_graph)
+	sphere_tracker.register_player(&"PLAYER", player_network_position)
+	sphere_tracker.sphere_changed.connect(EventBus.sphere_changed.emit)
 	cyberspace_clock = CyberspaceClockScript.new()
 	action_clock = cyberspace_clock
 	realtime_world_clock.start(true)
@@ -214,6 +219,7 @@ func end_session() -> void:
 	network_graph = null
 	player_network_position = null
 	player_knowledge = null
+	sphere_tracker = null
 	san_controller = null
 	action_clock = null
 	cyberspace_clock = null
@@ -233,6 +239,7 @@ func end_session() -> void:
 	deep_exploration = null
 	confrontation_controller = null
 	last_confrontation_result = null
+
 	mission = null
 	program_inventory = null
 	program_loadout = null
@@ -254,6 +261,15 @@ func end_session() -> void:
 	if facility_scenario != null:
 		facility_scenario.queue_free()
 		facility_scenario = null
+
+func get_current_sphere(player_id: StringName = &"PLAYER") -> SphereDefinition:
+	return sphere_tracker.get_current_sphere(player_id) if sphere_tracker != null else null
+
+func get_sphere_for_node(node_id: StringName) -> SphereDefinition:
+	return network_graph.get_sphere_for_node(node_id) if network_graph != null else null
+
+func get_nodes_in_sphere(sphere_id: StringName) -> Array[StringName]:
+	return network_graph.get_nodes_in_sphere(sphere_id) if network_graph != null else []
 
 
 func _ensure_realtime_world_clock() -> void:

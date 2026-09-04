@@ -16,6 +16,23 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 	var program_ids := _ids(document.program_definitions)
 	var comms_channel_ids := _ids(document.comms_channels)
 	var ice_definition_ids := _ids(document.ice_definitions)
+	var sphere_ids := _ids(document.spheres)
+	var sleeve_ids := _ids(document.security_sleeves)
+	for node: Dictionary in document.network_nodes:
+		var sphere_id: StringName = node.get("sphere_id", &"")
+		if sphere_id == &"": issues.append(_issue("WARNING", "SPHERES", node.id, "Network node has no persistent Sphere membership."))
+		elif sphere_id not in sphere_ids: issues.append(_issue("ERROR", "SPHERES", node.id, "Network node references missing Sphere '%s'." % sphere_id))
+	for sphere: Dictionary in document.spheres:
+		if sphere.get("original_security_sleeve_id", &"") != &"" and sphere.get("original_security_sleeve_id") not in sleeve_ids: issues.append(_issue("ERROR", "SPHERES", sphere.id, "Sphere references a missing original Security Sleeve."))
+		for member_id in sphere.get("node_ids", []):
+			if member_id not in node_ids: issues.append(_issue("ERROR", "SPHERES", sphere.id, "Sphere member node '%s' is missing." % member_id))
+			else:
+				var member := document.network_nodes.filter(func(node): return node.get("id", &"") == member_id)[0] as Dictionary
+				if member.get("sphere_id", &"") != sphere.id: issues.append(_issue("ERROR", "SPHERES", member_id, "Node and Sphere membership disagree."))
+	for sleeve: Dictionary in document.security_sleeves:
+		if sleeve.get("state", &"INTACT") not in [&"INTACT", &"BREACHED", &"SPLIT", &"BYPASSED", &"DISABLED"]: issues.append(_issue("ERROR", "SECURITY SLEEVES", sleeve.id, "Security Sleeve state is invalid."))
+		for member_id in sleeve.get("current_members", []):
+			if member_id not in node_ids: issues.append(_issue("ERROR", "SECURITY SLEEVES", sleeve.id, "Current sleeve member '%s' is missing." % member_id))
 	for link: Dictionary in document.network_links:
 		if link.get("source", &"") not in node_ids: issues.append(_issue("ERROR", "NETWORK", link.id, "Link source does not exist."))
 		if link.get("destination", &"") not in node_ids: issues.append(_issue("ERROR", "NETWORK", link.id, "Link destination does not exist."))

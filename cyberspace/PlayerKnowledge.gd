@@ -10,6 +10,7 @@ var node_records: Dictionary = {}
 var link_records: Dictionary = {}
 var ice_records: Dictionary = {}
 var hacker_records: Dictionary = {}
+var security_sleeve_records: Dictionary = {}
 var service_records: Dictionary = {}
 var realtime_endpoint_records: Dictionary = {}
 var realtime_process_records: Dictionary = {}
@@ -17,6 +18,28 @@ var ice_observations: Array[Dictionary] = []
 ## Tracks only already-discovered contributors, preventing repeated observations
 ## from inflating category counts. This is knowledge state, never world state.
 var node_capability_sources: Dictionary = {}
+
+func reveal_security_sleeve(sleeve: SecuritySleeve, graph: NetworkGraph, source: StringName = &"OBSERVATION") -> void:
+	if sleeve == null or graph == null: return
+	var known_members: Array[StringName] = []
+	for node_id in sleeve.current_members:
+		if player_knows_node_exists(node_id): known_members.append(node_id)
+	security_sleeve_records[sleeve.id] = {
+		"id": sleeve.id,
+		"display_name": sleeve.display_name,
+		"state": sleeve.state,
+		"current_members": known_members,
+		"source": source,
+	}
+	knowledge_changed.emit()
+
+func knows_security_sleeve(sleeve_id: StringName) -> bool:
+	return security_sleeve_records.has(sleeve_id)
+
+func get_known_security_sleeves() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for record: Dictionary in security_sleeve_records.values(): result.append(record.duplicate(true))
+	return result
 
 
 func observe_hacker(actor: HackerNPC) -> void:

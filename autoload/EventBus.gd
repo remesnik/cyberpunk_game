@@ -7,6 +7,7 @@ signal debug_visibility_changed(is_visible: bool)
 signal network_traversal_started(from_node_id: StringName, to_node_id: StringName, link_id: StringName)
 signal network_time_advanced(time_units: int)
 signal network_position_changed(from_node_id: StringName, to_node_id: StringName, link_id: StringName)
+signal sphere_changed(player_id: StringName, previous_sphere_id: StringName, new_sphere_id: StringName, entry_node_id: StringName)
 signal network_display_update_requested
 signal simulation_tick_advanced(previous_tick: int, current_tick: int, amount: int)
 signal action_resolved(request: ActionRequest, result: ActionResult)

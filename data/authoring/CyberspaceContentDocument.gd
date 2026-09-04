@@ -1,9 +1,9 @@
 class_name CyberspaceContentDocument
 extends Resource
 
-const SCHEMA_VERSION := 3
+const SCHEMA_VERSION := 4
 const COLLECTIONS: Array[StringName] = [
-	&"network_nodes", &"network_links", &"services", &"graffiti", &"flavor_text",
+	&"spheres", &"security_sleeves", &"network_nodes", &"network_links", &"services", &"graffiti", &"flavor_text",
 	&"story_hooks", &"story_bundles", &"story_variables", &"meatspace_locations",
 	&"realtime_endpoints", &"physical_devices", &"comms_channels", &"comms_sessions",
 	&"comms_participants", &"video_feeds", &"alarms", &"physical_teams",
@@ -25,6 +25,8 @@ const COLLECTIONS: Array[StringName] = [
 
 @export var network_nodes: Array[Dictionary] = []
 @export var network_links: Array[Dictionary] = []
+@export var spheres: Array[Dictionary] = []
+@export var security_sleeves: Array[Dictionary] = []
 @export var services: Array[Dictionary] = []
 @export var graffiti: Array[Dictionary] = []
 @export var flavor_text: Array[Dictionary] = []
