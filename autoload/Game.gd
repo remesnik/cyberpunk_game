@@ -112,6 +112,7 @@ var failure_controller: FailureRecoveryController
 var deep_exploration: DeepExplorationController
 var confrontation_controller: ConfrontationController
 var last_confrontation_result: ConfrontationResult
+var entry_guidance: AuthoredEntryGuidance
 var mission: Variant
 var facility_scenario: FacilityOperationScenario
 var program_inventory: ProgramInventory
@@ -240,6 +241,11 @@ func complete_intrusion_and_return_to_meatspace(completion_data: Dictionary = {}
 	if intrusion_session == null: return {"success": false, "reason": "No intrusion is active."}
 	var completed := intrusion_session.complete_normally(completion_data)
 	if not completed.success: return completed
+	if persistent_game_state.game_mode == GameMode.Value.STORY and active_content_document != null and active_content_document.document_id == &"FIRST_CONTACT":
+		persistent_game_state.campaign_state.get_or_add("story_flags", {})["FIRST_CONTACT_COMPLETE"] = true
+		var completed_ids: Array = persistent_game_state.campaign_state.get("completed_mission_ids", [])
+		if "FIRST_CONTACT" not in completed_ids: completed_ids.append("FIRST_CONTACT")
+		persistent_game_state.campaign_state["completed_mission_ids"] = completed_ids
 	return enter_meatspace(MeatspaceAutosaveServiceScript.Reason.MISSION_COMPLETE, completion_data)
 
 func serialize_persistent_state() -> Dictionary:
@@ -551,6 +557,10 @@ func start_session() -> void:
 	_restore_saved_meatspace_runtime()
 	session_active = true
 	EventBus.session_started.emit()
+	if active_content_document != null:
+		entry_guidance = AuthoredEntryGuidance.new()
+		add_child(entry_guidance)
+		entry_guidance.configure(active_content_document, persistent_game_state, player_network_position.current_node_id)
 
 
 func _create_program_loadout(create_connection := true) -> void:
@@ -632,6 +642,10 @@ func _create_free_roam_job_board() -> void:
 
 
 func end_session() -> void:
+	if entry_guidance != null:
+		entry_guidance.active = false
+		entry_guidance.queue_free()
+		entry_guidance = null
 	session_active = false
 	if realtime_world_clock != null:
 		realtime_world_clock.stop()

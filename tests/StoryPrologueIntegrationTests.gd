@@ -1,55 +1,85 @@
 extends Node
-
 var failures := 0
 var assertions := 0
 
 func _ready() -> void:
 	Game.create_new_game(GameMode.Value.STORY)
-	Game.start_session()
-	_expect(Game.active_content_profile.get("kind", &"") == &"MEATSPACE_PROLOGUE", "Story Mode begins in the authored meat-space prologue")
-	_expect(Game.game_domain == Game.GameDomain.MEATSPACE and Game.prologue_controller != null, "bedroom is playable before cyberspace entry")
-	_expect(Game.san_controller.get_san(Game.intrusion_run_id) == null, "no SAN exists before the authored Jack In")
-	var screen := (load("res://ui/story_prologue/StoryPrologueScreen.tscn") as PackedScene).instantiate() as StoryPrologueScreen
-	add_child(screen)
-	_expect(screen.visible and screen.interaction_list.get_child_count() == 1, "playable bedroom screen renders available authored objects")
-	(screen.bedroom.objects[&"JACK_IN_INTERFACE"] as MeatspaceTarget3D).activate()
-	screen._physical_action(&"JACK_IN_INTERFACE", &"STORY")
-	_expect(Game.prologue_controller.selected_interaction_id == &"CLAN_TERMINAL" and screen.choice_panel.visible, "3D selection reaches authored Story Mode choice UI")
-	var definition := load("res://data/authoring/story_prologue.tres") as MeatspacePrologueDefinition
-	_expect(definition.validate().is_empty() and definition.interactions.size() == 6, "prologue interactions and choices are data-driven and valid")
-
-	_choose(&"CLAN_TERMINAL", &"CLAN_GHOSTS")
-	_expect(Game.persistent_game_state.player_state.clan_id == &"GHOSTS", "clan/play style persists through story flags and player state")
-	_choose(&"DECK_CRATE", &"DECK_SCOUT")
-	_expect(screen.bedroom.display_anchors[0].get_child_count() == 0, "deck choice leaves the display table empty")
-	_expect(Game.persistent_game_state.player_state.deck_id == &"STARTER_SCOUT" and Game.persistent_game_state.player_state.hardware.DECK_RAM == 2, "starter deck choice changes persistent configuration")
-	var credits_before := int(Game.persistent_game_state.player_state.credits)
-	_choose(&"TOOLBOX", &"ADD_MEMORY")
-	_expect(Game.persistent_game_state.player_state.hardware.DECK_RAM == 3 and Game.persistent_game_state.player_state.credits == credits_before - 75, "optional toolbox uses hardware and currency state")
-	_choose(&"DECK_CHAIR", &"JACK_IN")
-	_choose(&"BBS_DIALER", &"CONNECT_BBS")
-	_choose(&"BBS_HELP_DESK", &"READ_BOARD")
-	_expect(Game.prologue_controller != null and Game.persistent_game_state.campaign_state.story_flags.BBS_READ, "optional BBS interaction does not prematurely start the tutorial")
-	_choose(&"BBS_HELP_DESK", &"ASK_FOR_GUIDE")
-	_expect(Game.active_content_document != null and Game.active_content_document.document_id == &"FIRST_CONTACT", "asking for guidance hands off to FIRST_CONTACT")
-	_expect(Game.player_network_position.current_node_id == &"ENTRY" and Game.san_controller.get_san(Game.intrusion_run_id) != null, "FIRST_CONTACT creates the real intrusion and SAN only after Jack In")
-	_expect(Game.program_loadout.is_installed(&"STARTER_ROUTE_SNIFFER_001"), "selected prologue loadout is applied to the tutorial intrusion")
-	_expect(Game.persistent_game_state.campaign_state.story_flags.PROLOGUE_COMPLETE and Game.persistent_game_state.campaign_state.story_flags.LATCH_CONTACTED, "prologue and Latch contact flags persist")
-	_expect(not screen.visible, "bedroom screen yields cleanly when FIRST_CONTACT begins")
-	screen.queue_free()
-	Game.end_session()
+	var main := (load("res://Main.tscn") as PackedScene).instantiate()
+	add_child(main)
 	await get_tree().process_frame
-	await get_tree().create_timer(0.15).timeout
+	await get_tree().physics_frame
+	var screen := main.get_node("StoryPrologueScreen") as StoryPrologueScreen
+	var network := main.get_node("NetworkDisplay")
+	var room := screen.bedroom
+	var controller := Game.prologue_controller
+	_expect(Game.game_domain == Game.GameDomain.MEATSPACE and screen.visible, "fresh save opens the existing bedroom")
+	_expect("25 ICs" in screen.phase_label.text and not room.objects[&"JACK_IN_INTERFACE"].visible, "25 ICs and no computer initially")
+	_expect(not controller.connect_first_contact().success, "missing deck prevents connection")
+	room.objects[&"POSTER_VIRUS"].activate()
+	_expect(screen.choice_panel.visible and not Game.persistent_game_state.campaign_state.story_flags.CLAN_SELECTED, "poster opens confirmation without choosing")
+	await _capture("class-confirmation")
+	screen.get_node("ChoiceOverlay/ChoicePanel/DismissChoices").pressed.emit()
+	_expect(not Game.persistent_game_state.campaign_state.story_flags.CLAN_SELECTED, "cancel leaves class unselected")
+	room.objects[&"POSTER_VIRUS"].activate()
+	screen.choice_list.get_child(0).pressed.emit()
+	await get_tree().process_frame
+	_expect(Game.persistent_game_state.player_state.player_class == "VIRUS" and room.objects[&"POSTER_VIRUS"].get_node("SelectedClass").visible, "class persists and selected poster is marked")
+	_expect(not controller.choose(&"CLASS_WAREZ", &"CHOOSE").success, "class choice is locked")
+	room.objects[&"STARTER_DECK_BOX"].activate()
+	_expect(screen.choice_list.get_child_count() == 2 and screen.choice_list.get_child(0).text.begins_with("More Slots") and screen.choice_list.get_child(1).text.begins_with("More Storage"), "only two supplied starter decks")
+	await _capture("deck-choice")
+	screen.choice_list.get_child(0).pressed.emit()
+	await get_tree().process_frame
+	_expect(not room.objects[&"STARTER_DECK_BOX"].visible and room.objects[&"JACK_IN_INTERFACE"].visible, "deck selection reveals usable computer")
+	room.objects[&"TOOLBOX"].activate()
+	_expect(screen.choice_list.get_child_count() == 9 and not screen.choice_list.get_child(0).disabled, "canonical toolbox lists all nine options")
+	for i in range(1, 9): _expect(screen.choice_list.get_child(i).disabled, "initially unavailable option remains visible")
+	await _capture("toolbox")
+	screen.choice_list.get_child(0).pressed.emit()
+	await get_tree().process_frame
+	_expect(Game.persistent_game_state.player_state.credits == 5, "running modification charges exactly 20")
+	await _capture("bedroom-ready")
+	room.objects[&"JACK_IN_INTERFACE"].activate()
+	await get_tree().process_frame
+	_expect(Game.active_content_document != null and Game.active_content_document.document_id == &"FIRST_CONTACT", "computer starts existing FIRST_CONTACT resource")
+	_expect(Game.game_domain == Game.GameDomain.CYBERSPACE and network.visible and not screen.visible, "actual control and presentation transition to cyberspace")
+	_expect(Game.player_network_position.current_node_id == &"ENTRY" and Game.san_controller.get_san(Game.intrusion_run_id) != null, "real player, graph and SAN exist")
+	_expect(Game.persistent_game_state.player_state.player_class == "VIRUS" and Game.meatspace_management.equipment_orders.credits == 5, "class and currency survive real handoff")
+	_expect(Game.entry_guidance != null and Game.entry_guidance.objective.id == "INSPECT_CURRENT_NODE", "authored First Contact opening objective is active")
+	Game.entry_guidance.advance(2.1)
+	_expect("INSPECT YOUR CURRENT NODE" in network.objective_label.text, "real tutorial HUD shows authored objective")
+	await _capture("first-contact")
+	_expect(Game.request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.SCAN, &"ENTRY", 1)).success, "player can perform real cyberspace scan")
+	Game.entry_guidance.advance(0.1)
+	Game.entry_guidance.advance(0.7)
+	_expect(Game.entry_guidance.objective.get("id") == "MOVE_TO_ACCESS_RELAY", "real scan advances authored opening tutorial")
+	_expect(not controller.connect_first_contact().success, "connection cannot launch twice")
+	Game.end_session()
+	main.queue_free()
+	await get_tree().process_frame
+	await get_tree().create_timer(0.2).timeout
+	for id in ["VIRUS", "PHREAKERS", "WAREZ"]:
+		var state := PersistentGameState.new()
+		StoryModeNewGameInitializer.initialize(state)
+		var other := MeatspacePrologueController.new()
+		other.configure(load("res://data/authoring/story_prologue.tres"), state)
+		_expect(other.choose(&"DECK_CRATE", &"DECK_BALANCED").success, "More Storage starter is selectable")
+		_expect(not other.connection_status().success and "hesitate" in other.connection_status().reason, "missing class gives contextual feedback")
+		_expect(other.choose(StringName("CLASS_" + id), &"CHOOSE").success and state.player_state.player_class == id, "%s is selectable" % id)
+		var restored := PersistentGameState.from_save_data(state.to_save_data())
+		other.configure(load("res://data/authoring/story_prologue.tres"), restored)
+		_expect(other.connection_status().success and restored.player_state.class_profile.affinities.size() == 1, "class and distinct profile survive restoration")
 	print("%s: %d Story prologue integration assertions" % ["PASS" if failures == 0 else "FAIL", assertions])
 	get_tree().quit(failures)
 
-func _choose(interaction_id: StringName, choice_id: StringName) -> void:
-	var result := Game.prologue_controller.choose(interaction_id, choice_id)
-	_expect(bool(result.get("success", false)), "%s accepts authored choice %s" % [interaction_id, choice_id])
+func _capture(id: String) -> void:
+	if "--capture" not in OS.get_cmdline_user_args(): return
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("res://.godot/bedroom-fix-%s.png" % id)
 
 func _expect(condition: bool, description: String) -> void:
 	assertions += 1
 	if not condition:
 		failures += 1
 		printerr("FAILED: %s" % description)
-

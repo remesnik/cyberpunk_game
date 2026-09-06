@@ -14,7 +14,7 @@ const POSTERS := {
 }
 
 func _build_room() -> void:
-	camera.position = Vector3(0, 4.3, 8.8)
+	camera.position = Vector3(-1.2, 3.9, 7.8)
 	camera.look_at(Vector3(0, 1.2, -0.5))
 	var environment := WorldEnvironment.new()
 	var settings := Environment.new()
@@ -45,10 +45,16 @@ func _build_room() -> void:
 	# Four solid segments leave a genuine aperture for the exterior set.
 	_block(world, Vector3(5.1, 3.3, 0.16), Vector3(-1.05, 1.65, -3), Color("62665f"))
 	_block(world, Vector3(0.4, 3.3, 0.16), Vector3(3.4, 1.65, -3), Color("62665f"))
-	_block(world, Vector3(1.7, 1.35, 0.16), Vector3(2.35, 0.675, -3), Color("62665f"))
-	_block(world, Vector3(1.7, 0.55, 0.16), Vector3(2.35, 3.025, -3), Color("62665f"))
+	_block(world, Vector3(1.7, 1.1, 0.16), Vector3(2.35, 0.55, -3), Color("62665f"))
+	_block(world, Vector3(1.7, 0.2, 0.16), Vector3(2.35, 3.2, -3), Color("62665f"))
 	for x in [-3.6, 3.6]:
-		_block(world, Vector3(0.16, 7.3, 12), Vector3(x, 3.65, 3), Color("505d60"))
+		if x < 0:
+			_block(world, Vector3(0.16, 7.3, 12), Vector3(x, 3.65, 3), Color("505d60"))
+		else:
+			for segment in [Vector3(-1.5, 3.0, 3.0), Vector3(5.8, 6.4, 3.0)]:
+				_block(world, Vector3(0.16, 7.3, segment.y), Vector3(x, 3.65, segment.x), Color("505d60"))
+			_block(world, Vector3(0.16, 1.1, 2.6), Vector3(x, 0.55, 1.3), Color("505d60"))
+			_block(world, Vector3(0.16, 4.2, 2.6), Vector3(x, 5.2, 1.3), Color("505d60"))
 		_block(world, Vector3(0.05, 0.14, 12), Vector3(x * 0.97, 0.07, 3), WOOD)
 	for z in range(-5, 6):
 		_block(world, Vector3(7, 0.006, 0.012), Vector3(0, 0.005, z * 0.5), Color("272c2c"))
@@ -61,6 +67,8 @@ func _build_room() -> void:
 	var window_data: Dictionary = location_definition.objects.WINDOW.duplicate(true)
 	window_data.merge({"id": &"WINDOW", "kind": &"WINDOW", "display_name": "WINDOW", "interaction_text": "[ EXAMINE ]"})
 	_build_prop(window_data)
+	_build_prop(location_definition.objects.WINDOW_TABLE)
+	_build_chair()
 	exterior = MeatspaceEnvironment3D.new()
 	world.add_child(exterior)
 	exterior.configure(location_definition.environment, settings)
@@ -87,7 +95,9 @@ func _build_prop(data: Dictionary) -> void:
 	var pos := Vector3.ZERO
 	var bounds := Vector3.ONE
 	match kind:
-		&"WINDOW": pos = Vector3(2.35, 1.35, -2.87); bounds = Vector3(1.7, 1.4, 0.12)
+		&"WINDOW":
+			pos = Vector3(3.48, 1.1, 1.3) if data.id == "WINDOW_TABLE" else Vector3(2.35, 1.1, -2.87)
+			bounds = Vector3(1.7, 1.4, 0.12)
 		&"DESK": pos = Vector3(0, 0, -2.35); bounds = Vector3(3.5, 1.0, 1.0)
 		&"BED": pos = Vector3(-2.5, 0, -0.3); bounds = Vector3(1.65, 0.9, 2.9)
 		&"BOX": pos = Vector3(-0.65, 0.99, -2.25); bounds = Vector3(0.8, 0.6, 0.65)
@@ -104,6 +114,11 @@ func _build_prop(data: Dictionary) -> void:
 	target.position = pos
 	world.add_child(target)
 	register_target(target)
+	if kind == &"WINDOW":
+		target.scale.y = 2.0 / 1.4
+		if data.id == "WINDOW_TABLE":
+			target.rotation_degrees.y = -90
+			target.scale.x = 2.6 / 1.7
 	match kind:
 		&"WINDOW":
 			for x in [-0.85, 0.85]: _block(target, Vector3(0.08, 1.5, 0.18), Vector3(x, 0.7, 0), WOOD)
@@ -190,6 +205,18 @@ func _build_prop(data: Dictionary) -> void:
 			material.roughness = 1.0
 			mesh.material_override = material
 			target.add_child(mesh)
+			var selected := Node3D.new()
+			selected.name = "SelectedClass"
+			target.add_child(selected)
+			for x in [-0.55, 0.55]: _block(selected, Vector3(0.025, 1.2, 0.02), Vector3(x, 0.575, 0.02), Color("edc96d"))
+			for y in [-0.025, 1.175]: _block(selected, Vector3(1.125, 0.025, 0.02), Vector3(0, y, 0.02), Color("edc96d"))
+			var badge := Label3D.new()
+			badge.text = "SELECTED"
+			badge.font_size = 32
+			badge.pixel_size = 0.004
+			badge.position = Vector3(0, -0.11, 0.035)
+			selected.add_child(badge)
+			target.bind_visual(selected, &"visible", &"selected", false, true)
 
 func _table(parent: Node3D, pos: Vector3, dimensions: Vector3) -> void:
 	_block(parent, Vector3(dimensions.x, 0.1, dimensions.z), pos + Vector3(0, dimensions.y, 0), WOOD)
@@ -207,5 +234,71 @@ func _block(parent: Node3D, dimensions: Vector3, pos: Vector3, color: Color) -> 
 	material.roughness = 0.82
 	instance.material_override = material
 	instance.position = pos
+	parent.add_child(instance)
+	return instance
+
+func _build_chair() -> void:
+	var chair := Node3D.new()
+	chair.name = "MustardWingChair"
+	world.add_child(chair)
+	chair.position = Vector3(2.6, 0, 3.1)
+	chair.rotation_degrees.y = -90
+	var cloth := StandardMaterial3D.new()
+	cloth.albedo_color = Color("bd942f")
+	cloth.roughness = 0.96
+	var noise := FastNoiseLite.new()
+	noise.frequency = 0.075
+	var fabric := NoiseTexture2D.new()
+	fabric.width = 128
+	fabric.height = 128
+	fabric.noise = noise
+	var gradient := Gradient.new()
+	gradient.set_color(0, Color("a89368"))
+	gradient.set_color(1, Color("eee1ba"))
+	fabric.color_ramp = gradient
+	cloth.albedo_texture = fabric
+	_cushion(chair, Vector3(1.08, 0.3, 0.95), Vector3(0, 0.48, 0), cloth)
+	var seat := _cushion(chair, Vector3(0.86, 0.23, 0.82), Vector3(-0.025, 0.65, 0.065), cloth)
+	seat.rotation_degrees.z = -1.5
+	var back := _cushion(chair, Vector3(0.97, 1.2, 0.35), Vector3(0, 1.13, -0.36), cloth)
+	back.rotation_degrees.x = -8
+	_cushion(chair, Vector3(0.78, 0.9, 0.22), Vector3(0, 1.13, -0.15), cloth)
+	for x in [-0.51, 0.51]:
+		_cushion(chair, Vector3(0.22, 0.5, 0.78), Vector3(x, 0.72, 0.03), cloth)
+		_cushion(chair, Vector3(0.29, 0.23, 0.9), Vector3(x, 0.94, 0.05), cloth)
+		var wing := _cushion(chair, Vector3(0.25, 0.79, 0.55), Vector3(x * 0.88, 1.37, -0.18), cloth)
+		wing.rotation_degrees.z = -signf(x) * 9
+		for z in [-0.32, 0.32]:
+			var leg := MeshInstance3D.new()
+			var shape := CylinderMesh.new()
+			shape.top_radius = 0.055
+			shape.bottom_radius = 0.035
+			shape.height = 0.36
+			shape.radial_segments = 8
+			leg.mesh = shape
+			var wood := StandardMaterial3D.new()
+			wood.albedo_color = WOOD.darkened(0.35)
+			leg.material_override = wood
+			leg.position = Vector3(x * 0.78, 0.19, z)
+			leg.rotation_degrees.z = -signf(x) * 6
+			chair.add_child(leg)
+	# Recessed fabric buttons and worn cushion piping, no collision targets.
+	var seam := cloth.duplicate() as StandardMaterial3D
+	seam.albedo_color = Color("997a35")
+	for x in [-0.22, 0.22]:
+		for y in [1.02, 1.36]: _cushion(chair, Vector3(0.045, 0.045, 0.018), Vector3(x, y, -0.037), seam)
+	_cushion(chair, Vector3(0.73, 0.022, 0.025), Vector3(-0.025, 0.645, 0.465), seam)
+
+func _cushion(parent: Node3D, dimensions: Vector3, pos: Vector3, material: Material) -> MeshInstance3D:
+	var mesh := SphereMesh.new()
+	mesh.radius = 0.5
+	mesh.height = 1.0
+	mesh.radial_segments = 20
+	mesh.rings = 10
+	var instance := MeshInstance3D.new()
+	instance.mesh = mesh
+	instance.scale = dimensions
+	instance.position = pos
+	instance.material_override = material
 	parent.add_child(instance)
 	return instance

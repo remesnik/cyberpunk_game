@@ -8,6 +8,7 @@ var world: Node3D
 var camera: Camera3D
 var hint: Label
 var game_state: PersistentGameState
+var pointer_position := Vector2.ZERO
 var focused_id: StringName
 
 func _ready() -> void:
@@ -28,7 +29,17 @@ func _ready() -> void:
 	camera.current = true
 	world.add_child(camera)
 	hint = Label.new()
-	hint.position = Vector2(12, 12)
+	hint.position = Vector2(18, 18)
+	hint.custom_minimum_size = Vector2(340, 0)
+	hint.size.x = 340
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	var tooltip_style := StyleBoxFlat.new()
+	tooltip_style.bg_color = Color(0.025, 0.035, 0.045, 0.94)
+	tooltip_style.content_margin_left = 12
+	tooltip_style.content_margin_right = 12
+	tooltip_style.content_margin_top = 9
+	tooltip_style.content_margin_bottom = 9
+	hint.add_theme_stylebox_override("normal", tooltip_style)
 	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hint.add_theme_color_override("font_shadow_color", Color.BLACK)
 	hint.add_theme_constant_override("shadow_offset_x", 2)
@@ -63,6 +74,7 @@ func _exit_tree() -> void:
 func _refresh_state() -> void:
 	var flags: Dictionary = game_state.campaign_state.get("story_flags", {}) if game_state != null else {}
 	for target: MeatspaceTarget3D in objects.values(): target.apply_state(flags)
+	_set_focus(focused_id if focused_id in get_object_ids() else &"")
 
 func pick(screen_position: Vector2) -> MeatspaceTarget3D:
 	if not Rect2(Vector2.ZERO, size).has_point(screen_position): return null
@@ -75,8 +87,10 @@ func pick(screen_position: Vector2) -> MeatspaceTarget3D:
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
+		pointer_position = event.position
 		var target := pick(event.position)
 		_set_focus(target.object_id if target != null else &"")
+		_place_hint(pointer_position)
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		var target := pick(event.position)
 		if target != null:
@@ -98,16 +112,25 @@ func _set_focus(id: StringName) -> void:
 	focused_id = id
 	mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND if objects.has(id) else Control.CURSOR_ARROW
 	hint.text = ""
+	hint.hide()
 	if objects.has(id):
 		var data: Dictionary = objects[id].authored_data
-		hint.text = "%s  %s" % [data.get("display_name", id), data.get("interaction_text", "")]
+		hint.text = "%s\n%s" % [String(data.get("display_name", id)), String(data.get("examine", data.get("description", "")))]
+		if data.has("class_id") and game_state != null and bool(game_state.campaign_state.get("story_flags", {}).get("CLAN_SELECTED", false)):
+			hint.text = "%s\n%s" % [data.display_name, "Your chosen clan." if game_state.player_state.get("player_class") == data.class_id else "Your clan choice is already committed."]
+		if data.get("kind") == &"WINDOW" and game_state != null:
+			var flags: Dictionary = game_state.campaign_state.get("story_flags", {})
+			hint.text += " %s. Window %s." % [String(game_state.world_state.get("time_of_day", "NIGHT")).capitalize(), "open" if flags.get(data.visual_state.open, false) else "closed"]
+		hint.visible = not hint.text.is_empty()
+		_place_hint(pointer_position)
 
 func _on_prop_selected(id: StringName) -> void:
 	if objects.has(id): object_selected.emit(objects[id].authored_data.duplicate(true))
 
 func get_object_ids() -> Array[StringName]:
 	var ids: Array[StringName] = []
-	for id: StringName in objects: ids.append(id)
+	for id: StringName in objects:
+		if objects[id].visible: ids.append(id)
 	ids.sort()
 	return ids
 
@@ -115,3 +138,13 @@ func focus_first() -> void:
 	grab_focus()
 	var ids := get_object_ids()
 	if not ids.is_empty(): _set_focus(ids[0])
+
+func _place_hint(cursor: Vector2) -> void:
+	hint.custom_minimum_size.x = minf(340, maxf(1, size.x - 16))
+	hint.size = Vector2(hint.custom_minimum_size.x, 0)
+	var extent := hint.get_combined_minimum_size()
+	extent.x = hint.size.x
+	var pos := cursor + Vector2(16, 18)
+	if pos.x + extent.x > size.x - 8: pos.x = cursor.x - extent.x - 16
+	if pos.y + extent.y > size.y - 8: pos.y = cursor.y - extent.y - 18
+	hint.position = pos.clamp(Vector2(8, 8), Vector2(maxf(8, size.x - extent.x - 8), maxf(8, size.y - extent.y - 8)))

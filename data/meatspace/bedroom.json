@@ -21,7 +21,9 @@
             }
           ]
         }
-      ]
+      ],
+      "examine": "It hasn't been made in a while.",
+      "primary_action": "PHYSICAL"
     },
     "DESK": {
       "verbs": [
@@ -29,45 +31,18 @@
           "id": "EXAMINE",
           "text": "Your primary hardware bench. Solder burns, cable scars, and just enough clear space for the next repair."
         }
-      ]
+      ],
+      "examine": "Your primary hardware bench. Solder burns, cable scars, and just enough clear space for the next repair.",
+      "primary_action": "PHYSICAL"
     },
     "STARTER_DECK_BOX": {
       "verbs": [
         {
-          "id": "EXAMINE",
-          "text": "A shipping carton with starter supplies tucked beneath folded packing paper."
-        },
-        {
           "id": "OPEN",
-          "when_flag": "BOX_OPEN",
-          "equals": false,
-          "text": "The packing tape gives way. Useful spares sit inside.",
           "actions": [
             {
               "type": "SET_FLAG",
               "id": "BOX_OPEN",
-              "value": true
-            }
-          ]
-        },
-        {
-          "id": "TAKE",
-          "when_flag": "BOX_EMPTIED",
-          "equals": false,
-          "text": "You pocket the spare leads and repair notes. The carton is empty.",
-          "actions": [
-            {
-              "type": "TAKE_CONTENTS",
-              "id": "STARTER_DECK_BOX"
-            },
-            {
-              "type": "SET_FLAG",
-              "id": "BOX_OPEN",
-              "value": true
-            },
-            {
-              "type": "SET_FLAG",
-              "id": "BOX_EMPTIED",
               "value": true
             }
           ]
@@ -88,6 +63,12 @@
       "visual_state": {
         "open": "BOX_OPEN",
         "empty": "BOX_EMPTIED"
+      },
+      "examine": "A cardboard carton containing your starter deck. Two configurations, one machine.",
+      "primary_action": "STORY",
+      "visibility": {
+        "flag": "DECK_SELECTED",
+        "equals": false
       }
     },
     "TOOLBOX": {
@@ -112,7 +93,16 @@
       ],
       "visual_state": {
         "open": "TOOLBOX_OPEN"
-      }
+      },
+      "examine": "A battered steel case. The handle has outlasted two sets of tools.",
+      "primary_action": "STORY",
+      "phase_interactions": {
+        "DECK_SELECTION": "TOOLBOX",
+        "TOOLBOX": "TOOLBOX",
+        "READY_TO_JACK_IN": "TOOLBOX"
+      },
+      "display_name": "Toolbox",
+      "story_interaction": "TOOLBOX"
     },
     "DISPLAY_TABLE": {
       "verbs": [
@@ -138,7 +128,9 @@
             0
           ]
         }
-      ]
+      ],
+      "examine": "This would be a good place to put things I don't want to lose.",
+      "primary_action": "PHYSICAL"
     },
     "BOOKSHELF": {
       "verbs": [
@@ -157,7 +149,9 @@
           "title": "Field repairs, volume II",
           "text": "The useful pages are held together with tape."
         }
-      ]
+      ],
+      "examine": "Repair manuals lean against photocopied zines. A pencilled note reads: never trust the pinout.",
+      "primary_action": "PHYSICAL"
     },
     "WINDOW": {
       "verbs": [
@@ -194,7 +188,9 @@
       ],
       "visual_state": {
         "open": "WINDOW_OPEN"
-      }
+      },
+      "examine": "Venetian blinds stripe the skyline. Beyond the glass: rooftop utilities, signal towers, and a city that never quite sleeps.",
+      "primary_action": "PHYSICAL"
     },
     "POSTER_VIRUS": {
       "verbs": [
@@ -202,7 +198,14 @@
           "id": "EXAMINE",
           "text": "VIRUS // Replicate. Mutate. A bootleg print celebrating exploits, destructive code, and programmers who sign their work in crash dumps."
         }
-      ]
+      ],
+      "examine": "Malware and code manipulation. Click to learn more and choose this clan.",
+      "primary_action": "CLASS",
+      "display_name": "Virus",
+      "class_id": "VIRUS",
+      "visual_state": {
+        "selected": "CLASS_VIRUS"
+      }
     },
     "POSTER_PHREAKER": {
       "verbs": [
@@ -210,7 +213,14 @@
           "id": "EXAMINE",
           "text": "PHREAKERS // The line is ours. Switching diagrams, radio frequencies, and a reminder that every network starts with physical wire."
         }
-      ]
+      ],
+      "examine": "Signals, communications and network access. Click to learn more and choose this clan.",
+      "primary_action": "CLASS",
+      "display_name": "Phreakers",
+      "class_id": "PHREAKERS",
+      "visual_state": {
+        "selected": "CLASS_PHREAKERS"
+      }
     },
     "POSTER_WAREZ": {
       "verbs": [
@@ -218,7 +228,14 @@
           "id": "EXAMINE",
           "text": "WAREZ // Copy. Keep. Share. A release-group emblem from the nights of cracked software, traded disks, and BBS upload ratios."
         }
-      ]
+      ],
+      "examine": "Software, distribution and program archives. Click to learn more and choose this clan.",
+      "primary_action": "CLASS",
+      "display_name": "Warez",
+      "class_id": "WAREZ",
+      "visual_state": {
+        "selected": "CLASS_WAREZ"
+      }
     },
     "JACK_IN_INTERFACE": {
       "verbs": [
@@ -226,7 +243,61 @@
           "id": "EXAMINE",
           "text": "A terminal, isolation switch, and coiled interface lead. Your connection to the local board."
         }
-      ]
+      ],
+      "examine": "A terminal, isolation switch, and coiled interface lead. Your connection to the local board.",
+      "primary_action": "CONNECT",
+      "visibility": {
+        "flag": "DECK_SELECTED",
+        "equals": true
+      },
+      "phase_interactions": {
+        "TOOLBOX": "TOOLBOX",
+        "READY_TO_JACK_IN": "DECK_CHAIR",
+        "BBS_OFFLINE": "BBS_DIALER",
+        "BBS_CONNECTED": "BBS_HELP_DESK"
+      }
+    },
+    "WINDOW_TABLE": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "Venetian blinds stripe the skyline. Beyond the glass: rooftop utilities, signal towers, and a city that never quite sleeps."
+        },
+        {
+          "id": "OPEN",
+          "when_flag": "WINDOW_TABLE_OPEN",
+          "equals": false,
+          "text": "You tilt the sash open. Traffic and rooftop wind become clearer.",
+          "actions": [
+            {
+              "type": "SET_FLAG",
+              "id": "WINDOW_TABLE_OPEN",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "CLOSE",
+          "when_flag": "WINDOW_TABLE_OPEN",
+          "equals": true,
+          "text": "The latch catches. The city falls back to a muffled hum.",
+          "actions": [
+            {
+              "type": "SET_FLAG",
+              "id": "WINDOW_TABLE_OPEN",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "visual_state": {
+        "open": "WINDOW_TABLE_OPEN"
+      },
+      "examine": "Venetian blinds stripe the skyline. Beyond the glass: rooftop utilities, signal towers, and a city that never quite sleeps.",
+      "primary_action": "PHYSICAL",
+      "id": "WINDOW_TABLE",
+      "kind": "WINDOW",
+      "display_name": "Table window"
     }
   },
   "environment": {
@@ -237,7 +308,13 @@
         "energy": 0.85,
         "neon": false,
         "city_db": -24,
-        "utility_db": -35
+        "utility_db": -35,
+        "layers_db": {
+          "rooftop_wind": -29,
+          "distant_traffic": -22,
+          "night_electric": -48
+        },
+        "event_interval_scale": 1
       },
       "DUSK": {
         "sky": "ad6870",
@@ -245,7 +322,13 @@
         "energy": 0.65,
         "neon": true,
         "city_db": -28,
-        "utility_db": -32
+        "utility_db": -32,
+        "layers_db": {
+          "rooftop_wind": -30,
+          "distant_traffic": -27,
+          "night_electric": -36
+        },
+        "event_interval_scale": 1.2
       },
       "NIGHT": {
         "sky": "101a32",
@@ -253,7 +336,13 @@
         "energy": 0.4,
         "neon": true,
         "city_db": -33,
-        "utility_db": -27
+        "utility_db": -27,
+        "layers_db": {
+          "rooftop_wind": -32,
+          "distant_traffic": -38,
+          "night_electric": -26
+        },
+        "event_interval_scale": 1.65
       },
       "DAWN": {
         "sky": "b0959f",
@@ -261,7 +350,13 @@
         "energy": 0.6,
         "neon": false,
         "city_db": -35,
-        "utility_db": -34
+        "utility_db": -34,
+        "layers_db": {
+          "rooftop_wind": -34,
+          "distant_traffic": -40,
+          "night_electric": -42
+        },
+        "event_interval_scale": 1.9
       }
     },
     "window_flag": "WINDOW_OPEN",
@@ -269,13 +364,73 @@
       {
         "id": "TRAIN",
         "delay": 20,
-        "duration": 7
+        "duration": 10.0
       }
     ],
     "audio": {
       "city": "res://assets/meatspace/audio/city.wav",
       "utility": "res://assets/meatspace/audio/utility.wav",
       "train": "res://assets/meatspace/audio/train.wav"
+    },
+    "window_flags": [
+      "WINDOW_OPEN",
+      "WINDOW_TABLE_OPEN"
+    ],
+    "layers": [],
+    "portal": {
+      "closed_gain": 0.4,
+      "open_gain": 1.0,
+      "closed_cutoff_hz": 1200,
+      "open_cutoff_hz": 18000,
+      "transition_seconds": 0.5
+    },
+    "sequencer": {
+      "interval_min": 14,
+      "interval_max": 32,
+      "events": [
+        {
+          "id": "car_horn_realistic_01",
+          "path": "res://assets/meatspace/audio/car_horn_realistic_01.wav",
+          "category": "horn",
+          "volume_db": -21,
+          "cooldown": 35
+        },
+        {
+          "id": "car_horn_realistic_02",
+          "path": "res://assets/meatspace/audio/car_horn_realistic_02.wav",
+          "category": "horn",
+          "volume_db": -22,
+          "cooldown": 35
+        },
+        {
+          "id": "car_horn_realistic_03",
+          "path": "res://assets/meatspace/audio/car_horn_realistic_03.wav",
+          "category": "horn",
+          "volume_db": -23,
+          "cooldown": 35
+        },
+        {
+          "id": "ambulance_distant_long_fade",
+          "path": "res://assets/meatspace/audio/ambulance_distant_long_fade.wav",
+          "category": "siren",
+          "volume_db": -25,
+          "cooldown": 65
+        },
+        {
+          "id": "fire_engine_from_reference_transformed_10blocks",
+          "path": "res://assets/meatspace/audio/fire_engine_from_reference_transformed_10blocks.wav",
+          "category": "siren",
+          "volume_db": -27,
+          "cooldown": 65
+        },
+        {
+          "id": "helicopter_over_building_6s_doppler",
+          "path": "res://assets/meatspace/audio/helicopter_over_building_6s_doppler.wav",
+          "category": "helicopter",
+          "volume_db": -28,
+          "cooldown": 80
+        }
+      ]
     }
   }
 }

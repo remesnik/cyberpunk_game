@@ -17,7 +17,7 @@ func _ready() -> void:
 	_expect(not game.realtime_process_manager.processes.has(&"TEAM_ALPHA_PROCESS"), "facility prototype realtime actors are absent from FIRST_CONTACT")
 	_expect(game.free_roam_job_board == null, "Free Roam job bootstrap is not injected into Story Mode")
 	_expect(game.program_inventory.has_instance(&"STARTER_SERVICE_PROBE_001") and game.program_loadout.is_installed(&"STARTER_SERVICE_PROBE_001"), "starter inventory and loadout are applied to runtime")
-	_expect(game.equipment_order_manager.credits == 500 and game.meatspace_management.hardware_levels.DECK_CPU == 1, "starter resources and hardware are applied")
+	_expect(game.equipment_order_manager.credits == 25 and game.meatspace_management.hardware_levels.DECK_CPU == 1, "starter resources and hardware are applied")
 	_expect(game.get_campaign_state().pending_entry_content_id == &"", "prologue entry request is consumed once its runtime starts")
 	game.end_session()
 	print("%s: %d Story Mode runtime assertions" % ["PASS" if failures == 0 else "FAIL", assertions])

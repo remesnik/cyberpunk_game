@@ -20,12 +20,15 @@ func configure(data: Dictionary, bounds: Vector3) -> void:
 	add_child(shape)
 
 func activate() -> void:
-	selected.emit(object_id)
+	if visible: selected.emit(object_id)
 
 func bind_visual(node: Node3D, property: StringName, key: StringName, inactive: Variant, active: Variant) -> void:
 	visual_bindings.append({"node": node, "property": property, "key": key, "inactive": inactive, "active": active})
 
 func apply_state(flags: Dictionary) -> void:
+	var rule: Dictionary = authored_data.get("visibility", {})
+	visible = rule.is_empty() or bool(flags.get(rule.get("flag", ""), false)) == bool(rule.get("equals", true))
+	collision_layer = 1 if visible else 0
 	var bindings: Dictionary = authored_data.get("visual_state", {})
 	for binding: Dictionary in visual_bindings:
 		var flag := StringName(bindings.get(binding.key, &""))

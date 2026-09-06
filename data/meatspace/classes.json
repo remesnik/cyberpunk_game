@@ -1,0 +1,29 @@
+{
+  "VIRUS": {
+    "id": "VIRUS",
+    "name": "Virus",
+    "description": "Malware and code manipulation.",
+    "affinities": {
+      "malware": 1
+    },
+    "abilities_implemented": false
+  },
+  "PHREAKERS": {
+    "id": "PHREAKERS",
+    "name": "Phreakers",
+    "description": "Signals, communications and network access.",
+    "affinities": {
+      "signals": 1
+    },
+    "abilities_implemented": false
+  },
+  "WAREZ": {
+    "id": "WAREZ",
+    "name": "Warez",
+    "description": "Software, distribution and program archives.",
+    "affinities": {
+      "software": 1
+    },
+    "abilities_implemented": false
+  }
+}

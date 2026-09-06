@@ -1,5 +1,5 @@
 extends Node
-const REQUIRED_IDS: Array[StringName] = [&"WINDOW", &"DESK", &"BED", &"POSTER_VIRUS", &"POSTER_PHREAKER", &"POSTER_WAREZ", &"STARTER_DECK_BOX", &"TOOLBOX", &"DISPLAY_TABLE", &"BOOKSHELF", &"JACK_IN_INTERFACE"]
+const REQUIRED_IDS: Array[StringName] = [&"WINDOW_TABLE", &"WINDOW", &"DESK", &"BED", &"POSTER_VIRUS", &"POSTER_PHREAKER", &"POSTER_WAREZ", &"STARTER_DECK_BOX", &"TOOLBOX", &"DISPLAY_TABLE", &"BOOKSHELF", &"JACK_IN_INTERFACE"]
 var failures := 0
 var assertions := 0
 
@@ -17,7 +17,7 @@ func _ready() -> void:
 		await RenderingServer.frame_post_draw
 		bedroom.viewport.get_texture().get_image().save_png("res://.godot/bedroom-preview.png")
 	var ids := bedroom.get_object_ids()
-	_expect(ids.size() == REQUIRED_IDS.size() and REQUIRED_IDS.all(func(id: StringName) -> bool: return id in ids), "all authored targets mapped")
+	_expect(bedroom.objects.size() == REQUIRED_IDS.size() and REQUIRED_IDS.all(func(id: StringName) -> bool: return bedroom.objects.has(id)), "all authored targets mapped")
 	_expect(bedroom.camera.projection == Camera3D.PROJECTION_PERSPECTIVE, "true perspective camera")
 	_expect(bedroom.viewport.own_world_3d, "room has isolated 3D world")
 	var selections: Array[Dictionary] = []
@@ -27,6 +27,10 @@ func _ready() -> void:
 		var shape := target.get_child(0) as CollisionShape3D
 		var screen := bedroom.camera.unproject_position(shape.global_position) * bedroom.size / Vector2(bedroom.viewport.size)
 		_expect(bedroom.pick(screen) == target, "ray resolves visible target %s" % id)
+		var motion := InputEventMouseMotion.new()
+		motion.position = screen
+		bedroom._gui_input(motion)
+		_expect(bedroom.hint.visible and String(target.authored_data.examine) in bedroom.hint.text, "hover displays examine text %s" % id)
 		var click := InputEventMouseButton.new()
 		click.position = screen
 		click.button_index = MOUSE_BUTTON_LEFT
@@ -42,13 +46,8 @@ func _ready() -> void:
 	var box_lid: Node3D = bedroom.objects[&"STARTER_DECK_BOX"].get_node("Lid")
 	var tool_lid: Node3D = bedroom.objects[&"TOOLBOX"].get_node("Lid")
 	_expect(bedroom.display_anchors[0].get_child_count() == 0 and box_lid.rotation == Vector3.ZERO and tool_lid.rotation == Vector3.ZERO, "initial room is empty with closed containers")
-	# Same phase link used by StoryPrologueScreen; no story action lives in the view.
-	var terminal: Dictionary = bedroom.objects[&"JACK_IN_INTERFACE"].authored_data
-	var interaction_id := StringName(terminal.phase_interactions[controller.phase])
-	_expect(controller.select_interaction(interaction_id).success, "physical target resolves authored interaction")
-	_expect(controller.choose(interaction_id, &"CLAN_GHOSTS").success, "authored interaction dispatch")
 	_expect(controller.choose(&"DECK_CRATE", &"DECK_SCOUT").success, "deck story choice succeeds")
-	_expect(physical.execute(&"STARTER_DECK_BOX", &"OPEN").success and box_lid.rotation.x < -1, "authored physical action opens box")
+	_expect(not bedroom.objects[&"STARTER_DECK_BOX"].visible and bedroom.objects[&"JACK_IN_INTERFACE"].visible, "deck replaces box")
 	_expect(physical.execute(&"TOOLBOX", &"OPEN").success and tool_lid.rotation.x < -1, "toolbox appearance follows authored action")
 	const SAVE_PATH := "res://.godot/bedroom-state-test.json"
 	_expect(state.save_to_file(SAVE_PATH) == OK, "room story state saves to disk")
@@ -64,7 +63,7 @@ func _ready() -> void:
 	var returned := _room(restored)
 	await get_tree().process_frame
 	_expect(returned.display_anchors[0].get_child_count() == 0, "empty display restored on room reentry")
-	_expect(returned.objects[&"STARTER_DECK_BOX"].get_node("Lid").rotation.x < -1 and returned.objects[&"TOOLBOX"].get_node("Lid").rotation.x < -1, "container state restored after save roundtrip")
+	_expect(not returned.objects[&"STARTER_DECK_BOX"].visible and returned.objects[&"TOOLBOX"].get_node("Lid").rotation.x < -1, "container state restored after save roundtrip")
 	_expect(restored.to_save_data() == restored_snapshot, "room presentation never mutates saved story state")
 	returned.bind_state(PersistentGameState.new())
 	_expect(returned.objects[&"TOOLBOX"].get_node("Lid").rotation == Vector3.ZERO, "rebinding a new game clears prior visuals")

@@ -18,16 +18,22 @@ static func initialize(state: PersistentGameState) -> void:
 			&"PROLOGUE_STARTED": true,
 			&"PROLOGUE_COMPLETE": false,
 			&"FIRST_CONTACT_AVAILABLE": false,
+			&"FIRST_CONTACT_STARTED": false,
+			&"CLAN_SELECTED": false,
+			&"DECK_SELECTED": false,
+			&"BOX_OPEN": false,
 			&"FIRST_CONTACT_COMPLETE": false,
 		},
 		"campaign_unlocks": [],
 		"optional_content": [],
-		"prologue": {"phase": &"CLAN_SELECTION", "completed": false},
+		"prologue": {"phase": &"DECK_SELECTION", "completed": false},
 	}
 	state.world_state = {"entry_state": &"MEATSPACE_PROLOGUE", "meatspace_location_id": &"BEDROOM", "time_of_day": "NIGHT"}
 	state.save_metadata = {"save_id": &"STORY_AUTO", "network_name": "OFFLINE", "location_name": "BEDROOM", "playtime_seconds": 0.0}
 	state.player_state = {
 		"fatigue": 35.0,
+		"player_class": "",
+		"selected_deck_variant": "",
 		"deck_id": &"STARTER_DECK",
 		"hardware": {
 			&"DECK_CPU": 1,
@@ -40,7 +46,7 @@ static func initialize(state: PersistentGameState) -> void:
 		],
 		"installed_program_instance_ids": [&"STARTER_SERVICE_PROBE_001"],
 		"inventory": [],
-		"credits": 500,
+		"credits": 25,
 		"resources": {
 			&"MEMORY_SHARD": 4,
 			&"ROUTING_KERNEL": 2,

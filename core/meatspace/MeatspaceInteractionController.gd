@@ -13,6 +13,8 @@ func actions_for(object_id: StringName) -> Array[Dictionary]:
 	if state == null: return result
 	var data: Dictionary = definition.get("objects", {}).get(String(object_id), {})
 	var flags: Dictionary = state.campaign_state.get("story_flags", {})
+	var visibility: Dictionary = data.get("visibility", {})
+	if not visibility.is_empty() and bool(flags.get(visibility.flag, false)) != bool(visibility.get("equals", true)): return result
 	for action: Dictionary in data.get("verbs", []):
 		if action.has("when_flag") and bool(flags.get(action.when_flag, false)) != bool(action.get("equals", true)): continue
 		result.append(action.duplicate(true))
@@ -49,3 +51,8 @@ func set_time_of_day(value: String) -> void:
 	if state == null or value not in ["DAY", "DUSK", "NIGHT", "DAWN"]: return
 	state.world_state["time_of_day"] = value
 	state.emit_changed()
+
+func primary(object_id: StringName) -> Dictionary:
+	for action: Dictionary in actions_for(object_id):
+		if String(action.id) != "EXAMINE": return execute(object_id, StringName(action.id))
+	return {"success": true, "text": ""}
