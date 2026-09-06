@@ -43,7 +43,7 @@ func _add() -> void:
 
 
 func _default_entry(collection_name: StringName, id: StringName) -> Dictionary:
-	var entry := {"id": id, "display_name": "New %s" % String(collection_name).replace("_", " ").capitalize(), "title": "New Entry", "text": "", "conditions": [], "actions": [], "tags": [], "author_notes": ""}
+	var entry := {"id": id, "display_name": "New %s" % String(collection_name).replace("_", " ").capitalize(), "title": "New Entry", "text": "", "availability": &"AVAILABLE_IN_ALL_MODES", "conditions": [], "actions": [], "tags": [], "author_notes": ""}
 	if collection_name == &"program_definitions":
 		entry.merge({"program_type": &"GENERIC", "version": "1.0", "description": "", "rarity": &"COMMON", "programming_recipe": {}, "programming_requirements": {}, "programming_duration": 0.0, "deployment_properties": {}, "trace_modifiers": {}, "security_modifiers": {}}, true)
 	elif collection_name == &"rewards":

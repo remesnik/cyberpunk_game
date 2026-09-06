@@ -1,6 +1,8 @@
 class_name SecuritySleeve
 extends RefCounted
 
+signal changed(sleeve: SecuritySleeve)
+
 enum State { INTACT, BREACHED, SPLIT, BYPASSED, DISABLED }
 
 var id: StringName = &""
@@ -22,12 +24,16 @@ func add_current_member(node_id: StringName) -> bool:
 	if node_id == &"" or current_members.has(node_id): return false
 	current_members.append(node_id)
 	current_members.sort()
+	changed.emit(self)
 	return true
 
 func remove_current_member(node_id: StringName) -> bool:
 	if not current_members.has(node_id): return false
 	current_members.erase(node_id)
+	changed.emit(self)
 	return true
 
 func set_state(next_state: State) -> void:
+	if state == next_state: return
 	state = next_state
+	changed.emit(self)

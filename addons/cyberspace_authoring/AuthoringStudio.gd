@@ -102,7 +102,9 @@ func _select_entry(value: Variant) -> void:
 	var id := StringName(value); _state.selected_id = id; _inspector.show_entry(id)
 
 
-func _document_changed() -> void: _browser.refresh()
+func _document_changed() -> void:
+	_browser.refresh()
+	_workspace.set_models(_document, _state)
 func _bind_document() -> void: _browser.set_document(_document); _workspace.set_models(_document, _state); _inspector.set_document(_document)
 func _state_path(path: String) -> String: return path.trim_suffix(".tres") + ".editor_state.tres"
 func _load_state(path: String) -> AuthoringEditorState:

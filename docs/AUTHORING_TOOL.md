@@ -31,6 +31,15 @@ Cyberspace Authoring Studio is a Godot 4 editor plugin for creating the game's l
 Runtime-safe authored data lives in `res://data/authoring/` and uses `CyberspaceContentDocument`. Editor UI, layout, selection, preview profiles, validators, and templates live under `res://addons/cyberspace_authoring/`. Runtime systems must never import addon scripts. Realtime definitions express durations in seconds and do not reference or advance `CyberspaceClock`.
 
 See [AUTHORING_DATA_MODEL.md](AUTHORING_DATA_MODEL.md) for schema details and [AUTHORING_TOOL_LIMITATIONS.md](AUTHORING_TOOL_LIMITATIONS.md) for deliberately deferred work.
+
+## Sphere authoring
+
+The GRAPH workspace provides `+ SPHERE` for creating a stable ID and display name. Selecting a Sphere opens a dedicated inspector where designers associate the original Security Sleeve, inspect its current authored grouping, and assign nodes. Assignment writes only `network_nodes[].sphere_id`; the displayed member list is derived and cannot drift from a second hand-maintained list. Existing `node_ids` fields are treated as legacy validation input, not the normal editing workflow.
+
+Network nodes carry an editor-only colored `SPHERE // ID` badge. Its stable hash palette distinguishes subnets while authoring without changing production security-level colors or runtime visualization resources. Cross-Sphere routes remain ordinary NetworkLinks and appear as a derived list in each affected Sphere inspector.
+
+Validation reports unassigned nodes, nonexistent or malformed Sphere IDs, conflicting legacy memberships, missing original Security Sleeves, invalid Sleeve members, and cross-Sphere links. Cross-Sphere links are informational review items rather than errors because they are valid authored boundary routes.
+
 ## Guided mission sequences
 
 The STORY workspace includes a SEQUENCES tab for composing tutorials and authored missions from generic event nodes. Supported nodes cover remote-hacker presence and movement, dialogue, objective lifecycle, gameplay-event waits, highlights, program rewards, ICE spawning, trace changes, realtime events, conditional branches, escalating optional hints, and completion flags.

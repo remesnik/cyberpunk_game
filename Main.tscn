@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://core/Main.gd" id="1_main"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/NetworkDisplay.tscn" id="2_display"]
@@ -7,6 +7,8 @@
 [ext_resource type="PackedScene" path="res://ui/monitors/RealtimeMonitorDock.tscn" id="9_monitors"]
 [ext_resource type="PackedScene" path="res://ui/meatspace/MeatspaceManagementPanel.tscn" id="10_meatspace"]
 [ext_resource type="PackedScene" path="res://ui/doorstop/DoorstopFeedbackOverlay.tscn" id="11_doorstop_feedback"]
+[ext_resource type="PackedScene" path="res://ui/game_over/GameOverScreen.tscn" id="12_game_over"]
+[ext_resource type="PackedScene" path="res://ui/story_prologue/StoryPrologueScreen.tscn" id="13_prologue"]
 
 [node name="Main" type="Node"]
 script = ExtResource("1_main")
@@ -22,3 +24,7 @@ script = ExtResource("1_main")
 [node name="DoorstopFeedbackOverlay" parent="." instance=ExtResource("11_doorstop_feedback")]
 
 [node name="DebugOverlay" parent="." instance=ExtResource("3_debug")]
+
+[node name="GameOverScreen" parent="." instance=ExtResource("12_game_over")]
+
+[node name="StoryPrologueScreen" parent="." instance=ExtResource("13_prologue")]

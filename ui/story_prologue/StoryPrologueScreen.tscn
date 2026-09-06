@@ -1,0 +1,109 @@
+[gd_scene load_steps=4 format=3]
+[ext_resource type="Script" path="res://ui/story_prologue/StoryPrologueScreen.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/story_prologue/PlayerBedroom.tscn" id="2"]
+[ext_resource type="Script" path="res://ui/meatspace/MeatspaceActionPanel.gd" id="3"]
+
+[node name="StoryPrologueScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0.035, 0.05, 0.065, 1)
+
+[node name="PlayerBedroom" parent="." instance=ExtResource("2")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = 42.0
+offset_bottom = -118.0
+custom_minimum_size = Vector2(0, 0)
+
+[node name="PhaseLabel" type="Label" parent="."]
+unique_name_in_owner = true
+offset_left = 18.0
+offset_top = 10.0
+text = "BEDROOM"
+
+[node name="TimeSelector" type="OptionButton" parent="."]
+unique_name_in_owner = true
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -160.0
+offset_right = -18.0
+offset_top = 5.0
+offset_bottom = 36.0
+tooltip_text = "Time of day"
+
+[node name="ActionPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_right = -18.0
+offset_top = -112.0
+offset_bottom = -48.0
+script = ExtResource("3")
+
+[node name="ResultLabel" type="Label" parent="."]
+unique_name_in_owner = true
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_right = -18.0
+offset_top = -46.0
+autowrap_mode = 2
+
+[node name="ChoiceOverlay" type="PanelContainer" parent="."]
+visible = false
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -440.0
+offset_top = -480.0
+offset_right = -20.0
+offset_bottom = -130.0
+
+[node name="ChoicePanel" type="VBoxContainer" parent="ChoiceOverlay"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="DismissChoices" type="Button" parent="ChoiceOverlay/ChoicePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "BACK TO ROOM"
+
+[node name="ChoiceTitle" type="Label" parent="ChoiceOverlay/ChoicePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="ChoicePrompt" type="Label" parent="ChoiceOverlay/ChoicePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+
+[node name="ChoiceList" type="VBoxContainer" parent="ChoiceOverlay/ChoicePanel"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="NarrativeLabel" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+
+[node name="InteractionList" type="VBoxContainer" parent="."]
+unique_name_in_owner = true
+visible = false

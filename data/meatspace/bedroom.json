@@ -1,0 +1,281 @@
+{
+  "id": "BEDROOM",
+  "objects": {
+    "BED": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "It hasn't been made in a while."
+        },
+        {
+          "id": "SLEEP",
+          "text": "You wake rested. The light beyond the blinds has changed.",
+          "actions": [
+            {
+              "type": "REST",
+              "amount": 60
+            },
+            {
+              "type": "ADVANCE_TIME",
+              "steps": 1
+            }
+          ]
+        }
+      ]
+    },
+    "DESK": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "Your primary hardware bench. Solder burns, cable scars, and just enough clear space for the next repair."
+        }
+      ]
+    },
+    "STARTER_DECK_BOX": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "A shipping carton with starter supplies tucked beneath folded packing paper."
+        },
+        {
+          "id": "OPEN",
+          "when_flag": "BOX_OPEN",
+          "equals": false,
+          "text": "The packing tape gives way. Useful spares sit inside.",
+          "actions": [
+            {
+              "type": "SET_FLAG",
+              "id": "BOX_OPEN",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "TAKE",
+          "when_flag": "BOX_EMPTIED",
+          "equals": false,
+          "text": "You pocket the spare leads and repair notes. The carton is empty.",
+          "actions": [
+            {
+              "type": "TAKE_CONTENTS",
+              "id": "STARTER_DECK_BOX"
+            },
+            {
+              "type": "SET_FLAG",
+              "id": "BOX_OPEN",
+              "value": true
+            },
+            {
+              "type": "SET_FLAG",
+              "id": "BOX_EMPTIED",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "contents": [
+        {
+          "id": "SPARE_LEADS",
+          "name": "Spare interface leads",
+          "visual": "SMALL_CASE"
+        },
+        {
+          "id": "REPAIR_NOTES",
+          "name": "Folded repair notes",
+          "visual": "BOOK"
+        }
+      ],
+      "visual_state": {
+        "open": "BOX_OPEN",
+        "empty": "BOX_EMPTIED"
+      }
+    },
+    "TOOLBOX": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "A battered steel case. The handle has outlasted two sets of tools."
+        },
+        {
+          "id": "OPEN",
+          "when_flag": "TOOLBOX_OPEN",
+          "equals": false,
+          "text": "The lid creaks open over neatly nested tools.",
+          "actions": [
+            {
+              "type": "SET_FLAG",
+              "id": "TOOLBOX_OPEN",
+              "value": true
+            }
+          ]
+        }
+      ],
+      "visual_state": {
+        "open": "TOOLBOX_OPEN"
+      }
+    },
+    "DISPLAY_TABLE": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "This would be a good place to put things I don't want to lose."
+        }
+      ],
+      "display_anchors": [
+        {
+          "id": "LEFT",
+          "position": [
+            -0.32,
+            1.09,
+            0
+          ]
+        },
+        {
+          "id": "RIGHT",
+          "position": [
+            0.32,
+            1.09,
+            0
+          ]
+        }
+      ]
+    },
+    "BOOKSHELF": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "Repair manuals lean against photocopied zines. A pencilled note reads: never trust the pinout."
+        },
+        {
+          "id": "READ",
+          "text": "Field repairs, volume II: the useful pages are held together with tape."
+        }
+      ],
+      "entries": [
+        {
+          "id": "MANUAL",
+          "title": "Field repairs, volume II",
+          "text": "The useful pages are held together with tape."
+        }
+      ]
+    },
+    "WINDOW": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "Venetian blinds stripe the skyline. Beyond the glass: rooftop utilities, signal towers, and a city that never quite sleeps."
+        },
+        {
+          "id": "OPEN",
+          "when_flag": "WINDOW_OPEN",
+          "equals": false,
+          "text": "You tilt the sash open. Traffic and rooftop wind become clearer.",
+          "actions": [
+            {
+              "type": "SET_FLAG",
+              "id": "WINDOW_OPEN",
+              "value": true
+            }
+          ]
+        },
+        {
+          "id": "CLOSE",
+          "when_flag": "WINDOW_OPEN",
+          "equals": true,
+          "text": "The latch catches. The city falls back to a muffled hum.",
+          "actions": [
+            {
+              "type": "SET_FLAG",
+              "id": "WINDOW_OPEN",
+              "value": false
+            }
+          ]
+        }
+      ],
+      "visual_state": {
+        "open": "WINDOW_OPEN"
+      }
+    },
+    "POSTER_VIRUS": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "VIRUS // Replicate. Mutate. A bootleg print celebrating exploits, destructive code, and programmers who sign their work in crash dumps."
+        }
+      ]
+    },
+    "POSTER_PHREAKER": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "PHREAKERS // The line is ours. Switching diagrams, radio frequencies, and a reminder that every network starts with physical wire."
+        }
+      ]
+    },
+    "POSTER_WAREZ": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "WAREZ // Copy. Keep. Share. A release-group emblem from the nights of cracked software, traded disks, and BBS upload ratios."
+        }
+      ]
+    },
+    "JACK_IN_INTERFACE": {
+      "verbs": [
+        {
+          "id": "EXAMINE",
+          "text": "A terminal, isolation switch, and coiled interface lead. Your connection to the local board."
+        }
+      ]
+    }
+  },
+  "environment": {
+    "profiles": {
+      "DAY": {
+        "sky": "88b7cb",
+        "ambient": "d3dece",
+        "energy": 0.85,
+        "neon": false,
+        "city_db": -24,
+        "utility_db": -35
+      },
+      "DUSK": {
+        "sky": "ad6870",
+        "ambient": "dcad95",
+        "energy": 0.65,
+        "neon": true,
+        "city_db": -28,
+        "utility_db": -32
+      },
+      "NIGHT": {
+        "sky": "101a32",
+        "ambient": "7c97bd",
+        "energy": 0.4,
+        "neon": true,
+        "city_db": -33,
+        "utility_db": -27
+      },
+      "DAWN": {
+        "sky": "b0959f",
+        "ambient": "b8bfd2",
+        "energy": 0.6,
+        "neon": false,
+        "city_db": -35,
+        "utility_db": -34
+      }
+    },
+    "window_flag": "WINDOW_OPEN",
+    "events": [
+      {
+        "id": "TRAIN",
+        "delay": 20,
+        "duration": 7
+      }
+    ],
+    "audio": {
+      "city": "res://assets/meatspace/audio/city.wav",
+      "utility": "res://assets/meatspace/audio/utility.wav",
+      "train": "res://assets/meatspace/audio/train.wav"
+    }
+  }
+}

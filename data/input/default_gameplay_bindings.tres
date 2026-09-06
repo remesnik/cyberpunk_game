@@ -1,0 +1,9 @@
+[gd_resource type="Resource" script_class="GameplayBindingProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://core/input/GameplayBindingProfile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+global_actions = {&"OPEN_PROGRAM_LOADOUT": &"game_inventory", &"TOGGLE_MINIMAP": &"network_map", &"JACK_OUT": &"gameplay_jack_out", &"TOGGLE_MONITOR": &"toggle_monitor", &"TOGGLE_TEAM_STATUS": &"toggle_team_status", &"OPEN_NODE_INSPECTOR": &"open_node_inspector"}
+cyberspace_commands = {&"SCAN": &"cyber_scan", &"INSPECT": &"cyber_inspect", &"CONFIRM_SELECTION": &"cyber_confirm", &"ATTACK": &"cyber_attack", &"EVADE": &"cyber_evade", &"TARGET_PREVIOUS": &"cyber_target_previous", &"TARGET_NEXT": &"cyber_target_next", &"CANCEL_SELECTION": &"cyber_cancel", &"INTERCEPT": &"comms_intercept"}
+program_bindings = {&"PROGRAM_SLOT_1": &"program_slot_1", &"PROGRAM_SLOT_2": &"program_slot_2", &"PROGRAM_SLOT_3": &"program_slot_3", &"PROGRAM_SLOT_4": &"program_slot_4", &"PROGRAM_SLOT_5": &"program_slot_5", &"PROGRAM_SLOT_6": &"program_slot_6", &"PROGRAM_SLOT_7": &"program_slot_7", &"PROGRAM_SLOT_8": &"program_slot_8"}

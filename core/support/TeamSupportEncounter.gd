@@ -16,12 +16,16 @@ var event_history: Array[Dictionary] = []
 
 
 func configure(target_team_id: StringName, target_access_point: PhysicalAccessPointInstance, manager: PhysicalTeamManager) -> void:
+	if team_manager != null and team_manager.team_route_blocked.is_connected(_on_team_blocked):
+		team_manager.team_route_blocked.disconnect(_on_team_blocked)
+	if access_point != null and access_point.access_changed.is_connected(_on_access_changed):
+		access_point.access_changed.disconnect(_on_access_changed)
 	team_id = target_team_id
 	access_point = target_access_point
 	team_manager = manager
 	team_manager.access_point_validator = _can_team_pass
-	team_manager.team_route_blocked.connect(_on_team_blocked)
-	access_point.access_changed.connect(_on_access_changed)
+	if not team_manager.team_route_blocked.is_connected(_on_team_blocked): team_manager.team_route_blocked.connect(_on_team_blocked)
+	if not access_point.access_changed.is_connected(_on_access_changed): access_point.access_changed.connect(_on_access_changed)
 
 
 func unlock_from_cyberspace(service_id: StringName) -> bool:

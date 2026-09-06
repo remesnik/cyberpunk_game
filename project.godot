@@ -13,6 +13,8 @@ PausePolicy="*res://core/PausePolicy.gd"
 Game="*res://autoload/Game.gd"
 EventBus="*res://autoload/EventBus.gd"
 Debug="*res://autoload/Debug.gd"
+GameplayBindings="*res://core/input/GameplayActionBindings.gd"
+HudState="*res://ui/hud/HudVisibilityManager.gd"
 
 [display]
 

@@ -1,0 +1,138 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://ui/frontend/game_mode_selection.gd" id="1"]
+[ext_resource type="PackedScene" path="res://ui/frontend/components/background_effect.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://ui/frontend/components/game_mode_option.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://ui/frontend/components/menu_button.tscn" id="4"]
+
+[node name="GameModeSelection" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" parent="." instance=ExtResource("2")]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Margin" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 56.0
+offset_top = 44.0
+offset_right = -56.0
+offset_bottom = -44.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Content" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 22
+alignment = 1
+
+[node name="Header" type="Label" parent="Margin/Content"]
+layout_mode = 2
+theme_type_variation = &"FrontendHeadingLabel"
+text = "NEW GAME"
+horizontal_alignment = 1
+
+[node name="Subheader" type="Label" parent="Margin/Content"]
+layout_mode = 2
+theme_type_variation = &"SystemLabel"
+text = "// SELECT OPERATING MODE"
+horizontal_alignment = 1
+
+[node name="Options" type="BoxContainer" parent="Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_horizontal = 4
+theme_override_constants/separation = 28
+alignment = 1
+
+[node name="StoryMode" parent="Margin/Content/Options" instance=ExtResource("3")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mode_id = &"STORY_MODE"
+mode_title = "STORY MODE"
+description = "Follow the authored campaign, meet characters, take contracts, and uncover the larger story."
+metadata = Array[String](["GUIDED PROGRESSION", "STORY EVENTS", "AUTHORED MISSIONS"])
+
+[node name="FreeRoam" parent="Margin/Content/Options" instance=ExtResource("3")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+mode_id = &"FREE_ROAM"
+accent_color = Color(0.49, 0.97, 0.77, 1)
+mode_title = "FREE ROAM"
+description = "Enter the network sandbox with fewer narrative restrictions. Explore, take jobs, build software, upgrade your deck, and choose your own targets."
+metadata = Array[String](["OPEN NETWORK", "SANDBOX PROGRESSION", "DYNAMIC JOBS"])
+
+[node name="Back" parent="Margin/Content" instance=ExtResource("4")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "BACK"
+
+[node name="SelectionStatus" type="Label" parent="Margin/Content"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"SystemLabel"
+text = "SESSION TYPE // STORY MODE"
+horizontal_alignment = 1
+
+[node name="Confirmation" type="VBoxContainer" parent="Margin/Content"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="ConfirmationTitle" type="Label" parent="Margin/Content/Confirmation"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_type_variation = &"FrontendHeadingLabel"
+text = "STORY MODE"
+horizontal_alignment = 1
+
+[node name="ConfirmationSummary" type="Label" parent="Margin/Content/Confirmation"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 20
+text = "Begin the authored campaign?"
+horizontal_alignment = 1
+
+[node name="OverwriteWarning" type="Label" parent="Margin/Content/Confirmation"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_type_variation = &"WarningLabel"
+text = "WARNING // EXISTING RESUMABLE SESSION DETECTED"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="Start" parent="Margin/Content/Confirmation" instance=ExtResource("4")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 4
+text = "START"
+
+[node name="ConfirmationBack" parent="Margin/Content/Confirmation" instance=ExtResource("4")]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(220, 48)
+layout_mode = 2
+size_flags_horizontal = 4
+text = "BACK"

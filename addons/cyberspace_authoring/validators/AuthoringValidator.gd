@@ -7,24 +7,30 @@ const MissionCatalog := preload("res://core/story/MissionEventNodeCatalog.gd")
 func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 	if document == null: return [_issue("ERROR", "GENERAL", &"", "No authoring document is open.")]
 	var issues: Array[Dictionary] = []; var ids: Dictionary = {}
+	_validate_availability(issues, document.document_id, StringName(document.availability), document.mode_variants)
 	for entry: Dictionary in document.all_entries():
 		var id: StringName = entry.get("id", &"")
 		if id == &"": issues.append(_issue("ERROR", "GENERAL", &"", "Entry has no ID."))
 		elif ids.has(id): issues.append(_issue("ERROR", "GENERAL", id, "Duplicate ID '%s'." % id))
 		else: ids[id] = entry.get("_collection", &"")
+		_validate_availability(issues, id, StringName(entry.get("availability", document.availability)), entry.get("mode_variants", {}))
 	var node_ids := _ids(document.network_nodes); var service_ids := _ids(document.services); var location_ids := _ids(document.meatspace_locations); var endpoint_ids := _ids(document.realtime_endpoints)
 	var program_ids := _ids(document.program_definitions)
 	var comms_channel_ids := _ids(document.comms_channels)
 	var ice_definition_ids := _ids(document.ice_definitions)
 	var sphere_ids := _ids(document.spheres)
 	var sleeve_ids := _ids(document.security_sleeves)
+	var legacy_sphere_claims := {}
 	for node: Dictionary in document.network_nodes:
 		var sphere_id: StringName = node.get("sphere_id", &"")
 		if sphere_id == &"": issues.append(_issue("WARNING", "SPHERES", node.id, "Network node has no persistent Sphere membership."))
 		elif sphere_id not in sphere_ids: issues.append(_issue("ERROR", "SPHERES", node.id, "Network node references missing Sphere '%s'." % sphere_id))
 	for sphere: Dictionary in document.spheres:
+		if not _valid_sphere_id(StringName(sphere.get("id", &""))): issues.append(_issue("ERROR", "SPHERES", sphere.get("id", &""), "Sphere ID must begin with A-Z and contain only A-Z, 0-9, or underscore."))
 		if sphere.get("original_security_sleeve_id", &"") != &"" and sphere.get("original_security_sleeve_id") not in sleeve_ids: issues.append(_issue("ERROR", "SPHERES", sphere.id, "Sphere references a missing original Security Sleeve."))
 		for member_id in sphere.get("node_ids", []):
+			if legacy_sphere_claims.has(member_id) and legacy_sphere_claims[member_id] != sphere.id: issues.append(_issue("ERROR", "SPHERES", member_id, "Node is listed in multiple legacy Sphere member lists. Use node sphere_id as the canonical assignment."))
+			else: legacy_sphere_claims[member_id] = sphere.id
 			if member_id not in node_ids: issues.append(_issue("ERROR", "SPHERES", sphere.id, "Sphere member node '%s' is missing." % member_id))
 			else:
 				var member := document.network_nodes.filter(func(node): return node.get("id", &"") == member_id)[0] as Dictionary
@@ -37,6 +43,11 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 		if link.get("source", &"") not in node_ids: issues.append(_issue("ERROR", "NETWORK", link.id, "Link source does not exist."))
 		if link.get("destination", &"") not in node_ids: issues.append(_issue("ERROR", "NETWORK", link.id, "Link destination does not exist."))
 		if int(link.get("traversal_cost", 0)) < 0: issues.append(_issue("ERROR", "NETWORK", link.id, "Traversal cost cannot be negative."))
+		var source := document.find_entry(link.get("source", &"")); var destination := document.find_entry(link.get("destination", &""))
+		if not source.is_empty() and not destination.is_empty():
+			var source_sphere: StringName = source.get("sphere_id", &""); var destination_sphere: StringName = destination.get("sphere_id", &"")
+			if source_sphere != &"" and destination_sphere != &"" and source_sphere != destination_sphere:
+				issues.append(_issue("INFO", "CROSS-SPHERE CONNECTIONS", link.id, "%s connects Sphere %s to %s." % [link.id, source_sphere, destination_sphere]))
 	for node_id in node_ids:
 		if node_id != &"PUBLIC_GATEWAY" and not _node_has_link(node_id, document.network_links): issues.append(_issue("WARNING", "NETWORK", node_id, "Network node is unreachable/orphaned."))
 	for endpoint: Dictionary in document.realtime_endpoints:
@@ -112,6 +123,19 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 
 
 func validate_shell() -> Array[Dictionary]: return [_issue("INFO", "GENERAL", &"", "Authoring plugin shell loaded.")]
+func _validate_availability(issues: Array[Dictionary], id: StringName, availability: StringName, variants: Dictionary) -> void:
+	if availability not in [&"AVAILABLE_IN_ALL_MODES", &"STORY_ONLY", &"FREE_ROAM_ONLY", &"MODE_SPECIFIC_VARIANT"]:
+		issues.append(_issue("ERROR", "CONTENT AVAILABILITY", id, "Unknown game-mode availability '%s'." % availability))
+	elif availability == &"MODE_SPECIFIC_VARIANT":
+		for required_mode in [&"STORY", &"FREE_ROAM"]:
+			if not variants.has(required_mode) and not variants.has(String(required_mode)):
+				issues.append(_issue("WARNING", "CONTENT AVAILABILITY", id, "Mode-specific content has no %s variant." % required_mode))
+func _valid_sphere_id(value: StringName) -> bool:
+	var text := String(value)
+	if text.is_empty() or not text[0] in "ABCDEFGHIJKLMNOPQRSTUVWXYZ": return false
+	for character in text:
+		if not character in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_": return false
+	return true
 func _ids(entries: Array[Dictionary]) -> Array[StringName]:
 	var result: Array[StringName] = []
 	for entry in entries: result.append(entry.get("id", &""))

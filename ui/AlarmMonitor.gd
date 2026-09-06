@@ -10,6 +10,9 @@ extends PanelContainer
 @onready var restore_button: Button = %RestoreButton
 @onready var trigger_button: Button = %TriggerButton
 @onready var record_button: Button = %RecordButton
+@onready var stop_monitoring_button: Button = %StopMonitoringButton
+
+@export var active_only := false
 
 var _alarm_ids: Array[StringName] = []
 
@@ -22,6 +25,7 @@ func _ready() -> void:
 	restore_button.pressed.connect(_command.bind(PhysicalAlarmDefinition.Command.RESTORE))
 	trigger_button.pressed.connect(_command.bind(PhysicalAlarmDefinition.Command.TRIGGER))
 	record_button.pressed.connect(_record_log)
+	stop_monitoring_button.pressed.connect(_stop_monitoring)
 	_refresh()
 
 
@@ -33,7 +37,7 @@ func _refresh() -> void:
 	if Game.physical_alarm_manager == null:
 		visible = false
 		return
-	var alarms: Array = Game.physical_alarm_manager.get_discovered_alarms()
+	var alarms: Array = Game.physical_alarm_manager.get_monitored_alarms() if active_only else Game.physical_alarm_manager.get_discovered_alarms()
 	visible = not alarms.is_empty()
 	var ids: Array[StringName] = []
 	var active_count := 0
@@ -53,6 +57,7 @@ func _refresh() -> void:
 			alarm_selector.set_item_text(index, "%s // %s" % [alarms[index].definition.display_name.to_upper(), alarms[index].state_label()])
 	summary_label.text = "ALARM MONITOR // ACTIVE %02d" % active_count
 	_update_detail()
+	stop_monitoring_button.disabled = not active_only or _selected_alarm() == null
 
 
 func _on_selected(_index: int) -> void:
@@ -95,6 +100,10 @@ func _record_log() -> void:
 	var instance := _selected_alarm()
 	if instance != null:
 		Game.record_alarm_log(instance.definition.id)
+
+func _stop_monitoring() -> void:
+	var instance := _selected_alarm()
+	if instance != null: Game.physical_alarm_manager.stop_monitoring(instance.definition.id)
 
 
 func _set_buttons(disabled: bool) -> void:

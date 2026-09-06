@@ -10,14 +10,94 @@ var node_records: Dictionary = {}
 var link_records: Dictionary = {}
 var ice_records: Dictionary = {}
 var hacker_records: Dictionary = {}
+var sphere_records: Dictionary = {}
 var security_sleeve_records: Dictionary = {}
 var service_records: Dictionary = {}
 var realtime_endpoint_records: Dictionary = {}
 var realtime_process_records: Dictionary = {}
 var ice_observations: Array[Dictionary] = []
+var current_observation_tick := 0
+var dynamic_node_observations: Dictionary = {}
+var dynamic_link_observations: Dictionary = {}
 ## Tracks only already-discovered contributors, preventing repeated observations
 ## from inflating category counts. This is knowledge state, never world state.
 var node_capability_sources: Dictionary = {}
+
+func reveal_sphere_identity(sphere: SphereDefinition, source: StringName = &"INTELLIGENCE") -> void:
+	if sphere == null or sphere.id == &"": return
+	var record: Dictionary = sphere_records.get(sphere.id, {}).duplicate(true)
+	record.merge({"id": sphere.id, "display_name": sphere.display_name, "identity_known": true, "source": source}, true)
+	sphere_records[sphere.id] = record
+	knowledge_changed.emit()
+
+func reveal_sphere_node_total(sphere_id: StringName, total_nodes: int, source: StringName = &"TOPOLOGY_INTELLIGENCE") -> void:
+	if sphere_id == &"" or total_nodes < 0: return
+	var record: Dictionary = sphere_records.get(sphere_id, {}).duplicate(true)
+	record.merge({"known_total_node_count": total_nodes, "topology_size_known": true, "topology_source": source}, true)
+	sphere_records[sphere_id] = record
+	knowledge_changed.emit()
+
+func set_sphere_security_state(sphere_id: StringName, state: StringName, source: StringName = &"SECURITY_INTELLIGENCE", observed_tick := -1, stale_after_ticks := -1) -> void:
+	if sphere_id == &"" or state == &"": return
+	var record: Dictionary = sphere_records.get(sphere_id, {}).duplicate(true)
+	record.merge({"security_state": state, "security_state_known": true, "security_source": source, "security_observed_tick": current_observation_tick if observed_tick < 0 else observed_tick, "security_stale_after_ticks": stale_after_ticks}, true)
+	sphere_records[sphere_id] = record
+	knowledge_changed.emit()
+
+func knows_sphere_identity(sphere_id: StringName) -> bool:
+	return bool(sphere_records.get(sphere_id, {}).get("identity_known", false))
+
+func get_sphere_view(sphere_id: StringName) -> Dictionary:
+	var record: Dictionary = sphere_records.get(sphere_id, {}).duplicate(true)
+	if not record.has("identity_known"): record["identity_known"] = false
+	if bool(record.get("security_state_known", false)):
+		var stale_after := int(record.get("security_stale_after_ticks", -1))
+		var age := maxi(0, current_observation_tick - int(record.get("security_observed_tick", current_observation_tick)))
+		record["security_state_freshness"] = &"STALE" if stale_after >= 0 and age > stale_after else &"CURRENT"
+		record["security_state_age_ticks"] = age
+	return record
+
+func advance_knowledge_time(tick: int) -> void:
+	if tick <= current_observation_tick: return
+	current_observation_tick = tick
+	var to_stale: Array[StringName] = []
+	for ice_id in ice_records:
+		var record: Dictionary = ice_records[ice_id]
+		if bool(record.get("position_stale", false)) or record.get("node_id", &"") == &"": continue
+		var stale_after := int(record.get("stale_after_ticks", -1))
+		if stale_after >= 0 and tick - int(record.get("last_observed_tick", tick)) > stale_after: to_stale.append(ice_id)
+	for ice_id in to_stale: mark_ice_position_stale(ice_id)
+	knowledge_changed.emit()
+
+func observe_dynamic_node_state(kind: StringName, subject_id: StringName, node_id: StringName, state: Variant, observed_tick := -1, stale_after_ticks := 3, expires_after_ticks := -1) -> void:
+	if kind == &"" or subject_id == &"" or node_id == &"": return
+	dynamic_node_observations[subject_id] = {"kind": kind, "subject_id": subject_id, "node_id": node_id, "state": state, "observed_tick": current_observation_tick if observed_tick < 0 else observed_tick, "stale_after_ticks": stale_after_ticks, "expires_after_ticks": expires_after_ticks}
+	knowledge_changed.emit()
+
+func observe_dynamic_link_state(kind: StringName, subject_id: StringName, link_id: StringName, state: Variant, observed_tick := -1, stale_after_ticks := 3, expires_after_ticks := -1) -> void:
+	if kind == &"" or subject_id == &"" or link_id == &"": return
+	dynamic_link_observations[subject_id] = {"kind": kind, "subject_id": subject_id, "link_id": link_id, "state": state, "observed_tick": current_observation_tick if observed_tick < 0 else observed_tick, "stale_after_ticks": stale_after_ticks, "expires_after_ticks": expires_after_ticks}
+	knowledge_changed.emit()
+
+func get_dynamic_node_information(node_id: StringName) -> Array[Dictionary]:
+	return _dynamic_information_for(dynamic_node_observations, &"node_id", node_id)
+
+func get_dynamic_link_information(link_id: StringName) -> Array[Dictionary]:
+	return _dynamic_information_for(dynamic_link_observations, &"link_id", link_id)
+
+func _dynamic_information_for(collection: Dictionary, field: StringName, value: StringName) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	for source: Dictionary in collection.values():
+		if source.get(field, &"") != value: continue
+		var age := maxi(0, current_observation_tick - int(source.get("observed_tick", current_observation_tick)))
+		var expires_after := int(source.get("expires_after_ticks", -1))
+		if expires_after >= 0 and age > expires_after: continue
+		var record := source.duplicate(true)
+		var stale_after := int(record.get("stale_after_ticks", -1))
+		record["age_ticks"] = age
+		record["freshness"] = &"STALE" if stale_after >= 0 and age > stale_after else &"CURRENT"
+		result.append(record)
+	return result
 
 func reveal_security_sleeve(sleeve: SecuritySleeve, graph: NetworkGraph, source: StringName = &"OBSERVATION") -> void:
 	if sleeve == null or graph == null: return
@@ -40,6 +120,40 @@ func get_known_security_sleeves() -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	for record: Dictionary in security_sleeve_records.values(): result.append(record.duplicate(true))
 	return result
+
+func set_node_critical_alert(node_id: StringName, active: bool, source: StringName = &"SECURITY_EVENT") -> void:
+	if node_id == &"" or not player_knows_node_exists(node_id): return
+	var record := _node_record(node_id)
+	record["critical_alert"] = active
+	_add_node_source(record, source)
+	node_records[node_id] = record
+	knowledge_changed.emit()
+
+func reveal_sphere_topology(graph: NetworkGraph, sphere_id: StringName, source: StringName = &"SPHERE_TOPOLOGY", reveal_identities := false) -> Dictionary:
+	if graph == null or graph.get_sphere(sphere_id) == null: return {"nodes_revealed": 0, "links_revealed": 0}
+	var sphere_nodes := graph.get_nodes_in_sphere(sphere_id)
+	var nodes_revealed := 0
+	var links_revealed := 0
+	var sphere_record: Dictionary = sphere_records.get(sphere_id, {}).duplicate(true)
+	sphere_record.merge({"known_total_node_count": sphere_nodes.size(), "topology_size_known": true, "topology_complete": true, "topology_source": source}, true)
+	sphere_records[sphere_id] = sphere_record
+	for node_id in sphere_nodes:
+		var node := graph.get_node(node_id)
+		var record := _node_record(node_id)
+		if not bool(record.get("exists_known", false)): nodes_revealed += 1
+		record["exists_known"] = true
+		if reveal_identities:
+			record.merge({"identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "level": maxi(int(record.get("level", KnowledgeLevel.Value.UNKNOWN)), KnowledgeLevel.Value.IDENTIFIED)}, true)
+		_add_node_source(record, source)
+		node_records[node_id] = record
+	for link: NetworkLinkDefinition in graph.links.values():
+		if not sphere_nodes.has(link.source) or not sphere_nodes.has(link.destination): continue
+		if get_link_level(link.id) < KnowledgeLevel.Value.IDENTIFIED: links_revealed += 1
+		var existing: Dictionary = link_records.get(link.id, {})
+		if int(existing.get("level", KnowledgeLevel.Value.UNKNOWN)) < KnowledgeLevel.Value.IDENTIFIED:
+			link_records[link.id] = {"level": KnowledgeLevel.Value.IDENTIFIED, "contact_id": _contact_id(link.id), "id": link.id, "source": link.source, "destination": link.destination, "one_way": link.one_way, "knowledge_source": source}
+	knowledge_changed.emit()
+	return {"nodes_revealed": nodes_revealed, "links_revealed": links_revealed}
 
 
 func observe_hacker(actor: HackerNPC) -> void:
@@ -308,7 +422,19 @@ func observe_traversal(graph: NetworkGraph, from_node_id: StringName, to_node_id
 		reveal_link(link, KnowledgeLevel.Value.IDENTIFIED)
 
 func get_node_view(node_id: StringName) -> Dictionary:
-	return (node_records.get(node_id, {}) as Dictionary).duplicate(true)
+	var view := (node_records.get(node_id, {}) as Dictionary).duplicate(true)
+	var dynamic := get_dynamic_node_information(node_id)
+	view["dynamic_information"] = dynamic
+	view["has_current_dynamic_status"] = dynamic.any(func(record): return record.freshness == &"CURRENT")
+	view["has_stale_dynamic_status"] = dynamic.any(func(record): return record.freshness == &"STALE")
+	var stale_ice: Array[Dictionary] = []
+	for record: Dictionary in ice_records.values():
+		if not bool(record.get("position_stale", false)) or record.get("last_known_node_id", &"") != node_id: continue
+		var observation := record.duplicate(true)
+		observation["age_ticks"] = maxi(0, current_observation_tick - int(record.get("last_observed_tick", current_observation_tick)))
+		stale_ice.append(observation)
+	view["stale_ice_observations"] = stale_ice
+	return view
 
 func get_local_contacts(current_node_id: StringName) -> Array[Dictionary]:
 	var contacts: Array[Dictionary] = []
@@ -462,12 +588,12 @@ func detect_ice(instance_id: StringName) -> void:
 	ice_records[instance_id] = {"level": KnowledgeLevel.Value.DETECTED, "contact_id": _contact_id(instance_id), "display_name": "UNKNOWN SECURITY PROCESS", "position_stale": false}
 	knowledge_changed.emit()
 
-func report_ice(instance_id: StringName, node_id: StringName, state: IceState.Value, level: KnowledgeLevel.Value = KnowledgeLevel.Value.IDENTIFIED) -> void:
+func report_ice(instance_id: StringName, node_id: StringName, state: IceState.Value, level: KnowledgeLevel.Value = KnowledgeLevel.Value.IDENTIFIED, observed_tick := -1, stale_after_ticks := 3) -> void:
 	var record := (ice_records.get(instance_id, {}) as Dictionary).duplicate(true)
 	var previous_node: StringName = record.get("last_known_node_id", record.get("node_id", &""))
 	if bool(record.get("position_stale", false)): _adjust_stale_ice_count(previous_node, -1)
 	elif previous_node != &"" and previous_node != node_id: _forget_node_capability_contributor(previous_node, NodeCapabilityType.Value.ICE, instance_id)
-	record.merge({"level": maxi(level, get_ice_level(instance_id)), "contact_id": _contact_id(instance_id), "id": instance_id, "display_name": String(instance_id), "node_id": node_id, "last_known_node_id": node_id, "position_stale": false, "state": state}, true)
+	record.merge({"level": maxi(level, get_ice_level(instance_id)), "contact_id": _contact_id(instance_id), "id": instance_id, "display_name": String(instance_id), "node_id": node_id, "last_known_node_id": node_id, "position_stale": false, "freshness": &"CURRENT", "last_observed_tick": current_observation_tick if observed_tick < 0 else observed_tick, "stale_after_ticks": stale_after_ticks, "state": state}, true)
 	ice_records[instance_id] = record
 	reveal_node_capability(node_id, NodeCapabilityType.Value.ICE, &"ICE_OBSERVATION", instance_id)
 	knowledge_changed.emit()
@@ -480,7 +606,7 @@ func mark_ice_position_stale(instance_id: StringName) -> void:
 	if old_node == &"": return
 	_forget_node_capability_contributor(old_node, NodeCapabilityType.Value.ICE, instance_id)
 	_adjust_stale_ice_count(old_node, 1)
-	record.merge({"last_known_node_id": old_node, "node_id": &"", "position_stale": true}, true)
+	record.merge({"last_known_node_id": old_node, "node_id": &"", "position_stale": true, "freshness": &"STALE"}, true)
 	ice_records[instance_id] = record
 	knowledge_changed.emit()
 
@@ -522,7 +648,7 @@ func _find_service(graph: NetworkGraph, service_id: StringName) -> Dictionary:
 func _node_record(node_id: StringName) -> Dictionary:
 	var record := (node_records.get(node_id, {}) as Dictionary).duplicate(true)
 	if record.is_empty():
-		record = {"id": node_id, "level": KnowledgeLevel.Value.UNKNOWN, "exists_known": false, "identity_known": false, "level_known": false, "contents_known": false, "unknown_content_count": 0, "capability_types": [], "capability_counts": {}, "stale_ice_count": 0, "local_san_present": false, "scanned": false, "visited": false, "compromised": false, "sources": []}
+		record = {"id": node_id, "level": KnowledgeLevel.Value.UNKNOWN, "exists_known": false, "identity_known": false, "level_known": false, "contents_known": false, "unknown_content_count": 0, "capability_types": [], "capability_counts": {}, "stale_ice_count": 0, "local_san_present": false, "critical_alert": false, "scanned": false, "visited": false, "compromised": false, "sources": []}
 	return record
 
 func _seed_capability_sources(node: NetworkNodeDefinition) -> void:

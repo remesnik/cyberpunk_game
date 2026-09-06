@@ -22,7 +22,9 @@ func set_saves(summaries: Array[FrontendSaveSummary]) -> void:
 	for summary in summaries:
 		if summary == null or not summary.is_valid(): continue
 		var button := Button.new()
-		button.text = "%s\n%s  //  %s" % [summary.network_name, summary.location_name, summary.display_timestamp]
+		var context := summary.network_name if not summary.network_name.is_empty() else summary.location_name
+		button.text = "%s\n%s\n%s\n%s" % [summary.save_id, summary.mode_label(), context, summary.playtime_display]
+		button.tooltip_text = "%s // %s" % [summary.location_name, summary.display_timestamp]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.focus_mode = Control.FOCUS_ALL
 		button.pressed.connect(func(): save_selected.emit(summary.save_id))

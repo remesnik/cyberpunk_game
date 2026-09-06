@@ -62,6 +62,7 @@ func _run() -> void:
 	menu.apply_availability(true, true, true)
 	_expect(not menu.get_node("Margin/Layout/MenuFrame/Buttons/Continue").disabled and not menu.get_node("Margin/Layout/MenuFrame/Buttons/LoadGame").disabled, "valid save availability enables continue and load")
 	var new_button: Button = menu.get_node("Margin/Layout/MenuFrame/Buttons/NewGame")
+	menu.new_game_requested.disconnect(frontend.show_game_mode_selection)
 	var requested_cues: Array[StringName] = []
 	menu.audio_cue_requested.connect(func(cue: StringName): requested_cues.append(cue))
 	_expect(not new_button.focus_neighbor_top.is_empty() and not new_button.focus_neighbor_bottom.is_empty(), "keyboard and controller controls use explicit focus neighbors")
@@ -76,6 +77,7 @@ func _run() -> void:
 	_expect(not new_button.effects_enabled and new_button.motion_scale == 0.0, "menu feedback supports a reduced-motion disabled mode")
 	new_button.pressed.emit()
 	_expect(transmission_count[0] == 2, "menu actions remain immediate and usable with all interaction animation disabled")
+	menu.new_game_requested.connect(frontend.show_game_mode_selection)
 	menu.idle_delay_seconds = 20.0
 	menu._process(20.1)
 	_expect(menu.is_idle_ambient_active() and menu.ambient_message.visible and menu.background.is_ambient_active(), "idle timeout enables lightweight messages and background activity")
@@ -132,8 +134,14 @@ func _run() -> void:
 	var requests := [false]
 	frontend.new_game_requested.connect(func(): requests[0] = true)
 	frontend.main_menu.new_game_requested.emit()
-	_expect(requests[0], "new-game navigation is exposed as a clean root signal")
-	_expect(not frontend.main_menu.get_node("Margin/Layout/MenuFrame/Buttons/LoadGame").disabled, "load browser remains reachable even when its session list is empty")
+	await process_frame; await process_frame; await process_frame
+	_expect(frontend.current_screen == frontend.Screen.GAME_MODE_SELECTION and not requests[0], "NEW GAME routes to mode selection without starting gameplay")
+	frontend.game_mode_selection.story_option.grab_focus()
+	_expect(not requests[0], "focusing a game mode does not activate it")
+	frontend.game_mode_selection.story_option.mode_activated.emit(&"STORY_MODE")
+	_expect(frontend.game_mode_selection.confirmation.visible and not requests[0], "mode selection opens an inline confirmation summary")
+	frontend.game_mode_selection.start_button.transmitted.emit()
+	_expect(requests[0], "explicit game-mode activation exposes the compatible new-game signal")
 	print("%s: %d frontend navigation assertions" % ["PASS" if failures == 0 else "FAIL", assertions])
 	frontend.queue_free(); quit(failures)
 

@@ -5,6 +5,7 @@ const NODE_SCENE := preload("res://cyberspace/display/NodeVisual.tscn")
 const LinkVisualScript := preload("res://cyberspace/display/LinkVisual.gd")
 const DEFAULT_VISUALIZATION_CONFIG := preload("res://cyberspace/display/cyberspace_visualization_config.tres")
 const DEFAULT_ACCESSIBILITY_CONFIG := preload("res://ui/frontend/accessibility/frontend_accessibility_config.tres")
+const GameplayBindingRequestScript := preload("res://core/input/GameplayBindingRequest.gd")
 const CYAN := Color("48e8ff")
 const AMBER := Color("ffc857")
 
@@ -50,6 +51,11 @@ const AMBER := Color("ffc857")
 @onready var doorstop_state_label: Label = %DoorstopStateLabel
 @onready var security_level_legend: Control = %SecurityLevelLegend
 @onready var capability_glossary: Control = %CapabilityGlossary
+@onready var sphere_minimap: SphereMinimap = %SphereMinimap
+@onready var left_panel: PanelContainer = %LeftPanel
+@onready var right_panel: PanelContainer = %RightPanel
+@onready var current_panel_toggle: Button = %CurrentPanelToggle
+@onready var event_feed_toggle: Button = %EventFeedToggle
 @export var visualization_config: Resource = DEFAULT_VISUALIZATION_CONFIG
 @export var accessibility_config: Resource = DEFAULT_ACCESSIBILITY_CONFIG
 
@@ -68,6 +74,11 @@ var _pending_doorstop_instance_id: StringName = &""
 var _knowledge_view_history: Dictionary = {}
 var _graph_zoom := 1.0
 var _visible_node_count := 1
+var _current_summary_expanded := false
+var _event_log_expanded := false
+var _context_panel_requested := false
+var _monitor_full_visible := false
+var _tutorial_hud_objective_id: StringName = &""
 
 func _ready() -> void:
 	security_level_legend.set_visualization_config(visualization_config)
@@ -77,9 +88,24 @@ func _ready() -> void:
 	EventBus.network_traversal_started.connect(_on_traversal_started)
 	EventBus.network_position_changed.connect(_on_position_changed)
 	EventBus.network_display_update_requested.connect(_on_display_update_requested)
+	EventBus.network_node_focus_requested.connect(_on_minimap_node_focus_requested)
 	EventBus.action_resolved.connect(_on_action_resolved)
 	EventBus.game_domain_changed.connect(_on_game_domain_changed)
 	EventBus.san_relocated.connect(_on_san_relocated)
+	EventBus.monitor_presentation_changed.connect(_on_monitor_presentation_changed)
+	HudState.widget_state_changed.connect(_on_hud_state_changed)
+	HudState.widget_open_requested.connect(_on_hud_widget_open_requested)
+	HudState.action_feedback.connect(_on_hud_action_feedback)
+	HudState.widget_emphasis_requested.connect(_on_hud_widget_emphasis_requested)
+	HudState.diegetic_lesson_requested.connect(_on_diegetic_hud_lesson)
+	HudState.tutorial_objective_requested.connect(_on_hud_tutorial_objective_requested)
+	HudState.tutorial_objective_completed.connect(_on_hud_tutorial_objective_completed)
+	sphere_minimap.collapsed_changed.connect(_on_minimap_collapsed_changed)
+	HudState.set_context_active(HudState.Widget.ALERTS, true)
+	HudState.set_context_active(HudState.Widget.NODE_INSPECTOR, false)
+	GameplayBindings.binding_triggered.connect(_on_gameplay_binding)
+	GameplayBindings.bindings_changed.connect(_on_bindings_changed)
+	GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE if Game.game_domain == Game.GameDomain.CYBERSPACE else GameplayBindings.Context.MEATSPACE)
 	scan_button.pressed.connect(_on_scan_pressed)
 	local_scan_button.pressed.connect(_on_scan_pressed)
 	confirm_button.pressed.connect(_confirm_selected_target)
@@ -101,6 +127,10 @@ func _ready() -> void:
 	doorstop_confirmation.confirmed.connect(_confirm_doorstop_deployment)
 	doorstop_confirmation.canceled.connect(_cancel_doorstop_deployment)
 	jack_out_button.pressed.connect(_jack_out_through_doorstop)
+	current_panel_toggle.pressed.connect(_toggle_current_summary)
+	event_feed_toggle.pressed.connect(_toggle_event_log)
+	_apply_hud_layout()
+	_apply_all_hud_states()
 	if Game.session_active:
 		_on_session_started()
 	queue_redraw()
@@ -109,6 +139,10 @@ func set_models(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_know
 	graph = p_graph
 	position_model = p_position
 	knowledge = p_knowledge
+	if sphere_minimap != null:
+		sphere_minimap.set_models(graph, position_model, knowledge, Game.sphere_tracker if Game.network_graph == graph else null)
+		if Game.network_graph == graph:
+			sphere_minimap.set_trail_source(Game.trail_system, &"PLAYER", Game.intrusion_run_id, func() -> int: return Game.action_clock.current_tick if Game.action_clock != null else 0)
 	_rebuild_neighborhood()
 
 func apply_accessibility(config: Resource) -> void:
@@ -121,6 +155,9 @@ func _reduced_animation_enabled() -> bool:
 	return accessibility_config != null and bool(accessibility_config.get("reduced_animation"))
 
 func _on_session_started() -> void:
+	visible = Game.game_domain == Game.GameDomain.CYBERSPACE
+	HudState.set_context_active(HudState.Widget.ALERTS, true)
+	_apply_all_hud_states()
 	set_models(Game.network_graph, Game.player_network_position, Game.player_knowledge)
 
 func _rebuild_neighborhood() -> void:
@@ -142,10 +179,11 @@ func _rebuild_neighborhood() -> void:
 	if current_view.is_empty():
 		status_label.text = "NO VALID NETWORK POSITION"
 		return
-	var map_left := 276.0
-	var map_right := size.x - 316.0
-	var map_top := 96.0
-	var map_bottom := size.y - 154.0
+	var map_rect := get_primary_graph_rect()
+	var map_left := map_rect.position.x
+	var map_right := map_rect.end.x
+	var map_top := map_rect.position.y
+	var map_bottom := map_rect.end.y
 	var center := Vector2((map_left + map_right) * 0.5, (map_top + map_bottom) * 0.5)
 	var contacts := knowledge.get_local_contacts(current_id)
 	var total_slots := contacts.size()
@@ -192,6 +230,7 @@ func _rebuild_neighborhood() -> void:
 	_update_current_panel(current_view)
 	_update_top_bar()
 	_update_program_bar()
+	_update_binding_labels()
 	_clear_target_panel()
 
 func _add_node_visual(node_view: Dictionary, center: Vector2, current: bool, selectable: bool) -> void:
@@ -306,6 +345,8 @@ func _on_node_capability_selected(node_id: StringName, capability_type: int) -> 
 	if definition == null:
 		return
 	selected_target_id = &""
+	_context_panel_requested = true
+	_refresh_context_panel_visibility()
 	for visual_id in node_visuals:
 		(node_visuals[visual_id] as NodeVisual).set_destination_emphasis(visual_id == node_id)
 	target_title.text = "%s // %s" % [String(definition.display_name).to_upper(), String(node_id)]
@@ -372,12 +413,28 @@ func _on_display_update_requested() -> void:
 	if not _transition_active:
 		_rebuild_neighborhood()
 
+func _on_minimap_node_focus_requested(node_id: StringName) -> void:
+	if knowledge == null or not knowledge.player_knows_node_exists(node_id): return
+	if node_visuals.has(node_id):
+		if target_views.has(node_id):
+			_select_target(node_id)
+		else:
+			for visual_id in node_visuals: (node_visuals[visual_id] as NodeVisual).set_destination_emphasis(visual_id == node_id)
+			status_label.text = "MAP FOCUS // %s" % _known_node_focus_name(node_id)
+	else:
+		status_label.text = "MAP FOCUS // %s // OUTSIDE LOCAL VIEW" % _known_node_focus_name(node_id)
+
+func _known_node_focus_name(node_id: StringName) -> String:
+	var view := knowledge.get_node_view(node_id)
+	return String(view.get("display_name", node_id)).to_upper() if bool(view.get("identity_known", false)) else "UNKNOWN NODE"
+
 func _on_san_relocated(_san_id: StringName, _previous_node_id: StringName, current_node_id: StringName) -> void:
 	var visual := node_visuals.get(current_node_id) as NodeVisual
 	if visual != null:
 		visual.play_san_arrival()
 
 func _on_resized() -> void:
+	_apply_hud_layout()
 	queue_redraw()
 	if not _transition_active:
 		_rebuild_neighborhood()
@@ -420,7 +477,7 @@ func graph_detail_level() -> int:
 func _unhandled_input(event: InputEvent) -> void:
 	if not visible or not event is InputEventMouseButton or not event.pressed:
 		return
-	var graph_rect := Rect2(Vector2(276.0, 94.0), Vector2(maxf(0.0, size.x - 592.0), maxf(0.0, size.y - 248.0)))
+	var graph_rect := get_primary_graph_rect()
 	if not graph_rect.has_point(event.position):
 		return
 	if event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -442,6 +499,8 @@ func _select_target(target_id: StringName) -> void:
 	if not target_views.has(target_id):
 		return
 	selected_target_id = target_id
+	_context_panel_requested = true
+	_refresh_context_panel_visibility()
 	for node_id in node_visuals:
 		(node_visuals[node_id] as NodeVisual).set_destination_emphasis(node_id == target_id)
 	var view := target_views[target_id] as Dictionary
@@ -486,12 +545,130 @@ func _select_target(target_id: StringName) -> void:
 
 func _clear_target_panel() -> void:
 	selected_target_id = &""
+	_context_panel_requested = false
+	_refresh_context_panel_visibility()
 	target_title.text = "NO TARGET"
 	target_details.text = "Q / TAB cycles contacts.\nClick a glyph or route to inspect."
 	target_cost.text = "ACTION COST // --"
 	program_cost_label.text = "    ACTION COST --"
 	confirm_button.disabled = true
 	target_scan_button.disabled = true
+
+func _toggle_current_summary() -> void:
+	_current_summary_expanded = not _current_summary_expanded
+	left_panel.visible = _current_summary_expanded
+	_apply_hud_layout()
+	_rebuild_neighborhood()
+
+func _toggle_event_log() -> void:
+	_event_log_expanded = not _event_log_expanded
+	event_feed.visible = _event_log_expanded
+	event_feed_toggle.text = "EVENT LOG  -" if _event_log_expanded else "EVENT LOG  +"
+
+func _on_monitor_presentation_changed(active: bool, expanded: bool) -> void:
+	_monitor_full_visible = active and expanded
+	HudState.set_suppressed(HudState.Widget.NODE_INSPECTOR, &"EXPANDED_MONITOR", _monitor_full_visible)
+	_refresh_context_panel_visibility()
+
+func _refresh_context_panel_visibility() -> void:
+	HudState.set_context_active(HudState.Widget.NODE_INSPECTOR, _context_panel_requested)
+	if right_panel != null: right_panel.visible = HudState.is_visible(HudState.Widget.NODE_INSPECTOR)
+
+func _on_hud_state_changed(widget_id: int, state: Dictionary) -> void:
+	match widget_id:
+		HudState.Widget.SPHERE_MINIMAP:
+			sphere_minimap.visible = bool(state.visible)
+			sphere_minimap.set_collapsed(bool(state.collapsed))
+		HudState.Widget.PROGRAM_QUICKBAR: $BottomBar.visible = bool(state.visible)
+		HudState.Widget.NODE_INSPECTOR: right_panel.visible = bool(state.visible)
+		HudState.Widget.OBJECTIVE: objective_label.visible = bool(state.visible)
+		HudState.Widget.TRACE: trace_label.visible = bool(state.visible)
+		HudState.Widget.ALERTS: status_label.visible = bool(state.visible)
+
+func _apply_all_hud_states() -> void:
+	for widget_id: int in [HudState.Widget.SPHERE_MINIMAP, HudState.Widget.PROGRAM_QUICKBAR, HudState.Widget.NODE_INSPECTOR, HudState.Widget.OBJECTIVE, HudState.Widget.TRACE, HudState.Widget.ALERTS]:
+		_on_hud_state_changed(widget_id, HudState.get_state(widget_id))
+
+func _on_minimap_collapsed_changed(collapsed: bool) -> void:
+	HudState.set_collapsed(HudState.Widget.SPHERE_MINIMAP, collapsed)
+	HudState.notify_widget_interacted(HudState.Widget.SPHERE_MINIMAP)
+
+func _on_hud_widget_open_requested(widget_id: int) -> void:
+	match widget_id:
+		HudState.Widget.NODE_INSPECTOR:
+			if right_panel.visible: target_title.grab_focus()
+		HudState.Widget.PROGRAM_QUICKBAR:
+			var buttons := $BottomBar/Margin/Rows/Programs.get_children()
+			for button: Button in buttons:
+				if not button.disabled:
+					button.grab_focus()
+					break
+
+func _on_hud_action_feedback(message: String) -> void:
+	if visible and not message.is_empty():
+		status_label.text = message
+		_flash_status()
+
+func _on_hud_widget_emphasis_requested(widget_id: int, duration: float) -> void:
+	var target: CanvasItem = $BottomBar if widget_id == HudState.Widget.PROGRAM_QUICKBAR else (sphere_minimap if widget_id == HudState.Widget.SPHERE_MINIMAP else null)
+	if target == null or not target.visible: return
+	if accessibility_config != null and bool(accessibility_config.get("reduced_animation")):
+		target.modulate = Color(1.18, 1.18, 0.9, 1.0)
+		get_tree().create_timer(minf(duration, 0.25)).timeout.connect(func() -> void: target.modulate = Color.WHITE)
+		return
+	var tween := create_tween()
+	tween.tween_property(target, "modulate", Color(1.3, 1.25, 0.72, 1.0), minf(0.18, duration * 0.3))
+	tween.tween_property(target, "modulate", Color.WHITE, maxf(0.12, duration * 0.7))
+
+func _on_diegetic_hud_lesson(actor_id: StringName, lesson_id: StringName, lines: Array) -> void:
+	# This follows the same authored Latch channel as the rest of FIRST_CONTACT;
+	# the event feed is only the current lightweight transcript presentation.
+	for line: Variant in lines:
+		event_feed.append_text("\n%s // %s" % [String(actor_id).trim_suffix("_REMOTE_ACTOR").replace("_", " "), String(line)])
+	if Game.hacker_npc_manager != null:
+		var timed_lines: Array[Dictionary] = []
+		for index in lines.size(): timed_lines.append({"time": float(index) * 1.8, "speaker_id": actor_id, "text": String(lines[index])})
+		Game.hacker_npc_manager.contextual_dialogue_requested.emit(actor_id, lesson_id, timed_lines)
+
+func _on_hud_tutorial_objective_requested(objective_id: StringName, title: String, optional: bool) -> void:
+	_tutorial_hud_objective_id = objective_id
+	objective_label.text = "%s%s" % ["OPTIONAL // " if optional else "", title]
+
+func _on_hud_tutorial_objective_completed(objective_id: StringName) -> void:
+	if objective_id != _tutorial_hud_objective_id: return
+	_tutorial_hud_objective_id = &""
+	_update_top_bar()
+
+func _apply_hud_layout() -> void:
+	if not is_node_ready(): return
+	var compact := size.x < 1500.0 or size.y < 850.0
+	var side_width := 196.0 if compact else 208.0
+	left_panel.offset_right = 12.0 + side_width
+	current_panel_toggle.offset_left = 12.0 + side_width - 48.0 if _current_summary_expanded else 12.0
+	current_panel_toggle.offset_right = current_panel_toggle.offset_left + 48.0
+	current_panel_toggle.text = "-" if _current_summary_expanded else "NODE +"
+	var minimap_width := 270.0 if compact else 300.0
+	sphere_minimap.offset_left = -12.0 - minimap_width
+	sphere_minimap.offset_right = -12.0
+	sphere_minimap.custom_minimum_size.x = minimap_width
+	# The target inspector is subordinate to the minimap and begins below it.
+	right_panel.offset_left = -12.0 - minimap_width
+	right_panel.offset_right = -12.0
+	right_panel.offset_top = 316.0
+	$BottomBar.offset_top = -82.0 if compact else -88.0
+	status_label.offset_top = -158.0
+	status_label.offset_bottom = status_label.offset_top + 26.0
+
+func get_primary_graph_rect() -> Rect2:
+	var left_reserved := left_panel.offset_right + 8.0 if _current_summary_expanded and left_panel.visible else 60.0
+	# A narrow right rail keeps the always-discoverable minimap and any active
+	# contextual monitor out of the node interaction field.
+	var right_reserved := maxf(414.0, maxf(absf(sphere_minimap.offset_left), sphere_minimap.size.x) + 24.0) if sphere_minimap != null else 414.0
+	var top := 74.0
+	# Includes the status line and minimized realtime monitor strip above the
+	# quick-slot bar, preventing large node hitboxes from sitting beneath HUD.
+	var bottom_reserved := 164.0
+	return Rect2(Vector2(left_reserved, top), Vector2(maxf(1.0, size.x - left_reserved - right_reserved), maxf(1.0, size.y - top - bottom_reserved)))
 
 func _confirm_selected_target() -> void:
 	if selected_target_id == &"" or not target_views.has(selected_target_id):
@@ -519,32 +696,52 @@ func _cycle_target(direction: int) -> void:
 	index = wrapi(index + direction, 0, target_order.size())
 	_select_target(target_order[index])
 
-func _unhandled_key_input(event: InputEvent) -> void:
-	if not event is InputEventKey or not event.pressed or event.echo:
+func _on_gameplay_binding(request: RefCounted) -> void:
+	if not visible or not Game.session_active: return
+	if request.category == GameplayBindingRequestScript.Category.PROGRAM_BINDING:
+		var installed: Array[StringName] = Game.program_loadout.installed_instance_ids if Game.program_loadout != null else []
+		var instance_id := GameplayBindings.resolve_program_instance(request, installed)
+		_activate_program_instance(instance_id, request.slot_index + 1)
 		return
-	match event.physical_keycode:
-		KEY_Q:
-			_cycle_target(-1)
-		KEY_TAB:
-			_cycle_target(1)
-		KEY_ENTER, KEY_E:
-			_confirm_selected_target()
-		KEY_R:
+	match request.command_id:
+		&"JACK_OUT": _jack_out_through_doorstop()
+		&"SCAN":
 			if selected_target_id == &"": _on_scan_pressed()
 			else: _scan_selected_target()
-		KEY_BACKSPACE:
-			_clear_target_panel()
-		KEY_J:
-			_jack_out_through_doorstop()
-		KEY_1, KEY_2, KEY_3, KEY_4, KEY_5:
-			_on_program_selected(int(event.physical_keycode - KEY_1 + 1))
+		&"INSPECT":
+			status_label.text = "INSPECTING // %s" % (target_title.text if not selected_target_id.is_empty() else current_name.text)
+		&"CONFIRM_SELECTION": _confirm_selected_target()
+		&"ATTACK": _submit_selected_confrontation(ActionRequest.ActionType.ATTACK_PROCESS)
+		&"EVADE": _submit_selected_confrontation(ActionRequest.ActionType.RETREAT)
+		&"TARGET_PREVIOUS": _cycle_target(-1)
+		&"TARGET_NEXT": _cycle_target(1)
+		&"CANCEL_SELECTION": _clear_target_panel()
+		&"INTERCEPT": status_label.text = "INTERCEPT // SELECT A DISCOVERED COMMS SIGNAL"
+
+func _on_bindings_changed(_input_action: StringName) -> void:
+	_update_binding_labels()
+	_update_program_bar()
+
+func _update_binding_labels() -> void:
+	if local_scan_button == null: return
+	var action: StringName = GameplayBindings.profile.input_action_for(GameplayBindingRequestScript.Category.CYBERSPACE_COMMAND, &"SCAN")
+	local_scan_button.text = "SCAN LOCAL [%s]" % GameplayBindings.get_binding_label(action)
 
 func _on_program_selected(slot: int) -> void:
-	if slot == 5:
+	var installed: Array[StringName] = Game.program_loadout.installed_instance_ids if Game.program_loadout != null else []
+	_activate_program_instance(installed[slot - 1] if slot > 0 and slot <= installed.size() else &"", slot)
+
+func _activate_program_instance(instance_id: StringName, slot: int) -> void:
+	var instance := Game.program_inventory.get_instance(instance_id) if Game.program_inventory != null else null
+	if instance == null or Game.program_loadout == null or not Game.program_loadout.is_installed(instance_id):
+		status_label.text = "PROGRAM BINDING %d // NO INSTALLED PROGRAM" % slot
+		_flash_status()
+		return
+	if instance.definition is DoorstopDefinition:
+		_pending_doorstop_instance_id = instance_id
 		_request_doorstop_confirmation()
 		return
-	var names := ["SCANNER", "SPOOF", "GHOST", "DECRYPT"]
-	status_label.text = "PROGRAM SLOT %d // %s SELECTED" % [slot, names[slot - 1]]
+	status_label.text = "PROGRAM BINDING %d // %s READY" % [slot, instance.definition.display_name.to_upper()]
 
 
 func _request_doorstop_confirmation() -> void:
@@ -554,7 +751,8 @@ func _request_doorstop_confirmation() -> void:
 		Game.notify_doorstop_invalid("No Doorstop copy is installed in the active deck.")
 		_flash_status()
 		return
-	_pending_doorstop_instance_id = installed[0]
+	if _pending_doorstop_instance_id.is_empty() or _pending_doorstop_instance_id not in installed:
+		_pending_doorstop_instance_id = installed[0]
 	Game.set_modal_action_selection_unresolved(true)
 	var node := graph.get_node(position_model.current_node_id) if graph != null and position_model != null else null
 	var node_label := node.display_name if node != null else String(position_model.current_node_id)
@@ -581,16 +779,16 @@ func _cancel_doorstop_deployment() -> void:
 
 
 func _update_program_bar() -> void:
-	if doorstop_button == null:
-		return
-	var installed := Game.installed_doorstop_instance_ids()
-	if not installed.is_empty():
-		var instance := Game.program_inventory.get_instance(installed[0])
-		doorstop_button.text = "[5] DOORSTOP %s // DISPOSABLE" % instance.definition.version
-	else:
-		doorstop_button.text = "[5] DOORSTOP // NO COPY INSTALLED"
-	doorstop_button.tooltip_text = "Disposable Backdoor Utility. Deployment destroys one specific copy."
-	doorstop_button.disabled = installed.is_empty()
+	var buttons := $BottomBar/Margin/Rows/Programs.get_children()
+	var loaded: Array[StringName] = Game.program_loadout.installed_instance_ids if Game.program_loadout != null else []
+	for index in buttons.size():
+		var button := buttons[index] as Button
+		var instance := Game.program_inventory.get_instance(loaded[index]) if index < loaded.size() and Game.program_inventory != null else null
+		var binding_id := StringName("PROGRAM_SLOT_%d" % (index + 1))
+		var action := StringName(GameplayBindings.profile.program_bindings.get(binding_id, &""))
+		button.text = "[%s] %s" % [GameplayBindings.get_binding_label(action), instance.definition.display_name.to_upper() if instance != null else "EMPTY"]
+		button.tooltip_text = "%s // binding: PROGRAM_SLOT_%d" % [instance.definition.description if instance != null else "No program installed in this loadout position.", index + 1]
+		button.disabled = instance == null
 	var anchor := Game.doorstop_controller.get_anchor(Game.intrusion_run_id) if Game.doorstop_controller != null else null
 	jack_out_button.disabled = anchor == null or not anchor.active
 	if anchor != null and anchor.active:
@@ -610,6 +808,7 @@ func _jack_out_through_doorstop() -> void:
 
 func _on_game_domain_changed(_previous_domain: int, current_domain: int) -> void:
 	visible = current_domain == Game.GameDomain.CYBERSPACE
+	GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE if visible else GameplayBindings.Context.MEATSPACE)
 
 func _submit_selected_confrontation(action_type: ActionRequest.ActionType) -> void:
 	if selected_target_id == &"" or not target_views.has(selected_target_id):

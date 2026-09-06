@@ -4,9 +4,8 @@ extends RefCounted
 static func build(document: CyberspaceContentDocument, entry_node_id: StringName = &"ENTRY", traversal_points := 100) -> Dictionary:
 	var graph := NetworkGraph.new()
 	for data: Dictionary in document.spheres:
-		var sphere_nodes: Array[StringName] = []
-		sphere_nodes.assign(data.get("node_ids", []))
-		var sphere := SphereDefinition.new(data.id, data.get("display_name", data.id), sphere_nodes, data.get("original_security_sleeve_id", &""))
+		# Membership is rebuilt from each node's canonical sphere_id below.
+		var sphere := SphereDefinition.new(data.id, data.get("display_name", data.id), [], data.get("original_security_sleeve_id", &""))
 		sphere.metadata = (data.get("metadata", {}) as Dictionary).duplicate(true)
 		graph.add_sphere(sphere)
 	var services: Dictionary = {}

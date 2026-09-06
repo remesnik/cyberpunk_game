@@ -68,6 +68,44 @@ const LevelStyle := preload("res://cyberspace/display/NodeLevelStyle.gd")
 @export var highlighted_edge_width := 4.0
 @export var edge_arc_offset := 14.0
 
+@export_group("Sphere Minimap Trail")
+@export var minimap_show_own_trail := true
+@export var minimap_show_detected_enemy_trails := true
+@export var minimap_own_trail_color := Color(0.42, 0.88, 0.94, 1.0)
+@export var minimap_enemy_trail_color := Color(0.92, 0.38, 0.48, 1.0)
+@export_range(0.0, 1.0, 0.01) var minimap_trail_min_alpha := 0.08
+@export_range(0.0, 1.0, 0.01) var minimap_trail_max_alpha := 0.62
+@export_range(0.5, 4.0, 0.1) var minimap_trail_width := 2.0
+@export_range(2.0, 12.0, 0.5) var minimap_trail_dash_length := 5.0
+
+@export_group("Sphere Minimap Security Sleeves")
+@export var minimap_show_security_sleeves := true
+@export var minimap_sleeve_color := Color(0.72, 0.54, 0.29, 1.0)
+@export_range(0.0, 1.0, 0.01) var minimap_sleeve_edge_alpha := 0.20
+@export_range(0.0, 1.0, 0.01) var minimap_sleeve_boundary_alpha := 0.58
+@export_range(1.0, 6.0, 0.1) var minimap_sleeve_edge_width := 3.5
+@export_range(0.5, 3.0, 0.1) var minimap_sleeve_boundary_width := 1.1
+
+@export_group("Sphere Minimap Exits")
+@export var minimap_exit_color := Color(0.83, 0.72, 0.40, 1.0)
+@export var minimap_unknown_exit_color := Color(0.58, 0.65, 0.67, 1.0)
+@export_range(14.0, 40.0, 1.0) var minimap_exit_length := 24.0
+@export_range(6.0, 20.0, 1.0) var minimap_exit_fan_spacing := 11.0
+
+@export_group("Sphere Minimap Level of Detail")
+@export_range(4, 20, 1) var minimap_close_node_limit := 8
+@export_range(10, 50, 1) var minimap_medium_node_limit := 24
+@export_range(1.0, 3.0, 0.1) var minimap_medium_inspection_zoom := 1.6
+@export_range(1.0, 4.0, 0.1) var minimap_close_inspection_zoom := 2.3
+@export_range(0.5, 4.0, 0.1) var minimap_min_zoom := 0.8
+@export_range(1.0, 6.0, 0.1) var minimap_max_zoom := 3.0
+@export_range(0.05, 0.5, 0.05) var minimap_zoom_step := 0.2
+
+@export_group("Sphere Minimap Information Age")
+@export var minimap_dynamic_current_color := Color(0.42, 0.88, 0.94, 1.0)
+@export var minimap_stale_color := Color(0.55, 0.68, 0.70, 1.0)
+@export var minimap_stale_ice_color := Color(0.82, 0.42, 0.48, 1.0)
+
 func radius(current: bool) -> float:
 	return (base_current_radius if current else base_connected_radius) * node_scale
 

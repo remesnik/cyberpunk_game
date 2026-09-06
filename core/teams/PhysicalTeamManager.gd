@@ -11,7 +11,7 @@ var definitions: Dictionary = {}
 var instances: Dictionary = {}
 var _process_manager: RealtimeProcessManager
 var _knowledge: PlayerKnowledge
-var team_knowledge: PhysicalTeamKnowledge
+var team_knowledge: PhysicalTeamKnowledge = PhysicalTeamKnowledge.new()
 var access_point_validator: Callable
 
 
@@ -39,6 +39,7 @@ func add_team(instance: PhysicalTeamInstance) -> bool:
 
 
 func get_player_views(realtime_now: float) -> Array[Dictionary]:
+	if team_knowledge == null: return []
 	return team_knowledge.get_all_views(realtime_now)
 
 
@@ -97,6 +98,9 @@ func _on_team_moved(team_id: StringName, previous: StringName, current: StringNa
 
 func _on_team_state_changed(team_id: StringName, previous: PhysicalTeamInstance.State, current: PhysicalTeamInstance.State) -> void:
 	team_state_changed.emit(team_id, previous, current)
+	if current == PhysicalTeamInstance.State.ENGAGED: _publish_tactical_alert(&"TEAM_MEMBER_UNDER_ATTACK", team_id, "UNDER ATTACK", &"CRITICAL")
+	elif current == PhysicalTeamInstance.State.LOST: _publish_tactical_alert(&"TEAM_MEMBER_DUMPED", team_id, "CONTACT LOST", &"CRITICAL")
+	elif current == PhysicalTeamInstance.State.COMPLETE: _publish_tactical_alert(&"OBJECTIVE_COMPLETE", team_id, "OBJECTIVE COMPLETE", &"SUCCESS")
 	teams_changed.emit()
 
 
@@ -112,4 +116,10 @@ func _on_knowledge_changed() -> void:
 		var team := value as PhysicalTeamInstance
 		if _knowledge.knows_realtime_process(team.realtime_process_id) and not team_knowledge.records.has(team.id):
 			team_knowledge.detect_team(team.id, team.elapsed_time, PhysicalTeamKnowledge.Source.TEAM_TELEMETRY)
+			_publish_tactical_alert(&"TEAM_MEMBER_DETECTED", team.id, "SIGNAL DETECTED", &"INFO")
 	teams_changed.emit()
+
+func _publish_tactical_alert(type: StringName, subject_id: StringName, message: String, severity: StringName) -> void:
+	if not is_inside_tree(): return
+	var event_bus := get_node_or_null("/root/EventBus")
+	if event_bus != null: event_bus.publish_tactical_status_alert(type, subject_id, message, severity)

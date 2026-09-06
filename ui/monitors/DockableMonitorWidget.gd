@@ -27,7 +27,7 @@ func configure(title: String, monitor_content: Control, initial_slot: DockSlot, 
 
 
 func _build_ui() -> void:
-	custom_minimum_size = Vector2(300.0, 0.0)
+	custom_minimum_size = Vector2(240.0 if dock_slot == DockSlot.BOTTOM else 280.0, 0.0)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	var panel_style := StyleBoxFlat.new()
 	panel_style.bg_color = Color(0.008, 0.025, 0.045, 0.96)

@@ -4,12 +4,14 @@ extends Node
 signal alarms_changed
 signal alarm_state_changed(alarm_id: StringName, previous_state: PhysicalAlarmInstance.State, current_state: PhysicalAlarmInstance.State)
 signal alarm_command_resolved(alarm_id: StringName, command: PhysicalAlarmDefinition.Command, success: bool, reason: String)
+signal monitoring_changed
 
 var definitions: Dictionary = {}
 var instances: Dictionary = {}
 var _process_manager: RealtimeProcessManager
 var _knowledge: PlayerKnowledge
 var _position: PlayerNetworkPosition
+var monitored_alarm_ids: Array[StringName] = []
 
 
 func configure(process_manager: RealtimeProcessManager, knowledge: PlayerKnowledge, position: PlayerNetworkPosition) -> void:
@@ -39,6 +41,24 @@ func get_discovered_alarms() -> Array[PhysicalAlarmInstance]:
 		if _knowledge.knows_realtime_process(instance.definition.realtime_process_id):
 			result.append(instance)
 	result.sort_custom(func(a: PhysicalAlarmInstance, b: PhysicalAlarmInstance) -> bool: return String(a.definition.id) < String(b.definition.id))
+	return result
+
+func start_monitoring(alarm_id: StringName) -> bool:
+	var instance := instances.get(alarm_id) as PhysicalAlarmInstance
+	if instance == null or _knowledge == null or not _knowledge.knows_realtime_process(instance.definition.realtime_process_id): return false
+	if alarm_id not in monitored_alarm_ids: monitored_alarm_ids.append(alarm_id)
+	monitoring_changed.emit()
+	return true
+
+func stop_monitoring(alarm_id: StringName) -> void:
+	monitored_alarm_ids.erase(alarm_id)
+	monitoring_changed.emit()
+
+func get_monitored_alarms() -> Array[PhysicalAlarmInstance]:
+	var result: Array[PhysicalAlarmInstance] = []
+	for alarm_id: StringName in monitored_alarm_ids:
+		var instance := instances.get(alarm_id) as PhysicalAlarmInstance
+		if instance != null and _knowledge != null and _knowledge.knows_realtime_process(instance.definition.realtime_process_id): result.append(instance)
 	return result
 
 

@@ -47,6 +47,7 @@ func appear(actor_id: StringName, node_id: StringName) -> Dictionary:
 	actor.previous_node_id = actor.current_node_id; actor.current_node_id = node_id; actor.state = HackerNPC.State.CONNECTED; actor.visible_signature = true
 	if actor.movement_history.is_empty() or actor.movement_history[-1] != node_id: actor.movement_history.append(node_id)
 	_emit_event(&"HACKER_APPEARED", actor_id, {"node_id": node_id}); actor_appeared.emit(actor_id, node_id); refresh_player_observations()
+	if _player_knows_relevant_actor(actor_id): _publish_tactical_alert(&"TEAM_MEMBER_DETECTED", actor_id, "%s ONLINE" % actor.definition.callsign, &"INFO")
 	return _success("Remote hacker appeared.")
 
 
@@ -56,6 +57,7 @@ func disappear(actor_id: StringName, disconnect := false) -> Dictionary:
 	var last_node := actor.current_node_id
 	actor.visible_signature = false; actor.state = HackerNPC.State.DISCONNECTED if disconnect else HackerNPC.State.HIDDEN
 	_emit_event(&"HACKER_DISAPPEARED", actor_id, {"node_id": last_node, "disconnected": disconnect}); actor_disappeared.emit(actor_id, last_node); refresh_player_observations()
+	if disconnect and actor.definition.player_relationship in [&"ALLY", &"FRIENDLY", &"CONTACT", &"GUIDE"]: _publish_tactical_alert(&"COMMS_LOST", actor_id, "%s COMMS LOST" % actor.definition.callsign, &"CRITICAL")
 	return _success("Remote hacker disappeared.")
 
 
@@ -148,6 +150,15 @@ func refresh_player_observations() -> void:
 func _is_local_and_known(node_id: StringName) -> bool:
 	if node_id == player_position.current_node_id: return true
 	return player_knowledge.knows_node(node_id) and graph.find_link(player_position.current_node_id, node_id) != null
+
+func _player_knows_relevant_actor(actor_id: StringName) -> bool:
+	var record: Dictionary = player_knowledge.hacker_records.get(actor_id, {}) if player_knowledge != null else {}
+	return bool(record.get("present", false)) and StringName(record.get("relationship", &"NEUTRAL")) in [&"ALLY", &"FRIENDLY", &"CONTACT", &"GUIDE"]
+
+func _publish_tactical_alert(type: StringName, subject_id: StringName, message: String, severity: StringName) -> void:
+	if not is_inside_tree(): return
+	var event_bus := get_node_or_null("/root/EventBus")
+	if event_bus != null: event_bus.publish_tactical_status_alert(type, subject_id, message, severity)
 
 
 func _reaction_matches(reaction: Dictionary, request: ActionRequest, result: ActionResult) -> bool:

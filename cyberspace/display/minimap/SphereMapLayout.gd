@@ -23,6 +23,15 @@ static func positions_for(graph: NetworkGraph, sphere_id: StringName) -> Diction
 			result[node_id] = _fallback_position(index, ids.size())
 	return result
 
+## Compact knowledge-only layout for player-facing maps. It deliberately does
+## not reserve sockets for authoritative hidden members.
+static func positions_for_known(known_node_ids: Array[StringName]) -> Dictionary:
+	var result := {}
+	var ids := known_node_ids.duplicate()
+	ids.sort()
+	for index in ids.size(): result[ids[index]] = _fallback_position(index, ids.size())
+	return result
+
 static func _fallback_position(index: int, count: int) -> Vector2:
 	if count <= 1: return Vector2(0.5, 0.5)
 	if index == 0: return Vector2(0.5, 0.5)
