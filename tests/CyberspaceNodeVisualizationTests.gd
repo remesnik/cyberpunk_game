@@ -21,6 +21,15 @@ func _ready() -> void:
 	var current := display.node_visuals[game.player_network_position.current_node_id] as NodeVisual
 	_expect(current.size.x >= 270.0 and current.size.y >= 190.0, "selection bounds and hitbox grow with the configured visual size")
 	_expect(is_equal_approx(config.radius(false), 54.6) and is_equal_approx(config.radius(true), 70.2), "connected and current hex radii both use the shared scale")
+	var reachable: NodeVisual
+	for candidate: NodeVisual in display.node_visuals.values():
+		if candidate.is_selectable: reachable = candidate; break
+	_expect(reachable != null and reachable.clickable_local_rect() == Rect2(Vector2.ZERO, reachable.size), "the click target covers the full rendered node billboard")
+	var selected_from_edge := [false]
+	reachable.selected.connect(func(_id: StringName): selected_from_edge[0] = true)
+	var edge_click := InputEventMouseButton.new(); edge_click.pressed = true; edge_click.button_index = MOUSE_BUTTON_LEFT; edge_click.position = reachable.size - Vector2.ONE
+	reachable._gui_input(edge_click)
+	_expect(selected_from_edge[0], "clicking at the outer edge of a visible node selects it")
 	var current_center := current.position + current.size * 0.5
 	for link: LinkVisual in display.link_visuals.values():
 		_expect(link.points[0].distance_to(current_center) >= config.radius(true), "connection begins outside the current hex perimeter")

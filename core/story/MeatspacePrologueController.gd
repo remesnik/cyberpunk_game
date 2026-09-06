@@ -81,10 +81,16 @@ func _apply_action(action: Dictionary) -> void:
 		&"SET_FLAG":
 			var flags := _flags(); flags[StringName(action.get("id", &""))] = action.get("value", true); game_state.campaign_state["story_flags"] = flags
 		&"SET_PLAYER_FIELD": game_state.player_state[StringName(action.get("id", &""))] = action.get("value")
-		&"SET_HARDWARE": game_state.player_state["hardware"] = (action.get("value", {}) as Dictionary).duplicate(true)
+		&"SET_HARDWARE":
+			var previous: Dictionary = game_state.player_state.get("hardware", {})
+			var replacement := (action.get("value", {}) as Dictionary).duplicate(true)
+			replacement[&"DECK_SENSORS"] = int(previous.get(&"DECK_SENSORS", previous.get(&"DECK_DETECTION", 1)))
+			game_state.player_state["hardware"] = replacement
 		&"MODIFY_HARDWARE":
 			var hardware: Dictionary = game_state.player_state.get("hardware", {}).duplicate(true)
-			var id := StringName(action.get("id", &"")); hardware[id] = int(hardware.get(id, 0)) + int(action.get("amount", 0)); game_state.player_state["hardware"] = hardware
+			var id := StringName(action.get("id", &""))
+			if id == &"DECK_DETECTION": id = &"DECK_SENSORS"
+			hardware[id] = int(hardware.get(id, 0)) + int(action.get("amount", 0)); game_state.player_state["hardware"] = hardware
 		&"SET_LOADOUT": game_state.player_state["installed_program_instance_ids"] = (action.get("value", []) as Array).duplicate()
 		&"SPEND_CREDITS": game_state.player_state["credits"] = maxi(0, int(game_state.player_state.get("credits", 0)) - int(action.get("amount", 0)))
 		&"COMPLETE_PROLOGUE":

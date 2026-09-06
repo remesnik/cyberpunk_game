@@ -28,8 +28,9 @@ func _ready() -> void:
 	await get_tree().process_frame
 	_expect(panel.visible and panel.get_node("Margin/Rows/Title").text.contains("FREE ROAM"), "Free Roam presents its home deck-management entry screen")
 	var entry: Dictionary = game.enter_free_roam_network()
-	_expect(entry.success and game.game_domain == game.GameDomain.CYBERSPACE, "home entry explicitly connects to the sandbox network")
-	_expect(game.persistent_game_state.world_state.entry_state == &"ACTIVE_NETWORK", "world entry state is persisted")
+	_expect(entry.success and game.game_domain == game.GameDomain.CLEAN_ROOM, "home entry opens the Clean-Room before the sandbox network")
+	_expect(game.persistent_game_state.world_state.entry_state == &"CLEAN_ROOM", "Clean-Room entry state is persisted")
+	_expect(game.enter_netspace_from_clean_room().success and game.game_domain == game.GameDomain.CYBERSPACE, "GO explicitly enters the sandbox network")
 	panel.queue_free()
 	game.end_session()
 	print("%s: %d Free Roam runtime assertions" % ["PASS" if failures == 0 else "FAIL", assertions])

@@ -19,6 +19,7 @@ func _test_end_to_end_contract() -> void:
 	knowledge.discover_node(node)
 	var visual := NodeVisual.new()
 	visual.apply_visualization_config(CONFIG)
+	_expect(CONFIG.capability_indicator_radius >= 14.0 and CONFIG.capability_indicator_font_size >= 11, "capability sockets and their symbols use the enlarged readable baseline")
 	visual.configure_view(knowledge.get_node_view(node.id), false, true, false)
 	_expect(CONFIG.node_scale >= 1.25, "hex nodes retain the revised larger scale")
 	_expect(visual.resolved_level_style() == CONFIG.unknown_level_style and visual.level_glyph() == "L?", "unknown level renders with configured grey style and accessible glyph")

@@ -17,6 +17,7 @@ func _ready() -> void:
 	game.create_new_game(GameMode.Value.FREE_ROAM)
 	game.start_session()
 	_expect(game.enter_free_roam_network().success, "test intrusion enters cyberspace")
+	_expect(game.enter_netspace_from_clean_room().success, "Clean-Room GO begins the test intrusion")
 	var initial_requests: int = game.autosave_service.request_count
 	var wait: ActionResult = game.request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.WAIT, &"", 3))
 	_expect(wait.success and game.action_clock.current_tick == 3, "cyberspace action advances the cyber clock")
@@ -45,18 +46,20 @@ func _ready() -> void:
 	game.autosave_service.successful_save_count = 0
 	game.create_new_game(GameMode.Value.STORY)
 	game.start_session()
+	game.enter_netspace_from_clean_room()
 	var normal: Dictionary = game.jack_out_normally()
-	_expect(normal.success and game.intrusion_session.lifecycle == IntrusionSession.Lifecycle.ABORTED and game.autosave_service.last_reason == AutosaveService.Reason.NORMAL_JACK_OUT, "normal Jack Out enters meat space and autosaves through policy")
-	_expect(game.autosave_service.successful_save_count == 1, "normal Jack Out produces one save rather than scattered writes")
+	_expect(normal.success and game.intrusion_session.lifecycle == IntrusionSession.Lifecycle.ABORTED and game.game_domain == game.GameDomain.CLEAN_ROOM, "normal Jack Out returns to the Clean-Room")
+	_expect(game.autosave_service.successful_save_count == 0, "Clean-Room return does not masquerade as a Meatspace autosave")
 	game.end_session()
 
 	_cleanup_file()
 	game.autosave_service.successful_save_count = 0
 	game.create_new_game(GameMode.Value.STORY)
 	game.start_session()
+	game.enter_netspace_from_clean_room()
 	var completed: Dictionary = game.complete_intrusion_and_return_to_meatspace({&"objective_id": &"TEST_OBJECTIVE"})
-	_expect(completed.success and game.intrusion_session.lifecycle == IntrusionSession.Lifecycle.COMPLETED and game.autosave_service.last_reason == AutosaveService.Reason.MISSION_COMPLETE, "mission completion enters meat space and uses the mission-complete reason")
-	_expect(game.autosave_service.successful_save_count == 1, "mission return produces exactly one autosave")
+	_expect(completed.success and game.intrusion_session.lifecycle == IntrusionSession.Lifecycle.COMPLETED and game.game_domain == game.GameDomain.CLEAN_ROOM, "mission completion returns to the Clean-Room")
+	_expect(game.autosave_service.successful_save_count == 0, "mission Clean-Room return waits for an explicit home transition before saving")
 	game.end_session()
 
 	_cleanup()

@@ -58,8 +58,9 @@ const ContentAvailabilityScript := preload("res://core/content/ContentAvailabili
 const FreeRoamJobBoardScript := preload("res://core/jobs/FreeRoamJobBoard.gd")
 const MeatspaceAutosaveServiceScript := preload("res://core/save/MeatspaceAutosaveService.gd")
 const MeatspacePrologueControllerScript := preload("res://core/story/MeatspacePrologueController.gd")
+const SensorTopologyControllerScript := preload("res://cyberspace/SensorTopologyController.gd")
 
-enum GameDomain { CYBERSPACE, MEATSPACE }
+enum GameDomain { CYBERSPACE, MEATSPACE, CLEAN_ROOM }
 
 var persistent_game_state: PersistentGameState = PersistentGameStateScript.new()
 var active_content_document: CyberspaceContentDocument
@@ -75,6 +76,7 @@ var session_active := false
 var network_graph: NetworkGraph
 var player_network_position: PlayerNetworkPosition
 var player_knowledge: PlayerKnowledge
+var sensor_topology: SensorTopologyController
 var sphere_tracker: CurrentSphereTracker
 var trail_system: HackerTrailSystem
 var action_clock: ActionClock
@@ -126,6 +128,8 @@ var _intrusion_sequence := 0
 var intrusion_session: IntrusionSession
 var game_domain: GameDomain = GameDomain.CYBERSPACE
 var meatspace_management: MeatspaceManagement
+var clean_room_controller: CleanRoomController
+var connection_trace_progress := 0.0
 var doorstop_programming_definition: DoorstopDefinition
 var doorstop_suspension_policy: DoorstopSuspensionPolicy
 var suspended_intrusion_advancer: SuspendedIntrusionAdvancer
@@ -217,10 +221,39 @@ func enter_free_roam_network() -> Dictionary:
 	if not is_content_available(&"FREE_ROAM_HOME"): return {"success": false, "reason": "Free Roam network entry is unavailable."}
 	if game_domain != GameDomain.MEATSPACE: return {"success": false, "reason": "Already connected to cyberspace."}
 	var previous := game_domain
+	game_domain = GameDomain.CLEAN_ROOM
+	persistent_game_state.world_state["entry_state"] = &"CLEAN_ROOM"
+	EventBus.game_domain_changed.emit(previous, game_domain)
+	if clean_room_controller != null: clean_room_controller.enter()
+	return {"success": true, "reason": "Entered the Clean-Room."}
+
+func enter_netspace_from_clean_room() -> Dictionary:
+	if game_domain != GameDomain.CLEAN_ROOM: return {"success": false, "reason": "The Clean-Room is not active."}
+	var previous := game_domain
 	game_domain = GameDomain.CYBERSPACE
+	if intrusion_session != null and intrusion_session.lifecycle in [IntrusionSession.Lifecycle.ABORTED, IntrusionSession.Lifecycle.COMPLETED]: intrusion_session.lifecycle = IntrusionSession.Lifecycle.ACTIVE
 	persistent_game_state.world_state["entry_state"] = &"ACTIVE_NETWORK"
 	EventBus.game_domain_changed.emit(previous, game_domain)
-	return {"success": true, "reason": "Connected to the Free Roam network."}
+	EventBus.network_display_update_requested.emit()
+	return {"success": true, "reason": "Entering Netspace."}
+
+func return_home_from_clean_room() -> Dictionary:
+	if game_domain != GameDomain.CLEAN_ROOM: return {"success": false, "reason": "The Clean-Room is not active."}
+	var previous := game_domain
+	game_domain = GameDomain.MEATSPACE
+	persistent_game_state.world_state["entry_state"] = &"MEATSPACE"
+	EventBus.game_domain_changed.emit(previous, game_domain)
+	var save_error := request_meatspace_autosave(MeatspaceAutosaveServiceScript.Reason.RETURN_TO_MEATSPACE, {&"source": &"CLEAN_ROOM"})
+	return {"success": true, "reason": "Returned home." if save_error == OK else "Returned home, but autosave failed.", "save_error": save_error}
+
+func return_to_clean_room(reason := "Run connection closed.") -> Dictionary:
+	if game_domain != GameDomain.CYBERSPACE: return {"success": false, "reason": "No Netspace run is active."}
+	var previous := game_domain
+	game_domain = GameDomain.CLEAN_ROOM
+	persistent_game_state.world_state["entry_state"] = &"CLEAN_ROOM"
+	EventBus.game_domain_changed.emit(previous, game_domain)
+	if clean_room_controller != null: clean_room_controller.enter()
+	return {"success": true, "reason": reason}
 
 func enter_meatspace(reason: int = MeatspaceAutosaveServiceScript.Reason.RETURN_TO_MEATSPACE, metadata: Dictionary = {}) -> Dictionary:
 	if game_domain != GameDomain.CYBERSPACE: return {"success": false, "reason": "Player is already in meat space."}
@@ -235,7 +268,7 @@ func jack_out_normally() -> Dictionary:
 	if not session_active or intrusion_session == null or intrusion_session.lifecycle != IntrusionSession.Lifecycle.ACTIVE:
 		return {"success": false, "reason": "No active intrusion can be disconnected."}
 	intrusion_session.lifecycle = IntrusionSession.Lifecycle.ABORTED
-	return enter_meatspace(MeatspaceAutosaveServiceScript.Reason.NORMAL_JACK_OUT, {&"intrusion_id": intrusion_run_id})
+	return return_to_clean_room("Disconnected to the Clean-Room.")
 
 func complete_intrusion_and_return_to_meatspace(completion_data: Dictionary = {}) -> Dictionary:
 	if intrusion_session == null: return {"success": false, "reason": "No intrusion is active."}
@@ -246,7 +279,7 @@ func complete_intrusion_and_return_to_meatspace(completion_data: Dictionary = {}
 		var completed_ids: Array = persistent_game_state.campaign_state.get("completed_mission_ids", [])
 		if "FIRST_CONTACT" not in completed_ids: completed_ids.append("FIRST_CONTACT")
 		persistent_game_state.campaign_state["completed_mission_ids"] = completed_ids
-	return enter_meatspace(MeatspaceAutosaveServiceScript.Reason.MISSION_COMPLETE, completion_data)
+	return return_to_clean_room("Run complete. Returned to the Clean-Room.")
 
 func serialize_persistent_state() -> Dictionary:
 	return persistent_game_state.to_save_data()
@@ -509,6 +542,15 @@ func start_session() -> void:
 	_create_shared_equipment_economy()
 	_create_free_roam_job_board()
 	_create_program_loadout(active_content_profile.get("kind", &"") != &"MEATSPACE_PROLOGUE")
+	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {})
+	if hardware.has(&"DECK_DETECTION") and not hardware.has(&"DECK_SENSORS"): hardware[&"DECK_SENSORS"] = int(hardware[&"DECK_DETECTION"])
+	hardware[&"DECK_SENSORS"] = int(hardware.get(&"DECK_SENSORS", 1))
+	persistent_game_state.player_state["hardware"] = hardware
+	sensor_topology = SensorTopologyControllerScript.new()
+	sensor_topology.configure(network_graph, player_network_position, player_knowledge, int(hardware[&"DECK_SENSORS"]))
+	sensor_topology.sensor_view_changed.connect(EventBus.network_display_update_requested.emit)
+	if meatspace_management != null:
+		meatspace_management.hardware_changed.connect(_on_hardware_changed)
 	ice_controller = IceController.new(network_graph, player_network_position, player_knowledge)
 	if active_content_document != null:
 		AuthoredNetworkRuntimeBuilderScript.populate_ice(active_content_document, ice_controller, Callable(self, "_is_active_authored_entry_available"))
@@ -554,9 +596,12 @@ func start_session() -> void:
 			persistent_game_state.world_state["pending_entry_content_id"] = &""
 	if active_content_profile.get("kind", &"") in [&"FREE_ROAM_WORLD", &"MEATSPACE_PROLOGUE"]:
 		game_domain = GameDomain.MEATSPACE
+	elif active_content_profile.get("kind", &"") == &"AUTHORED_NETWORK":
+		game_domain = GameDomain.CLEAN_ROOM
 	_restore_saved_meatspace_runtime()
 	session_active = true
 	EventBus.session_started.emit()
+	if game_domain == GameDomain.CLEAN_ROOM and clean_room_controller != null: clean_room_controller.enter()
 	if active_content_document != null:
 		entry_guidance = AuthoredEntryGuidance.new()
 		add_child(entry_guidance)
@@ -609,6 +654,8 @@ func _create_program_loadout(create_connection := true) -> void:
 	suspended_node_process_advancer = Callable()
 	meatspace_management = MeatspaceManagementScript.new()
 	meatspace_management.configure(program_inventory, program_loadout, equipment_order_manager, realtime_world_clock)
+	clean_room_controller = CleanRoomController.new()
+	clean_room_controller.configure(persistent_game_state, meatspace_management)
 	if not persistent_game_state.player_state.is_empty():
 		meatspace_management.hardware_levels = (persistent_game_state.player_state.get("hardware", {}) as Dictionary).duplicate(true)
 		equipment_order_manager.credits = int(persistent_game_state.player_state.get("credits", 0))
@@ -632,6 +679,14 @@ func _create_persistent_starter_programs() -> void:
 	for instance_id: Variant in persistent_game_state.player_state.get("installed_program_instance_ids", []):
 		program_loadout.install(StringName(instance_id), program_inventory)
 
+func _on_hardware_changed(component_id: StringName, level: int) -> void:
+	if component_id != &"DECK_SENSORS" or sensor_topology == null: return
+	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {}).duplicate(true)
+	hardware[component_id] = level
+	persistent_game_state.player_state["hardware"] = hardware
+	persistent_game_state.emit_changed()
+	sensor_topology.set_sensors_rating(level)
+
 func _create_free_roam_job_board() -> void:
 	free_roam_job_board = null
 	if not is_free_roam_mode(): return
@@ -654,6 +709,7 @@ func end_session() -> void:
 	network_graph = null
 	player_network_position = null
 	player_knowledge = null
+	sensor_topology = null
 	sphere_tracker = null
 	san_controller = null
 	action_clock = null
@@ -667,6 +723,7 @@ func end_session() -> void:
 	progression_controller = null
 	trace_level = 0
 	pending_action_trace = 0
+	connection_trace_progress = 0.0
 	resource_state = null
 	anchor_controller = null
 	shortcut_controller = null
@@ -1597,7 +1654,8 @@ func _validate_action(request: ActionRequest) -> Dictionary:
 			if not request.target is Dictionary:
 				return {"success": false, "reason": "Transfer target is malformed.", "events": []}
 			var transfer_validation: Dictionary = mission.validate_transfer(request.target)
-			if request.cost != 3:
+			var expected_transfer_cost := clean_room_controller.adjusted_transfer_cost(3) if clean_room_controller != null else 3
+			if request.cost != expected_transfer_cost:
 				return {"success": false, "reason": "Transfer cost mismatch.", "events": []}
 			return {"success": transfer_validation.success, "reason": transfer_validation.reason, "events": []}
 		_:
@@ -1690,6 +1748,10 @@ func _update_trace(tick: int, _request: ActionRequest) -> Array[Dictionary]:
 	pending_action_trace = 0
 	if player_network_position.has_capability(CapabilityCatalog.TRACE_SCRAMBLER):
 		increase = maxi(0, increase - 1)
+	if clean_room_controller != null and increase > 0:
+		connection_trace_progress += float(increase) / clean_room_controller.trace_resolution_multiplier()
+		increase = int(floor(connection_trace_progress))
+		connection_trace_progress -= float(increase)
 	trace_level += increase
 	var events: Array[Dictionary] = [{"type": &"TRACE_UPDATED", "tick": tick, "increase": increase, "trace": trace_level, "player_visible": increase != 0}]
 	if trace_level >= PayrollMissionController.TRACE_FAILURE_THRESHOLD:
@@ -1704,7 +1766,8 @@ func request_exploit(target: Dictionary) -> ActionResult:
 	return request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.EXPLOIT, target.duplicate(true), mission.exploit_cost(target)))
 
 func request_transfer(target: Dictionary) -> ActionResult:
-	return request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.TRANSFER, target.duplicate(true), 3))
+	var cost := clean_room_controller.adjusted_transfer_cost(3) if clean_room_controller != null else 3
+	return request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.TRANSFER, target.duplicate(true), cost))
 
 func _update_network_systems(tick: int, _request: ActionRequest) -> Array[Dictionary]:
 	return [{"type": &"NETWORK_SYSTEMS_UPDATED", "tick": tick}, deep_exploration.update(trace_level)]

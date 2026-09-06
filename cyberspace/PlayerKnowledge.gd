@@ -300,6 +300,7 @@ func get_node_knowledge_state(node_id: StringName) -> StringName:
 	if player_has_visited_node(node_id): return &"VISITED"
 	if player_has_scanned_node(node_id): return &"SCANNED"
 	if player_knows_node_level(node_id): return &"LEVEL_KNOWN"
+	if get_node_level(node_id) >= KnowledgeLevel.Value.DETECTED: return &"DETECTED"
 	return &"UNKNOWN"
 
 func discover_node(node: NetworkNodeDefinition, source: StringName = &"OBSERVATION") -> void:
@@ -308,6 +309,23 @@ func discover_node(node: NetworkNodeDefinition, source: StringName = &"OBSERVATI
 	record["exists_known"] = true
 	_add_node_source(record, source)
 	node_records[node.id] = record
+	knowledge_changed.emit()
+
+func reveal_topology_node(node: NetworkNodeDefinition, source: StringName = &"TOPOLOGY") -> void:
+	if node == null: return
+	var record := _node_record(node.id)
+	record["exists_known"] = true
+	record["level"] = maxi(KnowledgeLevel.Value.DETECTED, int(record.get("level", KnowledgeLevel.Value.UNKNOWN)))
+	_add_node_source(record, source)
+	node_records[node.id] = record
+	knowledge_changed.emit()
+
+func reveal_topology_link(link: NetworkLinkDefinition, source: StringName = &"TOPOLOGY") -> void:
+	if link == null: return
+	var existing := (link_records.get(link.id, {}) as Dictionary).duplicate(true)
+	if int(existing.get("level", KnowledgeLevel.Value.UNKNOWN)) >= KnowledgeLevel.Value.IDENTIFIED: return
+	# Endpoints are topology facts. Cost, lock, authority, and other route data remain absent.
+	link_records[link.id] = {"level": KnowledgeLevel.Value.DETECTED, "contact_id": _contact_id(link.id), "source": link.source, "destination": link.destination, "topology_only": true, "knowledge_source": source}
 	knowledge_changed.emit()
 
 func reveal_node_level(node: NetworkNodeDefinition, source: StringName = &"INTELLIGENCE") -> void:

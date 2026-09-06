@@ -1,9 +1,10 @@
-[gd_scene load_steps=6 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://cyberspace/display/NetworkDisplay.gd" id="1_display"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/SecurityLevelLegend.tscn" id="2_legend"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/CapabilityGlossary.tscn" id="3_glossary"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/minimap/SphereMinimap.tscn" id="4_minimap"]
+[ext_resource type="Script" path="res://cyberspace/display/CyberspaceSpatialBackdrop.gd" id="5_backdrop"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.008, 0.025, 0.045, 0.94)
@@ -37,6 +38,17 @@ grow_vertical = 2
 mouse_filter = 2
 color = Color(0.002, 0.008, 0.018, 1)
 show_behind_parent = true
+
+[node name="SpatialBackdrop" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("5_backdrop")
 
 [node name="LinkLayer" type="Node2D" parent="."]
 unique_name_in_owner = true

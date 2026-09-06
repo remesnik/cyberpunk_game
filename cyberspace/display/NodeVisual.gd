@@ -279,6 +279,12 @@ func _gui_input(event: InputEvent) -> void:
 			scan_requested.emit(node_id)
 			accept_event()
 
+func clickable_local_rect() -> Rect2:
+	## The complete billboard footprint is interactive. This remains in local
+	## coordinates, so Control scaling during camera movement scales the hit area
+	## with the rendered node instead of leaving a small central target behind.
+	return Rect2(Vector2.ZERO, size)
+
 func _draw() -> void:
 	var center := size * 0.5
 	var radius: float = visualization_config.radius_for_lod(is_current, detail_level) if visualization_config != null else (54.0 if is_current else 42.0)
@@ -467,7 +473,9 @@ func _unknown_content_tooltip(count: int) -> String:
 	return "UNKNOWN CONTENT\n%d unidentified signal%s" % [count, "" if count == 1 else "s"]
 
 func _on_capability_socket_activated(capability: int) -> void:
-	if capability >= 0:
+	if is_selectable:
+		selected.emit(node_id)
+	elif capability >= 0:
 		capability_selected.emit(node_id, capability)
 
 func _on_capability_socket_focus_changed(socket: int, focused: bool) -> void:

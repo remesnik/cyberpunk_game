@@ -6,11 +6,13 @@ const LinkVisualScript := preload("res://cyberspace/display/LinkVisual.gd")
 const DEFAULT_VISUALIZATION_CONFIG := preload("res://cyberspace/display/cyberspace_visualization_config.tres")
 const DEFAULT_ACCESSIBILITY_CONFIG := preload("res://ui/frontend/accessibility/frontend_accessibility_config.tres")
 const GameplayBindingRequestScript := preload("res://core/input/GameplayBindingRequest.gd")
+const SpatialLayoutScript := preload("res://cyberspace/display/CyberspaceSpatialLayout.gd")
 const CYAN := Color("48e8ff")
 const AMBER := Color("ffc857")
 
 @onready var link_layer: Node2D = %LinkLayer
 @onready var node_layer: Control = %NodeLayer
+@onready var spatial_backdrop: CyberspaceSpatialBackdrop = %SpatialBackdrop
 @onready var location_label: Label = %LocationLabel
 @onready var resource_label: Label = %ResourceLabel
 @onready var status_label: Label = %StatusLabel
@@ -58,10 +60,13 @@ const AMBER := Color("ffc857")
 @onready var event_feed_toggle: Button = %EventFeedToggle
 @export var visualization_config: Resource = DEFAULT_VISUALIZATION_CONFIG
 @export var accessibility_config: Resource = DEFAULT_ACCESSIBILITY_CONFIG
+@export var debug_sensor_topology := false
+@export var debug_spatial_layout := false
 
 var graph: NetworkGraph
 var position_model: PlayerNetworkPosition
 var knowledge: PlayerKnowledge
+var sensor_topology: SensorTopologyController
 var node_visuals: Dictionary = {}
 var link_visuals: Dictionary = {}
 var scan_targets: Dictionary = {}
@@ -70,6 +75,8 @@ var target_order: Array[StringName] = []
 var selected_target_id: StringName = &""
 var event_lines: PackedStringArray = ["> SESSION READY"]
 var _transition_active := false
+var _spatial_layout: CyberspaceSpatialLayout = SpatialLayoutScript.new()
+var _camera_tween: Tween
 var _pending_doorstop_instance_id: StringName = &""
 var _knowledge_view_history: Dictionary = {}
 var _graph_zoom := 1.0
@@ -135,10 +142,13 @@ func _ready() -> void:
 		_on_session_started()
 	queue_redraw()
 
-func set_models(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_knowledge: PlayerKnowledge) -> void:
+func set_models(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_knowledge: PlayerKnowledge, p_sensors: SensorTopologyController = null) -> void:
 	graph = p_graph
 	position_model = p_position
 	knowledge = p_knowledge
+	sensor_topology = p_sensors if p_sensors != null else (Game.sensor_topology if Game.network_graph == p_graph else null)
+	_spatial_layout.configure(graph, position_model.current_node_id if position_model != null else &"")
+	if position_model != null: _spatial_layout.snap_to(position_model.current_node_id)
 	if sphere_minimap != null:
 		sphere_minimap.set_models(graph, position_model, knowledge, Game.sphere_tracker if Game.network_graph == graph else null)
 		if Game.network_graph == graph:
@@ -158,7 +168,7 @@ func _on_session_started() -> void:
 	visible = Game.game_domain == Game.GameDomain.CYBERSPACE
 	HudState.set_context_active(HudState.Widget.ALERTS, true)
 	_apply_all_hud_states()
-	set_models(Game.network_graph, Game.player_network_position, Game.player_knowledge)
+	set_models(Game.network_graph, Game.player_network_position, Game.player_knowledge, Game.sensor_topology)
 
 func _rebuild_neighborhood() -> void:
 	if graph == null or position_model == null or knowledge == null or size.x <= 1.0:
@@ -184,9 +194,11 @@ func _rebuild_neighborhood() -> void:
 	var map_right := map_rect.end.x
 	var map_top := map_rect.position.y
 	var map_bottom := map_rect.end.y
-	var center := Vector2((map_left + map_right) * 0.5, (map_top + map_bottom) * 0.5)
+	var center := _spatial_screen_position(current_id, map_rect)
 	var contacts := knowledge.get_local_contacts(current_id)
-	var total_slots := contacts.size()
+	var sensor_view := sensor_topology.current_view() if sensor_topology != null else {"nodes": [], "edges": []}
+	var distant_nodes: Array = sensor_view.get("nodes", []).filter(func(item: Dictionary) -> bool: return int(item.depth) > 1)
+	var total_slots := contacts.size() + distant_nodes.size()
 	_visible_node_count = total_slots + 1
 	var detail_level: int = visualization_config.detail_level_for(_graph_zoom, _visible_node_count)
 	var current_radius: float = visualization_config.radius_for_lod(true, detail_level)
@@ -197,15 +209,12 @@ func _rebuild_neighborhood() -> void:
 	var orbit_y: float = maxf(visualization_config.preferred_vertical_orbit, required_orbit * 0.72)
 	orbit_x = minf(orbit_x, maxf(0.0, (map_right - map_left) * 0.5 - visualization_config.visual_size().x * 0.5 - visualization_config.map_edge_padding))
 	orbit_y = minf(orbit_y, maxf(0.0, (map_bottom - map_top) * 0.5 - visualization_config.visual_size().y * 0.5 - visualization_config.map_edge_padding))
-	var slot := 0
+	var positions: Dictionary = {current_id: center}
 	for contact in contacts:
-		var visual_position: Vector2
-		if total_slots <= visualization_config.close_density_limit:
-			var angle := _slot_angle(slot, maxi(total_slots, 1))
-			visual_position = center + Vector2(cos(angle) * orbit_x, sin(angle) * orbit_y)
-		else:
-			visual_position = _dense_contact_position(slot, total_slots, Rect2(Vector2(map_left, map_top), Vector2(map_right - map_left, map_bottom - map_top)), center)
+		var contact_node_id: StringName = contact.node.id if contact.kind == &"NODE" else &""
+		var visual_position: Vector2 = _spatial_screen_position(contact_node_id, map_rect) if contact_node_id != &"" else center.lerp(map_rect.get_center(), 0.35)
 		if contact.kind == &"NODE":
+			positions[StringName(contact.node.id)] = visual_position
 			_add_link_visual(contact.contact_id, center, visual_position, false, current_radius, connected_radius)
 			_add_node_visual(contact.node, visual_position, false, true)
 			scan_targets[contact.node.id] = {"kind": ScanSystem.NODE, "node_id": contact.node.id}
@@ -220,11 +229,35 @@ func _rebuild_neighborhood() -> void:
 			scan_targets[contact.contact_id] = {"kind": ScanSystem.LINK, "contact_id": contact.contact_id}
 			target_views[contact.contact_id] = {"kind": contact.kind, "title": "UNKNOWN NODE" if contact.kind == &"UNKNOWN_NODE" else "UNKNOWN SIGNAL", "scan_target": scan_targets[contact.contact_id]}
 			target_order.append(contact.contact_id)
-		slot += 1
+
+	# Distant topology is deliberately non-interactive. The renderer consumes only
+	# sanitized knowledge views; no NetworkNodeDefinition reaches these visuals.
+	var depth_groups: Dictionary = {}
+	for item: Dictionary in distant_nodes:
+		var depth := int(item.depth)
+		var group: Array = depth_groups.get(depth, [])
+		group.append(item)
+		depth_groups[depth] = group
+	for depth_value: Variant in depth_groups:
+		var depth := int(depth_value)
+		var group: Array = depth_groups[depth]
+		for index in group.size():
+			var item: Dictionary = group[index]
+			var sensor_position := _spatial_screen_position(StringName(item.node_id), map_rect)
+			positions[StringName(item.node_id)] = sensor_position
+			_add_sensor_unknown_visual(sensor_position, StringName(item.node_id), depth)
+	for edge: Dictionary in sensor_view.get("edges", []):
+		if int(edge.depth) <= 1 or not positions.has(edge.source) or not positions.has(edge.destination): continue
+		_add_link_visual(StringName(edge.link_id), positions[edge.source], positions[edge.destination], true, connected_radius, connected_radius)
 
 	location_label.text = "CURRENT HOST  //  %s" % String(current_view.get("display_name", "UNKNOWN")).to_upper()
-	resource_label.text = "TRAVERSAL UNITS  %02d    |    KNOWN CONTACTS  %02d" % [position_model.traversal_points, contacts.size()]
-	status_label.text = "SELECT A CONNECTED HOST"
+	var sensor_rating := sensor_topology.sensors_rating if sensor_topology != null else 0
+	resource_label.text = "TRAVERSAL UNITS  %02d    |    SENSORS %d    |    KNOWN CONTACTS  %02d" % [position_model.traversal_points, sensor_rating, contacts.size() + distant_nodes.size()]
+	if debug_sensor_topology and sensor_topology != null:
+		status_label.text = "\n".join(sensor_topology.debug_lines())
+	elif debug_spatial_layout:
+		status_label.text = "\n".join(_spatial_layout.debug_lines())
+	else: status_label.text = "SELECT A CONNECTED HOST"
 	_rebuild_services(current_id)
 	_rebuild_known_entities(current_id, contacts)
 	_update_current_panel(current_view)
@@ -249,6 +282,7 @@ func _add_node_visual(node_view: Dictionary, center: Vector2, current: bool, sel
 	visual.scan_requested.connect(_on_scan_target_requested)
 	visual.capability_selected.connect(_on_node_capability_selected)
 	node_visuals[node_id] = visual
+	_apply_spatial_scale(visual, node_id)
 
 func _add_unknown_visual(center: Vector2, unknown_title: String, contact_id: StringName) -> void:
 	var visual := NODE_SCENE.instantiate() as NodeVisual
@@ -260,6 +294,47 @@ func _add_unknown_visual(center: Vector2, unknown_title: String, contact_id: Str
 	visual.configure_unknown(contact_id)
 	visual.title = unknown_title
 	visual.scan_requested.connect(_on_scan_target_requested)
+
+func _add_sensor_unknown_visual(center: Vector2, node_id: StringName, depth: int) -> void:
+	var visual := NODE_SCENE.instantiate() as NodeVisual
+	node_layer.add_child(visual)
+	visual.apply_visualization_config(visualization_config)
+	visual.set_reduced_animation(_reduced_animation_enabled())
+	visual.set_view_context(_graph_zoom, _visible_node_count)
+	visual.position = center - visual.size * 0.5
+	visual.configure_unknown(&"")
+	visual.title = "UNKNOWN NODE"
+	visual.tooltip_text = "UNKNOWN NODE\nDetected by deck sensors."
+	visual.modulate = Color(0.72, 0.8, 0.86, 0.58)
+	visual.set_meta(&"sensor_node_id", node_id)
+	visual.set_meta(&"sensor_depth", depth)
+	node_visuals[node_id] = visual
+	_apply_spatial_scale(visual, node_id)
+
+func _spatial_screen_position(node_id: StringName, map_rect: Rect2) -> Vector2:
+	return (_spatial_layout.project(node_id, map_rect) as Dictionary).position
+
+func _apply_spatial_scale(visual: Control, node_id: StringName) -> void:
+	var projection := _spatial_layout.project(node_id, get_primary_graph_rect())
+	var compensated_scale := float(projection.scale)
+	visual.scale = Vector2.ONE * compensated_scale
+	visual.pivot_offset = visual.size * 0.5
+	visual.z_index = clampi(int(4000.0 - float(projection.depth) * 10.0), -4096, 4096)
+
+func _update_spatial_projection() -> void:
+	var map_rect := get_primary_graph_rect()
+	for node_id: StringName in node_visuals:
+		var visual := node_visuals[node_id] as Control
+		var projection := _spatial_layout.project(node_id, map_rect)
+		visual.position = Vector2(projection.position) - visual.size * 0.5
+		_apply_spatial_scale(visual, node_id)
+	for link_id: StringName in link_visuals:
+		var link := graph.get_link(link_id) if graph != null else null
+		if link == null: continue
+		var visual := link_visuals[link_id] as LinkVisual
+		visual.configure(link_id, _spatial_screen_position(link.source, map_rect), _spatial_screen_position(link.destination, map_rect), visual.unknown, visualization_config)
+		visual.set_highlighted(visual.highlighted)
+	spatial_backdrop.set_camera_offset(Vector2(_spatial_layout.camera_anchor.x, _spatial_layout.camera_anchor.z))
 
 func _add_link_visual(link_id: StringName, start: Vector2, finish: Vector2, unknown: bool, start_radius: float, finish_radius: float) -> void:
 	var visual := LinkVisualScript.new() as LinkVisual
@@ -338,7 +413,12 @@ func _rebuild_known_entities(current_node_id: StringName, contacts: Array[Dictio
 func _on_node_selected(node_id: StringName) -> void:
 	if _transition_active:
 		return
+	if not target_views.has(node_id) or (target_views[node_id] as Dictionary).get("kind") != &"NODE": return
 	_select_target(node_id)
+	var result := Game.request_traversal(node_id)
+	if not result.success:
+		status_label.text = "ACCESS DENIED  //  %s" % result.reason.to_upper()
+		_flash_status()
 
 func _on_node_capability_selected(node_id: StringName, capability_type: int) -> void:
 	var definition: Resource = visualization_config.capability_catalog.definition_for(capability_type)
@@ -387,8 +467,9 @@ func _on_action_resolved(request: ActionRequest, result: ActionResult) -> void:
 	if not _transition_active:
 		_rebuild_neighborhood()
 
-func _on_traversal_started(_from_id: StringName, to_id: StringName, link_id: StringName) -> void:
+func _on_traversal_started(from_id: StringName, to_id: StringName, link_id: StringName) -> void:
 	_transition_active = true
+	_spatial_layout.begin_transition(from_id, to_id)
 	status_label.text = "TRANSFERRING PROCESS  >>  %s" % to_id
 	var link := link_visuals.get(link_id) as LinkVisual
 	if link != null:
@@ -399,11 +480,18 @@ func _on_traversal_started(_from_id: StringName, to_id: StringName, link_id: Str
 
 func _on_position_changed(_from_id: StringName, _to_id: StringName, _link_id: StringName) -> void:
 	if _reduced_animation_enabled():
+		_spatial_layout.set_transition_progress(1.0)
+		_update_spatial_projection()
 		_finish_transition()
 		return
-	var tween := create_tween()
-	tween.tween_interval(0.5)
-	tween.tween_callback(_finish_transition)
+	_camera_tween = create_tween()
+	_camera_tween.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_camera_tween.tween_method(_set_camera_transition_progress, 0.0, 1.0, 0.5)
+	_camera_tween.tween_callback(_finish_transition)
+
+func _set_camera_transition_progress(progress: float) -> void:
+	_spatial_layout.set_transition_progress(progress)
+	_update_spatial_projection()
 
 func _finish_transition() -> void:
 	_transition_active = false
@@ -539,11 +627,15 @@ func _select_target(target_id: StringName) -> void:
 	var move_cost: Variant = view.get("link", {}).get("traversal_cost", "?") if kind == &"NODE" else "--"
 	target_cost.text = "MOVE %s  //  SCAN %s" % [move_cost, scan_cost if scan_cost >= 0 else "--"]
 	program_cost_label.text = "    ACTION COST MOVE %s / SCAN %s" % [move_cost, scan_cost if scan_cost >= 0 else "--"]
-	confirm_button.disabled = false
+	# Traversal is a direct spatial gesture: one click on a reachable node. The
+	# generic execute button remains available only for non-movement targets.
+	confirm_button.visible = kind != &"NODE"
+	confirm_button.disabled = kind == &"NODE"
 	target_scan_button.disabled = scan_target.is_empty()
-	status_label.text = "TARGET LOCKED  //  ENTER EXECUTES  //  R SCANS"
+	status_label.text = "TRAVERSAL ACCEPTED" if kind == &"NODE" else "TARGET LOCKED  //  ENTER EXECUTES  //  R SCANS"
 
 func _clear_target_panel() -> void:
+	confirm_button.visible = true
 	selected_target_id = &""
 	_context_panel_requested = false
 	_refresh_context_panel_visibility()
@@ -624,7 +716,7 @@ func _on_diegetic_hud_lesson(actor_id: StringName, lesson_id: StringName, lines:
 	# This follows the same authored Latch channel as the rest of FIRST_CONTACT;
 	# the event feed is only the current lightweight transcript presentation.
 	for line: Variant in lines:
-		event_feed.append_text("\n%s // %s" % [String(actor_id).trim_suffix("_REMOTE_ACTOR").replace("_", " "), String(line)])
+		event_feed.text += "\n%s // %s" % [String(actor_id).trim_suffix("_REMOTE_ACTOR").replace("_", " "), String(line)]
 	if Game.hacker_npc_manager != null:
 		var timed_lines: Array[Dictionary] = []
 		for index in lines.size(): timed_lines.append({"time": float(index) * 1.8, "speaker_id": actor_id, "text": String(lines[index])})

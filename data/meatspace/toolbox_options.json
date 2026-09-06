@@ -74,9 +74,9 @@
       ]
     },
     {
-      "id": "DECK_DETECTION",
-      "label": "Upgrade Detection",
-      "description": "Increase this deck component by one level.",
+      "id": "DECK_SENSORS",
+      "label": "Upgrade Sensors",
+      "description": "Increase deck topology look-ahead by one Sensors level.",
       "cost_ics": 100,
       "required_flags": [
         "DECK_SELECTED"
@@ -84,7 +84,7 @@
       "actions": [
         {
           "type": "MODIFY_HARDWARE",
-          "id": "DECK_DETECTION",
+          "id": "DECK_SENSORS",
           "amount": 1
         }
       ]

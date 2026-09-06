@@ -96,7 +96,7 @@ func _refresh_status() -> void:
 	var manager: MeatspaceManagement = Game.meatspace_management
 	if manager == null:
 		return
-	hardware_label.text = "DECK CPU %d  //  RAM %d  //  STORAGE %d\nFICTIONAL CREDITS %d" % [manager.hardware_levels.DECK_CPU, manager.hardware_levels.DECK_RAM, manager.hardware_levels.DECK_STORAGE, Game.equipment_order_manager.credits]
+	hardware_label.text = "DECK CPU %d  //  RAM %d  //  STORAGE %d  //  SENSORS %d\nFICTIONAL CREDITS %d" % [manager.hardware_levels.DECK_CPU, manager.hardware_levels.DECK_RAM, manager.hardware_levels.DECK_STORAGE, manager.hardware_levels.get(&"DECK_SENSORS", 1), Game.equipment_order_manager.credits]
 	var tasks: PackedStringArray = []
 	for task: SoftwareProgrammingTask in manager.programming_tasks.values():
 		tasks.append("%s // %s // %.1f/%.1fs" % [task.id, SoftwareProgrammingTask.State.keys()[task.state], task.elapsed(Game.realtime_world_clock.elapsed_seconds), task.duration])

@@ -40,6 +40,7 @@ func add_node(node: NetworkNodeDefinition) -> bool:
 		node.sphere_id = LEGACY_UNASSIGNED_SPHERE_ID
 	nodes[node.id] = node
 	if node.sphere_id != &"": (spheres[node.sphere_id] as SphereDefinition).register_node(node.id)
+	display_update_requested.emit()
 	return true
 
 func _ensure_legacy_sphere() -> void:
@@ -52,6 +53,7 @@ func add_link(link: NetworkLinkDefinition) -> bool:
 	links[link.id] = link
 	(nodes[link.source] as NetworkNodeDefinition).add_connected_link(link.id)
 	(nodes[link.destination] as NetworkNodeDefinition).add_connected_link(link.id)
+	display_update_requested.emit()
 	return true
 
 func get_node(node_id: StringName) -> NetworkNodeDefinition:

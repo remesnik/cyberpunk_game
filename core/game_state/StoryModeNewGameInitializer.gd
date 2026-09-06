@@ -39,6 +39,7 @@ static func initialize(state: PersistentGameState) -> void:
 			&"DECK_CPU": 1,
 			&"DECK_RAM": 1,
 			&"DECK_STORAGE": 1,
+			&"DECK_SENSORS": 1,
 		},
 		"owned_programs": [
 			{"instance_id": &"STARTER_SERVICE_PROBE_001", "definition_id": &"SERVICE_PROBE"},

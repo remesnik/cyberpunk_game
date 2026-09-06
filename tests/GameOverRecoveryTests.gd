@@ -20,6 +20,7 @@ func _ready() -> void:
 	_expect(game.request_meatspace_autosave(AutosaveService.Reason.RETURN_TO_MEATSPACE) == OK, "meat-space recovery point is saved")
 	var save_count: int = game.autosave_service.successful_save_count
 	_expect(game.enter_free_roam_network().success, "player enters cyberspace after the save")
+	game.enter_netspace_from_clean_room()
 	game.trace_level = 77
 	game.equipment_order_manager.credits = 3
 	game.meatspace_management.hardware_levels.DECK_RAM = 9
