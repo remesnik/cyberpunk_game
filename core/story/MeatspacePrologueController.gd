@@ -80,7 +80,11 @@ func _apply_action(action: Dictionary) -> void:
 		&"SET_PHASE": phase = StringName(action.get("value", phase))
 		&"SET_FLAG":
 			var flags := _flags(); flags[StringName(action.get("id", &""))] = action.get("value", true); game_state.campaign_state["story_flags"] = flags
-		&"SET_PLAYER_FIELD": game_state.player_state[StringName(action.get("id", &""))] = action.get("value")
+		&"SET_PLAYER_FIELD":
+			var field_id := StringName(action.get("id", &""))
+			var field_value: Variant = action.get("value")
+			game_state.player_state[field_id] = field_value
+			if field_id == &"selected_deck_variant": game_state.player_state[&"active_slot_count"] = 3 if StringName(field_value) == &"MORE_SLOTS" else 2
 		&"SET_HARDWARE":
 			var previous: Dictionary = game_state.player_state.get("hardware", {})
 			var replacement := (action.get("value", {}) as Dictionary).duplicate(true)

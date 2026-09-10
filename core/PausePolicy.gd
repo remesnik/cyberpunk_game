@@ -15,7 +15,7 @@ func _ready() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("pause"):
+	if event.is_action_pressed("pause") or event.is_action_pressed("pause_game"):
 		if mode == Mode.HARD_PAUSE:
 			set_mode(Mode.GAMEPLAY)
 		else:

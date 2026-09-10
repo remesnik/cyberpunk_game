@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://ui/clean_room/CleanRoom.gd" id="1"]
+[ext_resource type="Script" path="res://ui/input/ControlHintBar.gd" id="2_hints"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 bg_color = Color(1, 1, 1, 0.92)
@@ -164,3 +165,21 @@ offset_bottom = -24.0
 grow_vertical = 0
 text = "⌂  RETURN HOME"
 tooltip_text = "Leave the Clean-Room and return to Meatspace."
+
+[node name="ControlHints" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 200.0
+offset_top = -64.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.04, 0.28, 0.34, 0.8)
+horizontal_alignment = 2
+text = "ARROWS: SELECT  •  ENTER: CONFIRM  •  ESC: BACK"
+script = ExtResource("2_hints")
+keyboard_text = "ARROWS: SELECT  •  ENTER: CONFIRM  •  ESC: BACK"
+gamepad_text = "RIGHT STICK / D-PAD: SELECT  •  A: CONFIRM  •  B: BACK  •  Y: LOADOUT"

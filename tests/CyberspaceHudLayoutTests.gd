@@ -14,12 +14,19 @@ func _ready() -> void:
 	get_tree().quit(failures)
 
 func _test_resolution(resolution: Vector2) -> void:
+	var previous_inventory := Game.program_inventory
+	var previous_loadout := Game.program_loadout
+	Game.program_inventory = ProgramInventory.new()
+	Game.program_loadout = ProgramLoadout.new(6)
 	var display := DISPLAY.instantiate() as NetworkDisplay
 	add_child(display)
 	display.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	display.position = Vector2.ZERO
 	display.size = resolution
 	display._apply_hud_layout()
+	display._update_program_bar()
+	_expect(display.get_node("BottomBar/Margin/Rows/Programs").get_child_count() == 6, "%s renders every active slot at variable capacity" % resolution)
+	_expect((display.get_node("BottomBar/Margin/Rows/Programs").get_child(1) as Button).text.contains("EMPTY"), "%s renders empty active slots explicitly" % resolution)
 	var graph_rect := display.get_primary_graph_rect()
 	_expect(graph_rect.get_area() / (resolution.x * resolution.y) >= 0.35, "%s reserves the largest HUD region for graph interaction" % resolution)
 	_expect(not display.left_panel.visible and graph_rect.position.x <= 64.0, "%s current-node details start collapsed to free graph space" % resolution)
@@ -36,6 +43,8 @@ func _test_resolution(resolution: Vector2) -> void:
 	display._on_monitor_presentation_changed(true, false)
 	_expect(display.right_panel.visible, "%s collapsing Monitor restores requested target details" % resolution)
 	display.queue_free()
+	Game.program_inventory = previous_inventory
+	Game.program_loadout = previous_loadout
 
 func _test_contextual_monitors() -> void:
 	var dock := MONITOR_DOCK.instantiate() as RealtimeMonitorDock

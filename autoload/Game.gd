@@ -617,7 +617,7 @@ func _create_program_loadout(create_connection := true) -> void:
 	game_domain = GameDomain.CYBERSPACE
 	program_inventory = ProgramInventoryScript.new()
 	program_inventory.instance_added.connect(_on_program_instance_added)
-	program_loadout = ProgramLoadoutScript.new(5)
+	program_loadout = ProgramLoadoutScript.new(active_slot_capacity())
 	var standard = DoorstopDefinitionScript.new(&"DOORSTOP_STANDARD", "Doorstop", "1.0")
 	doorstop_programming_definition = standard
 	standard.rarity = &"UNCOMMON"
@@ -666,6 +666,13 @@ func _create_program_loadout(create_connection := true) -> void:
 		meatspace_management.software_programming.add_resource(&"MEMORY_SHARD", 12)
 		meatspace_management.software_programming.add_resource(&"ROUTING_KERNEL", 6)
 		meatspace_management.software_programming.add_resource(&"GHOST_SIGNATURE", 2)
+
+
+func active_slot_capacity() -> int:
+	if persistent_game_state == null: return 2
+	var count := int(persistent_game_state.player_state.get("active_slot_count", 2))
+	if StringName(persistent_game_state.player_state.get("selected_deck_variant", "")) == &"MORE_SLOTS": count = 3
+	return clampi(count, 2, 3)
 
 func _create_persistent_starter_programs() -> void:
 	var definitions := {}
@@ -1710,8 +1717,11 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 				var recovered := failure_controller.recover_at(player_network_position.current_node_id)
 				if not recovered.is_empty():
 					move_events.append({"type": &"CRASH_CACHE_RECOVERED", "resources": recovered})
-				move_events.append_array(mission.check_completion())
-				if mission.mission_complete:
+				# Free Roam and other missionless runtime bundles share traversal.
+				# Mission completion is an optional observer of a successful move.
+				if is_instance_valid(mission):
+					move_events.append_array(mission.check_completion())
+				if is_instance_valid(mission) and mission.mission_complete:
 					var committed := anchor_controller.commit_resources(player_network_position.current_node_id, resource_state)
 					if not committed.is_empty():
 						move_events.append({"type": &"VOLATILE_DATA_COMMITTED", "resources": committed})

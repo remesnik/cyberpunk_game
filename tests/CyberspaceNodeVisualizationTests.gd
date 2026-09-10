@@ -19,6 +19,31 @@ func _ready() -> void:
 	_test_sparse_hex_interior(config)
 	_test_restrained_state_animation(config)
 	var current := display.node_visuals[game.player_network_position.current_node_id] as NodeVisual
+	var world: CyberspaceWorld3D = display.spatial_world
+	var final_positions := world.final_world_positions()
+	_expect(final_positions == display._spatial_layout.anchors, "rendered Node3D global positions exactly match the one authoritative layout mapping")
+	_expect(final_positions.values().all(func(position: Vector3): return is_equal_approx(position.y, CyberspaceSpatialLayout.NODE_BASE_HEIGHT)), "actual rendered Node3D anchors all use the fixed world height")
+	var positions_before_camera := final_positions.duplicate(true)
+	var motion_node_before: StringName = game.player_network_position.current_node_id
+	var mouse_motion := InputEventMouseMotion.new()
+	mouse_motion.position = Vector2(320, 240)
+	display._unhandled_input(mouse_motion)
+	_expect(game.player_network_position.current_node_id == motion_node_before, "mouse motion passes safely through Netspace unhandled input without changing player position")
+	world.set_camera_anchor(display._spatial_layout.world_position(game.player_network_position.current_node_id) + Vector3(2, 0, -6))
+	_expect(world.final_world_positions() == positions_before_camera, "moving the actual Camera3D cannot mutate rendered node transforms")
+	world.set_camera_anchor(display._spatial_layout.world_position(game.player_network_position.current_node_id))
+	var player_node_before_pan: StringName = game.player_network_position.current_node_id
+	var rig_before_pan: Vector3 = world.view_anchor
+	var discovered_ids: Array[StringName] = display._discovered_node_ids()
+	_expect(world.pan(Vector2(1, 1), 0.2, discovered_ids) and world.view_anchor != rig_before_pan, "manual camera pan moves the rig continuously across the network plane")
+	var first_pan_position := world.view_anchor
+	world.pan(Vector2(1, 1), 0.05, discovered_ids)
+	_expect(world.view_anchor != first_pan_position and game.player_network_position.current_node_id == player_node_before_pan, "continued camera pan never changes logical player position")
+	_expect(world.final_world_positions() == positions_before_camera, "manual camera pan cannot mutate node transforms")
+	world.set_camera_anchor(display._spatial_layout.world_position(game.player_network_position.current_node_id)); world.finish_camera_motion()
+	for link_id: StringName in world.connection_meshes:
+		var endpoints: PackedVector3Array = display._spatial_layout.edge_world_endpoints(link_id)
+		_expect(endpoints.size() == 2 and is_equal_approx(endpoints[0].distance_to(endpoints[1]), display._spatial_layout.edge_world_length(link_id)), "rendered 3D connection uses fixed anchor endpoints")
 	_expect(current.size.x >= 270.0 and current.size.y >= 190.0, "selection bounds and hitbox grow with the configured visual size")
 	_expect(is_equal_approx(config.radius(false), 54.6) and is_equal_approx(config.radius(true), 70.2), "connected and current hex radii both use the shared scale")
 	var reachable: NodeVisual

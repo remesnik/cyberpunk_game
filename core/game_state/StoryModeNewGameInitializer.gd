@@ -34,6 +34,7 @@ static func initialize(state: PersistentGameState) -> void:
 		"fatigue": 35.0,
 		"player_class": "",
 		"selected_deck_variant": "",
+		"active_slot_count": 2,
 		"deck_id": &"STARTER_DECK",
 		"hardware": {
 			&"DECK_CPU": 1,

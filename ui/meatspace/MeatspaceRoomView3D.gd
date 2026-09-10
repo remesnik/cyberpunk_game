@@ -10,6 +10,7 @@ var hint: Label
 var game_state: PersistentGameState
 var pointer_position := Vector2.ZERO
 var focused_id: StringName
+var _focus_gesture_armed := true
 
 func _ready() -> void:
 	focus_mode = Control.FOCUS_ALL
@@ -49,6 +50,10 @@ func _ready() -> void:
 	resized.connect(_layout_objects)
 	_build_room()
 	_layout_objects()
+	GameplayBindings.semantic_action_triggered.connect(_on_semantic_action)
+	EventBus.game_domain_changed.connect(_on_domain_changed)
+	if Game.game_domain == Game.GameDomain.MEATSPACE:
+		GameplayBindings.set_context(GameplayBindings.Context.MEATSPACE)
 
 func _build_room() -> void:
 	pass
@@ -138,6 +143,32 @@ func focus_first() -> void:
 	grab_focus()
 	var ids := get_object_ids()
 	if not ids.is_empty(): _set_focus(ids[0])
+
+func _process(_delta: float) -> void:
+	if not is_visible_in_tree(): return
+	var direction := GameplayBindings.focus_vector()
+	if direction.length() < 0.3: _focus_gesture_armed = true
+	elif _focus_gesture_armed:
+		_focus_gesture_armed = false; focus_in_screen_direction(direction)
+
+func focus_in_screen_direction(direction: Vector2) -> void:
+	var candidates: Array[Dictionary] = []
+	for id: StringName in get_object_ids():
+		var target := objects[id] as MeatspaceTarget3D
+		candidates.append({"id": id, "position": camera.unproject_position(target.global_position), "priority": float(target.authored_data.get("focus_priority", 0.0)), "enabled": target.visible})
+	var next := DirectionalFocusSelector.choose(focused_id, direction, candidates)
+	if next != &"":
+		pointer_position = camera.unproject_position((objects[next] as MeatspaceTarget3D).global_position)
+		_set_focus(next)
+
+func _on_semantic_action(action_id: StringName) -> void:
+	if not is_visible_in_tree(): return
+	if action_id == &"primary_action" and objects.has(focused_id): (objects[focused_id] as MeatspaceTarget3D).activate()
+	elif action_id == &"back_action": _set_focus(&"")
+
+func _on_domain_changed(_previous: int, current: int) -> void:
+	if current == Game.GameDomain.MEATSPACE and is_visible_in_tree():
+		GameplayBindings.set_context(GameplayBindings.Context.MEATSPACE)
 
 func _place_hint(cursor: Vector2) -> void:
 	hint.custom_minimum_size.x = minf(340, maxf(1, size.x - 16))

@@ -48,6 +48,11 @@ func _ready() -> void:
 	clean_room.go_button.pressed.emit()
 	await get_tree().process_frame
 	_expect(Game.game_domain == Game.GameDomain.CYBERSPACE and network.visible and not clean_room.visible, "Clean-Room GO enters the Netspace run")
+	_expect(network.get_node("BottomBar").visible, "live Netspace quickbar is visible after entering Netspace")
+	_expect(network.get_node("BottomBar/Margin/Rows/Programs").get_child_count() == Game.program_loadout.capacity, "live quickbar renders deck capacity, including empty slots")
+	network._select_target(Game.player_network_position.current_node_id)
+	_expect(network.get_node("CommandDial").visible and network.get_node("CommandDial").get_child_count() > 0, "live command dial renders immediately for a focused target")
+	_expect(network._selected_contextual_command == &"SCAN", "live unscanned current node defaults the command dial to Scan")
 	_expect(Game.player_network_position.current_node_id == &"ENTRY" and Game.san_controller.get_san(Game.intrusion_run_id) != null, "real player, graph and SAN exist")
 	_expect(Game.meatspace_management.hardware_levels.DECK_SENSORS == 1 and Game.sensor_topology.sensors_rating == 1, "basic deck runtime exposes Sensors 1")
 	var sensor_view := Game.sensor_topology.current_view()

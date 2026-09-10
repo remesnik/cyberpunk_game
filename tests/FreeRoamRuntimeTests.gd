@@ -31,6 +31,12 @@ func _ready() -> void:
 	_expect(entry.success and game.game_domain == game.GameDomain.CLEAN_ROOM, "home entry opens the Clean-Room before the sandbox network")
 	_expect(game.persistent_game_state.world_state.entry_state == &"CLEAN_ROOM", "Clean-Room entry state is persisted")
 	_expect(game.enter_netspace_from_clean_room().success and game.game_domain == game.GameDomain.CYBERSPACE, "GO explicitly enters the sandbox network")
+	var origin: StringName = game.player_network_position.current_node_id
+	var destinations: Array[StringName] = game.network_graph.get_visible_connected_nodes(origin)
+	_expect(not destinations.is_empty(), "Free Roam entry exposes at least one traversable neighboring node")
+	if not destinations.is_empty():
+		var traversal: ActionResult = game.request_traversal(destinations[0])
+		_expect(traversal.success and game.player_network_position.current_node_id == destinations[0], "missionless Free Roam traversal resolves without a campaign completion controller")
 	panel.queue_free()
 	game.end_session()
 	print("%s: %d Free Roam runtime assertions" % ["PASS" if failures == 0 else "FAIL", assertions])

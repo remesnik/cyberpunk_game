@@ -13,3 +13,5 @@ Program bindings never depend on names such as ICEBREAKER, SPOOF, or DOORSTOP. I
 The binding service has Disabled, Cyberspace, and Meatspace contexts. Global actions remain available in gameplay contexts; cyberspace commands and program bindings emit only in cyberspace. `NetworkDisplay` owns the current presentation response, while other monitor/inventory controllers can subscribe to the same semantic requests later.
 
 HUD commands use semantic IDs rather than fixed key checks: `TOGGLE_MINIMAP`, `TOGGLE_MONITOR`, `TOGGLE_TEAM_STATUS`, `OPEN_NODE_INSPECTOR`, and `OPEN_PROGRAM_LOADOUT`. Their default InputMap actions are M, C, Y, N, and I respectively, but all may be rebound to keyboard, mouse, or controller inputs. `HudVisibilityManager` is the single dispatcher for these commands. It rejects contextual surfaces without valid content and emits concise feedback instead of creating empty panels.
+
+Netspace contextual command cycling uses `Z` / `.` on keyboard and D-pad Left / Right on gamepad. `C` remains reserved for the existing Monitor action.

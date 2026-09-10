@@ -12,6 +12,7 @@ extends Control
 @onready var message_label: Label = %MessageLabel
 var available_ids: Array[StringName] = []
 var loaded_ids: Array[StringName] = []
+var _focus_gesture_armed := true
 
 func _ready() -> void:
 	go_button.pressed.connect(_go)
@@ -22,16 +23,24 @@ func _ready() -> void:
 	%ContactButton.pressed.connect(_contact_latch)
 	EventBus.game_domain_changed.connect(_on_domain_changed)
 	EventBus.session_started.connect(_on_session_started)
+	GameplayBindings.semantic_action_triggered.connect(_on_semantic_action)
+	GameplayBindings.device_mode_changed.connect(_on_device_mode_changed)
 	visible = Game.game_domain == Game.GameDomain.CLEAN_ROOM
-	if visible: _bind_controller()
+	if visible:
+		GameplayBindings.set_context(GameplayBindings.Context.CLEAN_ROOM)
+		_bind_controller(); _focus_default_for_device()
 
 func _on_session_started() -> void:
 	visible = Game.game_domain == Game.GameDomain.CLEAN_ROOM
-	if visible: _bind_controller()
+	if visible:
+		GameplayBindings.set_context(GameplayBindings.Context.CLEAN_ROOM)
+		_bind_controller(); _focus_default_for_device()
 
 func _on_domain_changed(_previous: int, current: int) -> void:
 	visible = current == Game.GameDomain.CLEAN_ROOM
-	if visible: _bind_controller()
+	if visible:
+		GameplayBindings.set_context(GameplayBindings.Context.CLEAN_ROOM)
+		_bind_controller(); _focus_default_for_device()
 
 func _bind_controller() -> void:
 	var controller: CleanRoomController = Game.clean_room_controller
@@ -76,3 +85,35 @@ func _contact_latch() -> void:
 	_show_contact(Game.clean_room_controller.contact_ally(&"LATCH"))
 func _show_contact(event: Dictionary) -> void:
 	message_label.text = "LATCH // %s" % String(event.get("text", "Channel open."))
+
+func _process(_delta: float) -> void:
+	if not visible: return
+	var direction := GameplayBindings.focus_vector()
+	if direction.length() < 0.3: _focus_gesture_armed = true
+	elif _focus_gesture_armed:
+		_focus_gesture_armed = false; _focus_control(direction)
+
+func _focus_control(direction: Vector2) -> void:
+	var controls: Array[Control] = [go_button, home_button, buy_link_button, available_programs, %LoadButton, loaded_programs, %UnloadButton, %ContactButton]
+	var candidates: Array[Dictionary] = []
+	for control: Control in controls:
+		candidates.append({"id": StringName(control.name), "position": control.get_global_rect().get_center(), "priority": 500.0 if control == go_button else 0.0, "enabled": control.visible and not bool(control.get("disabled"))})
+	var owner := get_viewport().gui_get_focus_owner()
+	var current := StringName(owner.name) if owner != null and owner in controls else &""
+	var next := DirectionalFocusSelector.choose(current, direction, candidates)
+	for control: Control in controls:
+		if StringName(control.name) == next: control.grab_focus(); break
+
+func _on_semantic_action(action_id: StringName) -> void:
+	if not visible: return
+	if action_id == &"primary_action":
+		var owner := get_viewport().gui_get_focus_owner()
+		if owner is Button and owner.is_visible_in_tree() and not owner.disabled: owner.pressed.emit()
+	elif action_id == &"back_action": message_label.text = "SELECT RETURN HOME TO LEAVE THE CLEAN-ROOM."
+	elif action_id == &"open_loadout": available_programs.grab_focus()
+
+func _on_device_mode_changed(_mode: int) -> void:
+	if visible: _focus_default_for_device()
+
+func _focus_default_for_device() -> void:
+	if GameplayBindings.device_mode == GameplayBindings.DeviceMode.GAMEPAD: go_button.grab_focus()

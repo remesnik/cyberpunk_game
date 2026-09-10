@@ -11,6 +11,30 @@ func _ready() -> void:
 	_expect(bindings.profile.global_actions.has(&"TOGGLE_MINIMAP") and bindings.profile.global_actions.has(&"TOGGLE_MONITOR") and bindings.profile.global_actions.has(&"TOGGLE_TEAM_STATUS") and bindings.profile.global_actions.has(&"OPEN_NODE_INSPECTOR") and bindings.profile.global_actions.has(&"OPEN_PROGRAM_LOADOUT"), "all HUD commands are configurable global actions")
 	_expect(bindings.profile.cyberspace_commands.has(&"SCAN") and bindings.profile.program_bindings.has(&"PROGRAM_SLOT_1"), "global, cyberspace, and program binding namespaces are distinct")
 	_expect(InputMap.has_action(&"cyber_scan") and InputMap.has_action(&"toggle_monitor") and InputMap.has_action(&"toggle_team_status") and InputMap.has_action(&"open_node_inspector") and InputMap.has_action(&"program_slot_8"), "profile actions are installed in Godot InputMap")
+	_expect(InputMap.has_action(&"primary_action") and InputMap.has_action(&"move_camera_left") and InputMap.has_action(&"focus_right") and InputMap.has_action(&"pause_game"), "shared semantic actions are installed for every gameplay domain")
+	_expect(_has_joy_button(&"primary_action", JOY_BUTTON_A) and _has_joy_button(&"back_action", JOY_BUTTON_B) and _has_joy_button(&"execute_program", JOY_BUTTON_X), "controller face buttons map to primary, back, and execute semantics")
+	_expect(InputMap.has_action(&"previous_slot") and InputMap.has_action(&"next_slot") and InputMap.has_action(&"open_slot_management"), "active-slot controller and management semantics are installed")
+	_expect(_has_joy_axis(&"execute_program", JOY_AXIS_TRIGGER_RIGHT) and _has_joy_axis(&"open_slot_management", JOY_AXIS_TRIGGER_LEFT), "program execution and slot management use trigger axes")
+	_expect(InputMap.has_action(&"previous_context_command") and InputMap.has_action(&"next_context_command") and InputMap.has_action(&"class_skill"), "contextual command and class-skill semantics are installed")
+	_expect(_has_joy_button(&"previous_context_command", JOY_BUTTON_DPAD_LEFT) and _has_joy_button(&"next_context_command", JOY_BUTTON_DPAD_RIGHT) and _has_joy_button(&"class_skill", JOY_BUTTON_DPAD_UP), "D-pad contextual controls use semantic actions")
+	_expect(not _has_joy_button(&"focus_down", JOY_BUTTON_DPAD_DOWN), "D-pad down remains reserved rather than changing focus")
+	_expect(_has_joy_axis(&"move_camera_left", JOY_AXIS_LEFT_X) and _has_joy_axis(&"focus_right", JOY_AXIS_RIGHT_X), "camera movement and focus navigation use separate controller sticks")
+
+	bindings._set_device_mode(bindings.DeviceMode.MOUSE_KEYBOARD)
+	var noise := InputEventJoypadMotion.new(); noise.device = 4; noise.axis = JOY_AXIS_LEFT_X; noise.axis_value = 0.05
+	bindings._input(noise)
+	_expect(bindings.device_mode == bindings.DeviceMode.MOUSE_KEYBOARD, "minor analog drift does not change the active input device")
+	noise.axis_value = 0.8; bindings._input(noise)
+	_expect(bindings.device_mode == bindings.DeviceMode.GAMEPAD and bindings.active_joypad_id == 4, "meaningful stick input switches prompts to gamepad mode")
+	bindings._on_joy_connection_changed(4, false)
+	_expect(bindings.device_mode == bindings.DeviceMode.MOUSE_KEYBOARD, "disconnecting the active controller safely restores keyboard prompts")
+
+	var candidates: Array[Dictionary] = [
+		{"id": &"CURRENT", "position": Vector2.ZERO, "priority": 0.0},
+		{"id": &"REACHABLE", "position": Vector2(90, 4), "priority": 500.0},
+		{"id": &"WRONG_WAY", "position": Vector2(-5, 0), "priority": 900.0},
+	]
+	_expect(DirectionalFocusSelector.choose(&"CURRENT", Vector2.RIGHT, candidates) == &"REACHABLE", "directional focus prefers an authored high-priority reachable target in the requested direction")
 
 	var key := InputEventKey.new(); key.physical_keycode = KEY_K
 	var key_events: Array[InputEvent] = [key]
@@ -55,6 +79,16 @@ func _ready() -> void:
 func _action(action: StringName) -> InputEventAction:
 	var event := InputEventAction.new(); event.action = action; event.pressed = true
 	return event
+
+func _has_joy_button(action: StringName, button: JoyButton) -> bool:
+	for event: InputEvent in InputMap.action_get_events(action):
+		if event is InputEventJoypadButton and event.button_index == button: return true
+	return false
+
+func _has_joy_axis(action: StringName, axis: JoyAxis) -> bool:
+	for event: InputEvent in InputMap.action_get_events(action):
+		if event is InputEventJoypadMotion and event.axis == axis: return true
+	return false
 
 func _cleanup() -> void:
 	var file := ProjectSettings.globalize_path(config_path)

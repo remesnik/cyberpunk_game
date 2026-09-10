@@ -5,6 +5,7 @@ signal instance_added(instance: ProgramInstance)
 signal instance_removed(instance: ProgramInstance)
 
 var _instances: Dictionary = {}
+var storage_capacity := -1
 
 
 func add_instance(instance: ProgramInstance) -> bool:
@@ -38,6 +39,18 @@ func all_instances() -> Array[ProgramInstance]:
 	for instance: ProgramInstance in _instances.values():
 		result.append(instance)
 	return result
+
+
+func stored_count(loadout: ProgramLoadout) -> int:
+	if loadout == null: return _instances.size()
+	var count := 0
+	for instance_id: StringName in _instances:
+		if not loadout.is_installed(instance_id): count += 1
+	return count
+
+
+func can_store(loadout: ProgramLoadout) -> bool:
+	return storage_capacity < 0 or stored_count(loadout) < storage_capacity
 
 
 func instances_for_definition(definition_id: StringName) -> Array[ProgramInstance]:
