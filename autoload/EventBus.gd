@@ -22,6 +22,7 @@ signal doorstop_feedback(event: Dictionary)
 signal san_relocated(san_id: StringName, previous_node_id: StringName, current_node_id: StringName)
 signal tactical_status_alert(event: Dictionary)
 signal monitor_presentation_changed(active: bool, expanded: bool)
+signal social_message_delivered(message: Dictionary)
 
 func publish_tactical_status_alert(type: StringName, subject_id: StringName = &"", message: String = "", severity: StringName = &"WARNING", duration := 4.0, metadata: Dictionary = {}) -> void:
 	var event := {"type": type, "subject_id": subject_id, "message": message, "severity": severity, "duration": maxf(0.5, duration), "metadata": metadata.duplicate(true), "player_visible": true}

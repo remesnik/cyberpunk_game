@@ -11,6 +11,8 @@ func _ready() -> void:
 	state.player_state["selected_deck_variant"] = "MORE_STORAGE"
 	state.player_state["active_slot_count"] = 2
 	_expect(Game.active_slot_capacity() == 2, "More Storage keeps exactly two active slots")
+	state.player_state["active_slot_count"] = 3
+	_expect(Game.active_slot_capacity() == 2, "stale slot count cannot add a slot to More Storage")
 	state.player_state["selected_deck_variant"] = "MORE_SLOTS"
 	state.player_state["active_slot_count"] = 3
 	_expect(Game.active_slot_capacity() == 3, "More Slots has exactly three active slots")

@@ -35,6 +35,22 @@ func _test_resolution(resolution: Vector2) -> void:
 	_expect(not display.event_feed.visible, "%s detailed event log starts collapsed" % resolution)
 	_expect(display.sphere_minimap.get_rect().end.y <= display.right_panel.get_rect().position.y, "%s minimap does not overlap contextual target panel" % resolution)
 	_expect(graph_rect.end.y <= resolution.y - 160.0, "%s graph clears status, monitor, and quick-slot strips" % resolution)
+	var projected := Control.new(); projected.position = Vector2(420, 330); projected.size = Vector2(100, 80); display.node_layer.add_child(projected)
+	display.node_visuals[&"HUD_TARGET"] = projected
+	display.target_views[&"HUD_TARGET"] = {"kind": &"NODE", "node": {"id": &"HUD_TARGET"}}
+	display.selected_target_id = &"HUD_TARGET"; display._valid_contextual_commands = [&"SCAN"]; display._selected_contextual_command = &"SCAN"
+	var dial_instance := display.command_dial.get_instance_id()
+	display._render_command_dial(); display._update_command_dial_position()
+	_expect(display.command_dial.get_parent() is CanvasLayer and (display.command_dial.get_parent() as CanvasLayer).layer > 0, "%s command dial renders in an unoccluded HUD CanvasLayer" % resolution)
+	var first_dial_position := display.command_dial.position
+	projected.position += Vector2(120, 45); display._update_command_dial_position()
+	_expect(display.command_dial.position != first_dial_position and is_equal_approx(display.command_dial.position.x - first_dial_position.x, 120.0), "%s command dial follows the projected target while the map pans" % resolution)
+	projected.position = Vector2(-200, -200); display._update_command_dial_position()
+	_expect(display.command_dial.position.x >= 12 and display.command_dial.position.y >= 12, "%s command dial clamps inside the near viewport edge" % resolution)
+	projected.position = resolution + Vector2(200, 200); display._update_command_dial_position()
+	_expect(display.command_dial.get_rect().end.x <= resolution.x - 12 and display.command_dial.get_rect().end.y <= resolution.y - 12, "%s command dial clamps inside the far viewport edge" % resolution)
+	display.target_views[&"SECOND_TARGET"] = {"kind": &"NODE", "node": {"id": &"SECOND_TARGET"}}; display.node_visuals[&"SECOND_TARGET"] = projected; display.selected_target_id = &"SECOND_TARGET"; display._update_command_dial_position()
+	_expect(display.command_dial.get_instance_id() == dial_instance, "%s target changes reuse the single command dial" % resolution)
 	display._context_panel_requested = true
 	display._refresh_context_panel_visibility()
 	_expect(display.right_panel.visible, "%s selected target can claim contextual rail" % resolution)

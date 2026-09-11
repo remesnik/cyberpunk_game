@@ -1,4 +1,5 @@
 extends Node
+const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.gd")
 
 const CyberspaceClockScript := preload("res://core/CyberspaceClock.gd")
 const RealtimeWorldClockScript := preload("res://core/RealtimeWorldClock.gd")
@@ -58,6 +59,8 @@ const ContentAvailabilityScript := preload("res://core/content/ContentAvailabili
 const FreeRoamJobBoardScript := preload("res://core/jobs/FreeRoamJobBoard.gd")
 const MeatspaceAutosaveServiceScript := preload("res://core/save/MeatspaceAutosaveService.gd")
 const MeatspacePrologueControllerScript := preload("res://core/story/MeatspacePrologueController.gd")
+const NetworkResidueStateScript := preload("res://core/game_state/NetworkResidueState.gd")
+const SocialMessageInboxScript := preload("res://core/story/SocialMessageInbox.gd")
 const SensorTopologyControllerScript := preload("res://cyberspace/SensorTopologyController.gd")
 
 enum GameDomain { CYBERSPACE, MEATSPACE, CLEAN_ROOM }
@@ -97,6 +100,7 @@ var evidence_archive: Variant
 var realtime_story_router: Variant
 var story_action_log: Array[Dictionary] = []
 var story_messages: Array[Dictionary] = []
+var social_inbox: SocialMessageInbox
 var story_graffiti: Array[Dictionary] = []
 var realtime_event_log: Array[Dictionary] = []
 var last_video_action_result: VideoFeedActionResult
@@ -134,6 +138,7 @@ var doorstop_programming_definition: DoorstopDefinition
 var doorstop_suspension_policy: DoorstopSuspensionPolicy
 var suspended_intrusion_advancer: SuspendedIntrusionAdvancer
 var suspended_security_level := 0
+var network_residue: NetworkResidueState
 var temporary_cyberspace_effects: Array[Dictionary] = []
 var suspended_intrusion_events: Array[Dictionary] = []
 var suspended_replacement_ice_factory: Callable
@@ -233,6 +238,7 @@ func enter_netspace_from_clean_room() -> Dictionary:
 	game_domain = GameDomain.CYBERSPACE
 	if intrusion_session != null and intrusion_session.lifecycle in [IntrusionSession.Lifecycle.ABORTED, IntrusionSession.Lifecycle.COMPLETED]: intrusion_session.lifecycle = IntrusionSession.Lifecycle.ACTIVE
 	persistent_game_state.world_state["entry_state"] = &"ACTIVE_NETWORK"
+	FirstMeatspaceTutorial.advance_to(persistent_game_state, FirstMeatspaceTutorial.Step.COMPLETE)
 	EventBus.game_domain_changed.emit(previous, game_domain)
 	EventBus.network_display_update_requested.emit()
 	return {"success": true, "reason": "Entering Netspace."}
@@ -243,6 +249,7 @@ func return_home_from_clean_room() -> Dictionary:
 	game_domain = GameDomain.MEATSPACE
 	persistent_game_state.world_state["entry_state"] = &"MEATSPACE"
 	EventBus.game_domain_changed.emit(previous, game_domain)
+	if social_inbox != null: social_inbox.evaluate(&"MEATSPACE_RETURN", {"progress": int(save_metadata_run_count())})
 	var save_error := request_meatspace_autosave(MeatspaceAutosaveServiceScript.Reason.RETURN_TO_MEATSPACE, {&"source": &"CLEAN_ROOM"})
 	return {"success": true, "reason": "Returned home." if save_error == OK else "Returned home, but autosave failed.", "save_error": save_error}
 
@@ -251,6 +258,7 @@ func return_to_clean_room(reason := "Run connection closed.") -> Dictionary:
 	var previous := game_domain
 	game_domain = GameDomain.CLEAN_ROOM
 	persistent_game_state.world_state["entry_state"] = &"CLEAN_ROOM"
+	if social_inbox != null: social_inbox.evaluate(&"RUN_RETURN", {"success": true, "trace": trace_level, "progress": int(action_clock.current_tick if action_clock != null else 0)})
 	EventBus.game_domain_changed.emit(previous, game_domain)
 	if clean_room_controller != null: clean_room_controller.enter()
 	return {"success": true, "reason": reason}
@@ -260,6 +268,7 @@ func enter_meatspace(reason: int = MeatspaceAutosaveServiceScript.Reason.RETURN_
 	var previous := game_domain
 	game_domain = GameDomain.MEATSPACE
 	persistent_game_state.world_state["entry_state"] = &"MEATSPACE"
+	if social_inbox != null: social_inbox.evaluate(&"MEATSPACE_RETURN", {"progress": int(action_clock.current_tick if action_clock != null else 0)})
 	EventBus.game_domain_changed.emit(previous, game_domain)
 	var error := request_meatspace_autosave(reason, metadata)
 	return {"success": error == OK, "reason": "Entered meat space." if error == OK else "Entered meat space, but autosave failed.", "save_error": error}
@@ -377,6 +386,10 @@ func _synchronize_persistent_state_from_runtime() -> void:
 			&"hackers": player_knowledge.hacker_records.duplicate(true),
 			&"observation_tick": player_knowledge.current_observation_tick,
 		}
+	if network_residue != null:
+		network_residue.capture_runtime(network_graph, ice_controller, physical_alarm_manager)
+		world["network_residue"] = network_residue.to_save_data()
+	world["network_security_level"] = maxi(int(world.get("network_security_level", 0)), suspended_security_level)
 	if intrusion_session != null:
 		var anchor := intrusion_session.suspended_anchor
 		var san: Variant = san_controller.get_san(intrusion_run_id) if san_controller != null else null
@@ -407,6 +420,15 @@ func _restore_saved_meatspace_runtime() -> void:
 	var world: Dictionary = persistent_game_state.world_state
 	if StringName(world.get("entry_state", &"")) != &"MEATSPACE": return
 	_restore_saved_programming_tasks(world.get("programming_tasks", []))
+	var saved_knowledge: Dictionary = world.get("network_knowledge", {})
+	if player_knowledge != null and not saved_knowledge.is_empty():
+		player_knowledge.node_records = _string_name_keyed(saved_knowledge.get("nodes", {}))
+		player_knowledge.link_records = _string_name_keyed(saved_knowledge.get("links", {}))
+		player_knowledge.sphere_records = _string_name_keyed(saved_knowledge.get("spheres", {}))
+		player_knowledge.service_records = _string_name_keyed(saved_knowledge.get("services", {}))
+		player_knowledge.ice_records = _string_name_keyed(saved_knowledge.get("ice", {}))
+		player_knowledge.hacker_records = _string_name_keyed(saved_knowledge.get("hackers", {}))
+		player_knowledge.current_observation_tick = int(saved_knowledge.get("observation_tick", 0))
 	var snapshot: Dictionary = world.get("intrusion_snapshot", {})
 	if snapshot.is_empty(): return
 	var resume: Dictionary = snapshot.get("resume_state", {})
@@ -540,6 +562,10 @@ func start_session() -> void:
 		_create_debug_operation_pressure()
 		_create_debug_realtime_story()
 	_create_shared_equipment_economy()
+	social_inbox = SocialMessageInboxScript.new()
+	var social_definitions: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/social_messages.json"))
+	social_inbox.configure(persistent_game_state, social_definitions if social_definitions is Array else [])
+	social_inbox.message_delivered.connect(EventBus.social_message_delivered.emit)
 	_create_free_roam_job_board()
 	_create_program_loadout(active_content_profile.get("kind", &"") != &"MEATSPACE_PROLOGUE")
 	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {})
@@ -559,6 +585,14 @@ func start_session() -> void:
 	else:
 		FacilityOperationFactory.populate_ice(ice_controller)
 		player_knowledge.detect_ice(&"FACILITY_SENTINEL_01")
+	network_residue = NetworkResidueStateScript.new()
+	network_residue.configure(persistent_game_state.world_state.get("network_residue", {}))
+	network_residue.advance(Time.get_unix_time_from_system())
+	network_residue.apply_to_graph(network_graph)
+	network_residue.apply_to_ice(ice_controller)
+	network_residue.apply_to_knowledge(player_knowledge)
+	network_residue.apply_to_alarms(physical_alarm_manager)
+	suspended_security_level = int(persistent_game_state.world_state.get("network_security_level", suspended_security_level))
 	hacker_npc_manager = HackerNPCManager.new()
 	hacker_npc_manager.name = "HackerNPCManager"
 	add_child(hacker_npc_manager)
@@ -655,7 +689,7 @@ func _create_program_loadout(create_connection := true) -> void:
 	meatspace_management = MeatspaceManagementScript.new()
 	meatspace_management.configure(program_inventory, program_loadout, equipment_order_manager, realtime_world_clock)
 	clean_room_controller = CleanRoomController.new()
-	clean_room_controller.configure(persistent_game_state, meatspace_management)
+	clean_room_controller.configure(persistent_game_state, meatspace_management, social_inbox)
 	if not persistent_game_state.player_state.is_empty():
 		meatspace_management.hardware_levels = (persistent_game_state.player_state.get("hardware", {}) as Dictionary).duplicate(true)
 		equipment_order_manager.credits = int(persistent_game_state.player_state.get("credits", 0))
@@ -670,9 +704,10 @@ func _create_program_loadout(create_connection := true) -> void:
 
 func active_slot_capacity() -> int:
 	if persistent_game_state == null: return 2
-	var count := int(persistent_game_state.player_state.get("active_slot_count", 2))
-	if StringName(persistent_game_state.player_state.get("selected_deck_variant", "")) == &"MORE_SLOTS": count = 3
-	return clampi(count, 2, 3)
+	var variant := StringName(persistent_game_state.player_state.get("selected_deck_variant", ""))
+	if variant == &"MORE_SLOTS": return 3
+	if variant == &"MORE_STORAGE": return 2
+	return clampi(int(persistent_game_state.player_state.get("active_slot_count", 2)), 2, 3)
 
 func _create_persistent_starter_programs() -> void:
 	var definitions := {}
@@ -687,12 +722,11 @@ func _create_persistent_starter_programs() -> void:
 		program_loadout.install(StringName(instance_id), program_inventory)
 
 func _on_hardware_changed(component_id: StringName, level: int) -> void:
-	if component_id != &"DECK_SENSORS" or sensor_topology == null: return
 	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {}).duplicate(true)
 	hardware[component_id] = level
 	persistent_game_state.player_state["hardware"] = hardware
 	persistent_game_state.emit_changed()
-	sensor_topology.set_sensors_rating(level)
+	if component_id == &"DECK_SENSORS" and sensor_topology != null: sensor_topology.set_sensors_rating(level)
 
 func _create_free_roam_job_board() -> void:
 	free_roam_job_board = null
@@ -722,6 +756,8 @@ func end_session() -> void:
 	action_clock = null
 	cyberspace_clock = null
 	ice_controller = null
+	network_residue = null
+	social_inbox = null
 	if hacker_npc_manager != null:
 		hacker_npc_manager.queue_free()
 	hacker_npc_manager = null
@@ -1591,11 +1627,22 @@ func _on_knowledge_tick_advanced(_previous_tick: int, current_tick: int, _amount
 
 
 func _on_action_resolved_team_support(_request: ActionRequest, result: ActionResult) -> void:
+	if result.success and social_inbox != null:
+		social_inbox.evaluate(&"NETSPACE_PROGRESS", {"progress": int(action_clock.current_tick if action_clock != null else 0), "events": result.events_produced})
+	if result.success and network_residue != null:
+		network_residue.observe_events(result.events_produced, Time.get_unix_time_from_system())
+		network_residue.apply_to_graph(network_graph)
+		network_residue.apply_to_ice(ice_controller)
+		network_residue.apply_to_knowledge(player_knowledge)
+		persistent_game_state.world_state["network_residue"] = network_residue.to_save_data()
 	if not result.success or team_support_encounter == null:
 		return
 	for event: Dictionary in result.events_produced:
 		if event.get("type", &"") == &"SERVICE_COMPROMISED":
 			team_support_encounter.unlock_from_cyberspace(event.get("service_id", &""))
+
+func save_metadata_run_count() -> int:
+	return int(persistent_game_state.save_metadata.get("completed_runs", action_clock.current_tick if action_clock != null else 0))
 
 func _validate_action(request: ActionRequest) -> Dictionary:
 	if confrontation_controller != null and confrontation_controller.has_action(request.action_type):

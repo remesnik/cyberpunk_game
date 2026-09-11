@@ -56,3 +56,12 @@ func primary(object_id: StringName) -> Dictionary:
 	for action: Dictionary in actions_for(object_id):
 		if String(action.id) != "EXAMINE": return execute(object_id, StringName(action.id))
 	return {"success": true, "text": ""}
+
+func get_available_meatspace_destinations() -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	if state == null: return result
+	var flags: Dictionary = state.campaign_state.get("story_flags", {})
+	for source: Dictionary in definition.get("destinations", []):
+		if source.has("when_flag") and bool(flags.get(source.when_flag, false)) != bool(source.get("equals", true)): continue
+		result.append(source.duplicate(true))
+	return result

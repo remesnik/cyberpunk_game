@@ -1,5 +1,6 @@
 class_name MeatspacePrologueController
 extends RefCounted
+const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.gd")
 
 signal state_changed(view: Dictionary)
 signal interaction_resolved(event: Dictionary)
@@ -56,6 +57,12 @@ func choose(interaction_id: StringName, choice_id: StringName) -> Dictionary:
 	game_state.player_state["credits"] = int(game_state.player_state.get("credits", 0)) - choice_cost(choice)
 	for action: Dictionary in choice.get("actions", []):
 		if String(action.get("type", "")) != "SPEND_CREDITS": _apply_action(action)
+	if interaction_id == &"TOOLBOX" and choice_id == &"ASSEMBLE_DECK":
+		_apply_action({"type": "SET_FLAG", "id": &"DECK_ASSEMBLED"})
+		phase = &"READY_TO_JACK_IN"
+		FirstMeatspaceTutorial.advance_to(game_state, FirstMeatspaceTutorial.Step.USE_COMPUTER)
+	elif interaction_id == &"DECK_CRATE":
+		FirstMeatspaceTutorial.advance_to(game_state, FirstMeatspaceTutorial.Step.USE_TOOLBOX)
 	var event := {"interaction_id": interaction_id, "choice_id": choice_id, "phase": phase, "text": choice.get("result_text", "")}
 	event_history.append(event)
 	selected_interaction_id = &""
@@ -148,6 +155,7 @@ func connection_status() -> Dictionary:
 	if not bool(_flags().get("DECK_SELECTED", false)): return _failure("You don't have anything to connect with.")
 	if not classes.has(String(game_state.player_state.get("player_class", ""))) or not bool(_flags().get("CLAN_SELECTED", false)):
 		return _failure("You hesitate. You still haven't decided who you're going to be out there.")
+	if not bool(_flags().get("DECK_ASSEMBLED", false)): return _failure("The deck is still open on the bench. Finish the setup with the toolbox.")
 	if bool(_flags().get("FIRST_CONTACT_STARTED", false)): return _failure("First Contact has already started.")
 	return {"success": true, "reason": "Connecting to First Contact..."}
 
@@ -169,6 +177,7 @@ func progression_view() -> Dictionary:
 		"class_selected": bool(_flags().get("CLAN_SELECTED", false)),
 		"player_class": game_state.player_state.get("player_class", ""),
 		"computer_unlocked": bool(_flags().get("DECK_SELECTED", false)),
+		"computer_state": &"ASSEMBLED" if bool(_flags().get("DECK_ASSEMBLED", false)) else (&"PARTIALLY_ASSEMBLED" if bool(_flags().get("DECK_SELECTED", false)) else &"NOT_PRESENT"),
 		"first_contact_started": bool(_flags().get("FIRST_CONTACT_STARTED", false)),
 		"first_contact_completed": bool(_flags().get("FIRST_CONTACT_COMPLETE", false)),
 	}

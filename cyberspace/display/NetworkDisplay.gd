@@ -17,6 +17,7 @@ const AMBER := Color("ffc857")
 @onready var node_layer: Control = %NodeLayer
 @onready var spatial_backdrop: CyberspaceSpatialBackdrop = %SpatialBackdrop
 @onready var spatial_world: CyberspaceWorld3D = %SpatialWorld3D
+@onready var ambient_activity: AmbientNetworkActivity = %AmbientActivity
 @onready var location_label: Label = %LocationLabel
 @onready var resource_label: Label = %ResourceLabel
 @onready var status_label: Label = %StatusLabel
@@ -55,7 +56,6 @@ const AMBER := Color("ffc857")
 @onready var exploit_button: Button = %ExploitButton
 @onready var extract_button: Button = %ExtractButton
 @onready var wait_button: Button = %WaitButton
-@onready var doorstop_button: Button = %DoorstopButton
 @onready var doorstop_confirmation: ConfirmationDialog = %DoorstopConfirmation
 @onready var jack_out_button: Button = %JackOutButton
 @onready var doorstop_state_label: Label = %DoorstopStateLabel
@@ -116,6 +116,8 @@ var _event_log_expanded := false
 var _context_panel_requested := false
 var _monitor_full_visible := false
 var _tutorial_hud_objective_id: StringName = &""
+const COMMAND_DIAL_VERTICAL_OFFSET := 22.0
+const COMMAND_DIAL_EDGE_MARGIN := 12.0
 
 func _ready() -> void:
 	security_level_legend.set_visualization_config(visualization_config)
@@ -130,6 +132,7 @@ func _ready() -> void:
 	EventBus.game_domain_changed.connect(_on_game_domain_changed)
 	EventBus.san_relocated.connect(_on_san_relocated)
 	EventBus.monitor_presentation_changed.connect(_on_monitor_presentation_changed)
+	EventBus.social_message_delivered.connect(_on_social_message_delivered)
 	HudState.widget_state_changed.connect(_on_hud_state_changed)
 	HudState.widget_open_requested.connect(_on_hud_widget_open_requested)
 	HudState.action_feedback.connect(_on_hud_action_feedback)
@@ -145,7 +148,6 @@ func _ready() -> void:
 	GameplayBindings.semantic_action_triggered.connect(_on_semantic_action)
 	GameplayBindings.device_mode_changed.connect(_on_device_mode_changed)
 	_create_slot_management_ui()
-	_create_debug_hud()
 	if Game.game_domain == Game.GameDomain.CYBERSPACE and is_visible_in_tree():
 		GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE)
 	scan_button.pressed.connect(_on_scan_pressed)
@@ -175,51 +177,6 @@ func _ready() -> void:
 		_on_session_started()
 	queue_redraw()
 
-	EventBus.san_relocated.connect(_on_san_relocated)
-	EventBus.monitor_presentation_changed.connect(_on_monitor_presentation_changed)
-	HudState.widget_state_changed.connect(_on_hud_state_changed)
-	HudState.widget_open_requested.connect(_on_hud_widget_open_requested)
-	HudState.action_feedback.connect(_on_hud_action_feedback)
-	HudState.widget_emphasis_requested.connect(_on_hud_widget_emphasis_requested)
-	HudState.diegetic_lesson_requested.connect(_on_diegetic_hud_lesson)
-	HudState.tutorial_objective_requested.connect(_on_hud_tutorial_objective_requested)
-	HudState.tutorial_objective_completed.connect(_on_hud_tutorial_objective_completed)
-	sphere_minimap.collapsed_changed.connect(_on_minimap_collapsed_changed)
-	HudState.set_context_active(HudState.Widget.ALERTS, true)
-	HudState.set_context_active(HudState.Widget.NODE_INSPECTOR, false)
-	GameplayBindings.binding_triggered.connect(_on_gameplay_binding)
-	GameplayBindings.bindings_changed.connect(_on_bindings_changed)
-	GameplayBindings.semantic_action_triggered.connect(_on_semantic_action)
-	GameplayBindings.device_mode_changed.connect(_on_device_mode_changed)
-	_create_slot_management_ui()
-	if Game.game_domain == Game.GameDomain.CYBERSPACE and is_visible_in_tree():
-		GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE)
-	scan_button.pressed.connect(_on_scan_pressed)
-	local_scan_button.pressed.connect(_on_scan_pressed)
-	confirm_button.pressed.connect(_confirm_selected_target)
-	target_scan_button.pressed.connect(_scan_selected_target)
-	_update_program_bar()
-	attack_button.pressed.connect(_submit_selected_confrontation.bind(ActionRequest.ActionType.ATTACK_PROCESS))
-	disrupt_button.pressed.connect(_submit_selected_confrontation.bind(ActionRequest.ActionType.DISRUPT))
-	spoof_button.pressed.connect(_submit_selected_confrontation.bind(ActionRequest.ActionType.SPOOF))
-	hide_button.pressed.connect(_submit_self_confrontation.bind(ActionRequest.ActionType.HIDE))
-	scramble_button.pressed.connect(_submit_self_confrontation.bind(ActionRequest.ActionType.TRACE_SCRAMBLE))
-	retreat_button.pressed.connect(_submit_selected_confrontation.bind(ActionRequest.ActionType.RETREAT))
-	break_lock_button.pressed.connect(_submit_selected_confrontation.bind(ActionRequest.ActionType.BREAK_LOCK))
-	redirect_button.pressed.connect(_submit_selected_confrontation.bind(ActionRequest.ActionType.REDIRECT))
-	exploit_button.pressed.connect(_submit_mission_action.bind(ActionRequest.ActionType.EXPLOIT))
-	extract_button.pressed.connect(_submit_mission_action.bind(ActionRequest.ActionType.TRANSFER))
-	wait_button.pressed.connect(_submit_wait)
-	doorstop_confirmation.confirmed.connect(_confirm_doorstop_deployment)
-	doorstop_confirmation.canceled.connect(_cancel_doorstop_deployment)
-	jack_out_button.pressed.connect(_jack_out_through_doorstop)
-	current_panel_toggle.pressed.connect(_toggle_current_summary)
-	event_feed_toggle.pressed.connect(_toggle_event_log)
-	_apply_hud_layout()
-	_apply_all_hud_states()
-	if Game.session_active:
-		_on_session_started()
-	queue_redraw()
 
 func set_models(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_knowledge: PlayerKnowledge, p_sensors: SensorTopologyController = null) -> void:
 	graph = p_graph
@@ -231,6 +188,10 @@ func set_models(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_know
 	if spatial_world != null:
 		spatial_world.configure(graph, _spatial_layout)
 		spatial_world.set_camera_anchor(_spatial_layout.camera_anchor)
+	if ambient_activity != null:
+		ambient_activity.reduced_animation = _reduced_animation_enabled()
+		ambient_activity.configure(graph, _ambient_node_position, _ambient_visible_nodes, _ambient_service_nodes, _ambient_visible_links)
+	_update_command_dial_position()
 	if sphere_minimap != null:
 		sphere_minimap.set_models(graph, position_model, knowledge, Game.sphere_tracker if Game.network_graph == graph else null)
 		if Game.network_graph == graph:
@@ -242,6 +203,36 @@ func apply_accessibility(config: Resource) -> void:
 		accessibility_config = config
 	for visual: NodeVisual in node_visuals.values():
 		visual.set_reduced_animation(_reduced_animation_enabled())
+	if ambient_activity != null: ambient_activity.reduced_animation = _reduced_animation_enabled()
+
+func _ambient_node_position(node_id: StringName) -> Vector2:
+	if not node_visuals.has(node_id): return Vector2.INF
+	var visual := node_visuals[node_id] as Control
+	return visual.position + visual.size * visual.scale * 0.5
+
+func _ambient_visible_nodes() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for value: Variant in node_visuals.keys(): result.append(StringName(value))
+	return result
+
+func _ambient_service_nodes() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for value: Variant in node_visuals.keys():
+		var id := StringName(value)
+		if knowledge != null and not knowledge.get_services_at(id).is_empty(): result.append(id)
+	return result
+
+func _ambient_visible_links() -> Array[StringName]:
+	var result: Array[StringName] = []
+	for value: Variant in link_visuals.keys(): result.append(StringName(value))
+	return result
+
+func _on_social_message_delivered(message: Dictionary) -> void:
+	if ambient_activity == null or not visible or int(message.get("priority", SocialMessageInbox.Priority.OPTIONAL)) == SocialMessageInbox.Priority.CRITICAL: return
+	var visible_nodes := _ambient_visible_nodes()
+	if visible_nodes.is_empty(): return
+	var allied := StringName(message.get("actor_id", &"")) == &"LATCH"
+	ambient_activity.trigger(&"REMOTE_SESSION", {"node_id": visible_nodes[0], "role": &"ALLY" if allied else &"REMOTE", "actor_type": AmbientNetworkActivity.ActorType.HACKER_FRIENDLY if allied else AmbientNetworkActivity.ActorType.NORMAL})
 
 func _reduced_animation_enabled() -> bool:
 	return accessibility_config != null and bool(accessibility_config.get("reduced_animation"))
@@ -264,9 +255,9 @@ func _on_session_started() -> void:
 			var bb = get_node("BottomBar") as Control
 			print("BOTTOMBAR_VISIBLE: %s | BOTTOMBAR_POSITION: %s | SIZE: %s" % [bb.visible, bb.position, bb.size])
 			print("BOTTOMBAR_RECT: %s" % bb.get_global_rect())
-		print("COMMAND_DIAL_EXISTS: %s" % has_node("CommandDial"))
-		if has_node("CommandDial"):
-			var cd = get_node("CommandDial") as Control
+		print("COMMAND_DIAL_EXISTS: %s" % (command_dial != null))
+		if command_dial != null:
+			var cd := command_dial as Control
 			print("COMMAND_DIAL_VISIBLE: %s | POSITION: %s | SIZE: %s" % [cd.visible, cd.position, cd.size])
 		print("=========================================\n")
 	_log_live_hud_state("session_started")
@@ -276,13 +267,18 @@ func _rebuild_neighborhood() -> void:
 		return
 	var restore_local_mode := netspace_focus_mode == NetspaceFocusMode.LOCAL_TARGET
 	var restore_local_target := focused_local_target_id
+	var restore_target := selected_target_id
+	var restore_command := _selected_contextual_command
 	for child in link_layer.get_children():
+		link_layer.remove_child(child)
 		child.queue_free()
 	for child in node_layer.get_children():
+		if restore_local_mode and child.has_meta("local_target_id"): continue
+		node_layer.remove_child(child)
 		child.queue_free()
 	node_visuals.clear()
 	link_visuals.clear()
-	local_target_visuals.clear()
+	if not restore_local_mode: _clear_local_target_visuals()
 	scan_targets.clear()
 	target_views.clear()
 	target_order.clear()
@@ -394,6 +390,12 @@ func _rebuild_neighborhood() -> void:
 	if restore_local_mode:
 		focused_local_target_id = restore_local_target
 		_enter_local_target_mode()
+	elif target_views.has(restore_target):
+		_select_target(restore_target)
+	if restore_command in _valid_contextual_commands:
+		_selected_contextual_command = restore_command
+		selected_command_id = restore_command
+		_update_contextual_command_hud()
 
 func _add_node_visual(node_view: Dictionary, center: Vector2, current: bool, selectable: bool) -> void:
 	var visual := NODE_SCENE.instantiate() as NodeVisual
@@ -458,6 +460,31 @@ func _update_spatial_projection() -> void:
 		visual.position = _spatial_screen_position(node_id, map_rect) - visual.size * 0.5
 		_apply_spatial_scale(visual, node_id)
 	spatial_backdrop.set_camera_offset(Vector2(spatial_world.view_anchor.x, spatial_world.view_anchor.z) if spatial_world != null else Vector2.ZERO)
+	_update_command_dial_position()
+
+func selected_target_screen_position() -> Vector2:
+	if selected_target_id == &"" or not target_views.has(selected_target_id): return Vector2.INF
+	if node_visuals.has(selected_target_id): return _ambient_node_position(selected_target_id)
+	var view: Dictionary = target_views[selected_target_id]
+	var kind := StringName(view.get("kind", &""))
+	if kind == &"LINK":
+		var link: Dictionary = view.get("link", {})
+		var source := StringName(link.get("source", &"")); var destination := StringName(link.get("destination", &""))
+		var a := _ambient_node_position(source); var b := _ambient_node_position(destination)
+		if a != Vector2.INF and b != Vector2.INF: return a.lerp(b, 0.5)
+	var record: Dictionary = view.get("ice", view.get("service", view.get("hacker", {})))
+	var host := StringName(record.get("node_id", position_model.current_node_id if position_model != null else &""))
+	return _ambient_node_position(host)
+
+func _update_command_dial_position() -> void:
+	if command_dial == null: return
+	var target_position := selected_target_screen_position()
+	command_dial.visible = target_position != Vector2.INF and not _valid_contextual_commands.is_empty()
+	if not command_dial.visible: return
+	var dial_size := command_dial.size.max(command_dial.custom_minimum_size)
+	var desired := target_position + Vector2(-dial_size.x * 0.5, -dial_size.y - COMMAND_DIAL_VERTICAL_OFFSET)
+	var viewport_size := size
+	command_dial.position = desired.clamp(Vector2.ONE * COMMAND_DIAL_EDGE_MARGIN, viewport_size - dial_size - Vector2.ONE * COMMAND_DIAL_EDGE_MARGIN)
 
 func _discovered_node_ids() -> Array[StringName]:
 	var result: Array[StringName] = []
@@ -522,11 +549,17 @@ func _local_target_ids_for_node(node_id: StringName) -> Array[StringName]:
 			result.append(target_id)
 		elif kind == &"ICE" and StringName((view.get("ice", {}) as Dictionary).get("node_id", &"")) == node_id:
 			result.append(target_id)
+		elif kind in [&"FILE", &"DEVICE_OBJECT"]:
+			var record := view.get("file", view.get("device", {})) as Dictionary
+			if StringName(record.get("node_id", record.get("host_node_id", &""))) == node_id: result.append(target_id)
 	return result
 
 
 func _create_local_target_visual(target_id: StringName, index: int, count: int) -> void:
 	var view := target_views[target_id] as Dictionary
+	if local_target_visuals.has(target_id):
+		_update_local_target_visual(target_id, index, count)
+		return
 	var button := Button.new()
 	button.name = "LocalTarget_%s" % target_id
 	button.text = "[%s]\n%s" % [String(view.get("kind", "TARGET")), String(view.get("title", "LOCAL TARGET")).to_upper()]
@@ -538,10 +571,43 @@ func _create_local_target_visual(target_id: StringName, index: int, count: int) 
 	button.pressed.connect(func() -> void: _select_local_target(target_id))
 	node_layer.add_child(button)
 	local_target_visuals[target_id] = button
+	_update_local_target_visual(target_id, index, count)
+
+func _update_local_target_visual(target_id: StringName, index: int, count: int) -> void:
+	if not target_views.has(target_id) or not local_target_visuals.has(target_id): return
+	var view := target_views[target_id] as Dictionary
+	var button := local_target_visuals[target_id] as Button
+	var state_suffix := ""
+	if view.get("kind") == &"ICE":
+		var ice := view.get("ice", {}) as Dictionary
+		state_suffix = "\nDESTROYED" if not bool(ice.get("operational", true)) else ("\nINTEGRITY %d/%d" % [int(ice.integrity), int(ice.maximum_integrity)] if ice.has("integrity") else "")
+		button.custom_minimum_size.y = 72
+		button.size.y = 72
+	button.text = "[%s]\n%s%s" % [String(view.get("kind", "TARGET")), String(view.get("title", "LOCAL TARGET")).to_upper(), state_suffix]
+	button.tooltip_text = button.text.replace("\n", " // ")
+	button.icon = load(_target_icon_path(StringName(view.get("kind", &"UNKNOWN")))) as Texture2D
 	var center_visual := node_visuals.get(focused_node_id) as Control
 	var center := center_visual.position + center_visual.size * center_visual.scale * 0.5 if center_visual != null else get_primary_graph_rect().get_center()
 	var angle := -PI * 0.5 + TAU * float(index) / float(maxi(1, count))
 	button.position = center + Vector2(cos(angle), sin(angle)) * 150.0 - button.size * 0.5
+
+func _reconcile_local_target_visuals(local_ids: Array[StringName]) -> void:
+	for value: Variant in local_target_visuals.keys():
+		var id := StringName(value)
+		if id in local_ids: continue
+		var stale := local_target_visuals[id] as Button
+		local_target_visuals.erase(id)
+		if stale != null:
+			if stale.get_parent() != null: stale.get_parent().remove_child(stale)
+			stale.queue_free()
+	for index in local_ids.size(): _create_local_target_visual(local_ids[index], index, local_ids.size())
+
+func _clear_local_target_visuals() -> void:
+	for visual: Button in local_target_visuals.values():
+		if visual != null:
+			if visual.get_parent() != null: visual.get_parent().remove_child(visual)
+			visual.queue_free()
+	local_target_visuals.clear()
 
 
 func _enter_local_target_mode() -> bool:
@@ -555,7 +621,7 @@ func _enter_local_target_mode() -> bool:
 	var remembered_id := StringName(_last_local_target_by_node.get(focused_node_id, &""))
 	var remembered := focused_local_target_id if focused_local_target_id in local_ids else (remembered_id if remembered_id in local_ids else local_ids[0])
 	focused_local_target_id = remembered
-	for index in local_ids.size(): _create_local_target_visual(local_ids[index], index, local_ids.size())
+	_reconcile_local_target_visuals(local_ids)
 	_select_local_target(focused_local_target_id)
 	return true
 
@@ -563,8 +629,7 @@ func _enter_local_target_mode() -> bool:
 func _exit_local_target_mode() -> void:
 	if netspace_focus_mode != NetspaceFocusMode.LOCAL_TARGET: return
 	if not focused_local_target_id.is_empty(): _last_local_target_by_node[focused_node_id] = focused_local_target_id
-	for visual: Button in local_target_visuals.values(): visual.queue_free()
-	local_target_visuals.clear()
+	_clear_local_target_visuals()
 	netspace_focus_mode = NetspaceFocusMode.NODE
 	focused_local_target_id = &""
 	selected_target_id = focused_node_id
@@ -596,12 +661,12 @@ func _rebuild_known_entities(current_node_id: StringName, contacts: Array[Dictio
 			continue
 		var contact_id: StringName = record.contact_id
 		var button := Button.new()
-		button.text = "ICE // %s [%s]" % [String(record.get("display_name", ice_id)), IceState.label(int(record.get("state", IceState.Value.DORMANT)))]
+		button.text = "ICE // %s [%s]" % [String(record.get("display_name", ice_id)), "DESTROYED" if not bool(record.get("operational", true)) else IceState.label(int(record.get("state", IceState.Value.DORMANT)))]
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		button.pressed.connect(func() -> void: _select_target(contact_id))
 		known_entities.add_child(button)
 		var ice_target := {"kind": &"ICE", "contact_id": contact_id}
-		target_views[contact_id] = {"kind": &"ICE", "title": record.get("display_name", "SECURITY PROCESS"), "ice": record, "scanned": bool(record.get("scanned", false)), "attackable": bool(record.get("attackable", true)), "bypassable": bool(record.get("bypassable", false)), "confrontation_target": ice_target, "scan_target": {"kind": ScanSystem.ICE_SIGNAL, "contact_id": contact_id}}
+		target_views[contact_id] = {"kind": &"ICE", "title": record.get("display_name", "SECURITY PROCESS"), "ice": record, "scanned": bool(record.get("scanned", false)), "attackable": bool(record.get("operational", true)) and bool(record.get("attackable", true)), "bypassable": bool(record.get("bypassable", false)), "confrontation_target": ice_target, "scan_target": {"kind": ScanSystem.ICE_SIGNAL, "contact_id": contact_id}}
 		target_order.append(contact_id)
 	for hacker: Dictionary in knowledge.get_visible_hackers_at(locally_known_nodes):
 		var contact_id: StringName = hacker.contact_id
@@ -678,6 +743,19 @@ func _on_action_resolved(request: ActionRequest, result: ActionResult) -> void:
 	_append_action_events(request, result)
 	if not _transition_active:
 		_rebuild_neighborhood()
+	if OS.is_debug_build() and request.action_type == ActionRequest.ActionType.ATTACK_PROCESS:
+		print("[ICE PRESENTATION] %s" % JSON.stringify(debug_ice_counters()))
+
+func debug_ice_counters() -> Dictionary:
+	var gameplay := 0
+	if Game.ice_controller != null:
+		for ice: IceInstance in Game.ice_controller.instances.values():
+			if position_model == null or ice.current_node_id == position_model.current_node_id: gameplay += 1
+	var visuals := 0
+	for value: Variant in local_target_visuals.keys():
+		var id := StringName(value)
+		if target_views.has(id) and (target_views[id] as Dictionary).get("kind") == &"ICE": visuals += 1
+	return {"ice_gameplay_instances": gameplay, "local_targets": local_target_visuals.size(), "ice_target_visuals": visuals, "status_visuals": 0, "temporary_effects": ambient_activity.events.size() if ambient_activity != null else 0}
 
 func _on_traversal_started(from_id: StringName, to_id: StringName, link_id: StringName) -> void:
 	_transition_active = true
@@ -716,6 +794,7 @@ func _finish_transition() -> void:
 	_rebuild_neighborhood()
 
 func _process(delta: float) -> void:
+	_update_command_dial_position()
 	if not visible or spatial_world == null or _transition_active or _camera_view_motion_active: return
 	var direction := GameplayBindings.camera_pan_vector()
 	if spatial_world.pan(direction, delta, _discovered_node_ids()):
@@ -916,7 +995,7 @@ func _log_live_hud_state(reason: String) -> void:
 	var slot_count := Game.program_loadout.capacity if Game.program_loadout != null else 0
 	var rendered_slot_count := $BottomBar/Margin/Rows/Programs.get_child_count() if has_node("BottomBar/Margin/Rows/Programs") else -1
 	var commands := _valid_contextual_commands
-	print("[NetspaceHUD] reason=%s hud_instance=%s active_slot_bar_instance=%s command_dial_instance=%s visible=%s" % [reason, name, str(has_node("BottomBar")), str(has_node("BottomBar/Margin/Rows/Programs")), str(has_node("CommandDial"))])
+	print("[NetspaceHUD] reason=%s hud_instance=%s active_slot_bar_instance=%s command_dial_instance=%s visible=%s" % [reason, name, str(has_node("BottomBar")), str(has_node("BottomBar/Margin/Rows/Programs")), str(command_dial != null)])
 	print("[DeckSlots] active_slot_count=%d loaded_program_count=%d rendered_slot_widgets=%d bar_visible=%s bar_size=%s bar_position=%s viewport_size=%s" % [slot_count, Game.program_loadout.installed_instance_ids.size() if Game.program_loadout != null else 0, rendered_slot_count, str($BottomBar.visible) if has_node("BottomBar") else "false", str($BottomBar.size) if has_node("BottomBar") else "(0,0)", str($BottomBar.position) if has_node("BottomBar") else "(0,0)", str(get_viewport_rect().size)])
 	print("[CommandDial] target=%s focus_mode=%s valid_commands=%s selected=%s selected_index=%d rendered_icon_count=%d visible=%s size=%s position=%s" % [selected_target_id, netspace_focus_mode, commands, _selected_contextual_command, commands.find(_selected_contextual_command), command_dial.get_child_count() if command_dial != null else -1, str(command_dial.visible) if command_dial != null else "false", str(command_dial.size) if command_dial != null else "(0,0)", str(command_dial.position) if command_dial != null else "(0,0)"])
 	if slot_count > 0 and rendered_slot_count == 0: push_error("Active slots exist but HUD rendered none")
@@ -983,6 +1062,7 @@ func _security_visible_at(node_id: StringName) -> bool:
 func _select_target(target_id: StringName) -> void:
 	if not target_views.has(target_id):
 		return
+	var target_changed := selected_target_id != target_id
 	selected_target_id = target_id
 	_context_panel_requested = true
 	_refresh_context_panel_visibility()
@@ -1029,21 +1109,23 @@ func _select_target(target_id: StringName) -> void:
 	confirm_button.visible = kind != &"NODE"
 	confirm_button.disabled = kind == &"NODE"
 	target_scan_button.disabled = scan_target.is_empty()
-	_recalculate_contextual_commands()
+	_recalculate_contextual_commands(target_changed)
 	_refresh_contextual_command_buttons()
 	if OS.is_debug_build(): print("[NetspaceTarget] focus_mode=%s focused_node_id=%s focused_local_target_id=%s resolved_target=%s" % [netspace_focus_mode, focused_node_id, focused_local_target_id, target_id])
 	status_label.text = "TRAVERSAL ACCEPTED" if kind == &"NODE" else "TARGET LOCKED  //  ENTER EXECUTES  //  R SCANS"
 
 
-func get_valid_commands(target_id: StringName = selected_target_id, _player_state: Variant = null, _run_state: Variant = null) -> Array[StringName]:
+func get_valid_commands(target_id: StringName = &"", _player_state: Variant = null, _run_state: Variant = null) -> Array[StringName]:
 	var commands: Array[StringName] = []
+	if target_id.is_empty(): target_id = selected_target_id
 	if target_id.is_empty() or not target_views.has(target_id): return commands
 	var view := target_views[target_id] as Dictionary
 	var kind: StringName = view.get("kind", &"UNKNOWN")
 	var scanned := bool(view.get("scanned", false))
 	var nested: Dictionary = view.get("node", view.get("ice", view.get("service", {}))) as Dictionary
 	scanned = scanned or bool(nested.get("scanned", false))
-	if not scanned and kind in [&"NODE", &"ICE", &"SERVICE", &"FILE", &"DEVICE_OBJECT"]: commands.append(&"SCAN")
+	if kind in [&"NODE", &"ICE", &"SERVICE", &"FILE", &"DEVICE_OBJECT"] and (not scanned or not view.get("scan_target", {}).is_empty()):
+		commands.append(&"SCAN")
 	match kind:
 		&"NODE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
@@ -1051,7 +1133,7 @@ func get_valid_commands(target_id: StringName = selected_target_id, _player_stat
 			if bool(view.get("enterable", false)) or (not link.is_empty() and target_id != position_model.current_node_id): commands.append(&"ENTER")
 		&"ICE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
-			if bool(view.get("attackable", false)) or not view.get("confrontation_target", {}).is_empty(): commands.append(&"ATTACK")
+			if bool(view.get("attackable", false)): commands.append(&"ATTACK")
 			if bool(view.get("bypassable", false)): commands.append(&"BYPASS")
 		&"SERVICE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
@@ -1070,17 +1152,17 @@ func get_valid_commands(target_id: StringName = selected_target_id, _player_stat
 	return commands
 
 
-func available_commands_for_target(target_id: StringName = selected_target_id) -> Array[StringName]:
+func available_commands_for_target(target_id: StringName = &"") -> Array[StringName]:
 	return get_valid_commands(target_id)
 
 
-func _recalculate_contextual_commands() -> void:
+func _recalculate_contextual_commands(reset_selection := false) -> void:
 	var previous := _selected_contextual_command
-	_valid_contextual_commands = get_valid_commands()
+	_valid_contextual_commands = get_valid_commands(selected_target_id)
 	var target_view := target_views.get(selected_target_id, {}) as Dictionary
 	var target_nested := target_view.get("node", target_view.get("ice", target_view.get("service", {}))) as Dictionary
 	var target_scanned := bool(target_view.get("scanned", false)) or bool(target_nested.get("scanned", false))
-	if not target_scanned and &"SCAN" in _valid_contextual_commands:
+	if reset_selection and not target_scanned and &"SCAN" in _valid_contextual_commands:
 		_selected_contextual_command = &"SCAN"
 	elif previous in _valid_contextual_commands:
 		_selected_contextual_command = previous
@@ -1114,21 +1196,23 @@ func _render_command_dial() -> void:
 	if _valid_contextual_commands.is_empty(): return
 	var selected_index := _valid_contextual_commands.find(_selected_contextual_command)
 	if selected_index < 0: selected_index = 0
-	var first := maxi(0, selected_index - 2)
-	var last := mini(_valid_contextual_commands.size() - 1, selected_index + 2)
-	if selected_index - first < 2: last = mini(_valid_contextual_commands.size() - 1, last + (2 - (selected_index - first)))
-	if last - selected_index < 2: first = maxi(0, first - (2 - (last - selected_index)))
-	for index in range(first, last + 1):
+	var visible_count := mini(5, _valid_contextual_commands.size())
+	var start := -int(visible_count / 2)
+	for offset in range(start, start + visible_count):
+		var index := posmod(selected_index + offset, _valid_contextual_commands.size())
 		var command_id: StringName = _valid_contextual_commands[index]
-		var icon := TextureButton.new()
-		icon.ignore_texture_size = true
-		icon.custom_minimum_size = Vector2(48, 48)
-		icon.texture_normal = load(_command_icon_path(command_id)) as Texture2D
-		icon.tooltip_text = _contextual_command_label(command_id)
-		icon.modulate = Color.WHITE if index == selected_index else Color(0.72, 0.82, 0.88, 0.9)
-		var target_scale := Vector2.ONE * (1.0 if index == selected_index else (0.85 if abs(index - selected_index) == 1 else 0.7))
-		icon.scale = target_scale * 0.9
-		create_tween().tween_property(icon, "scale", target_scale, 0.16).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		var icon := Button.new()
+		icon.name = String(command_id)
+		icon.focus_mode = Control.FOCUS_NONE
+		icon.custom_minimum_size = Vector2(94, 56)
+		icon.icon = load(_command_icon_path(command_id)) as Texture2D
+		icon.add_theme_constant_override("icon_max_width", 28)
+		icon.text = _contextual_command_label(command_id)
+		icon.add_theme_font_size_override("font_size", 12)
+		icon.tooltip_text = "Execute " + _contextual_command_label(command_id) if offset == 0 else "Select " + _contextual_command_label(command_id)
+		icon.toggle_mode = true
+		icon.button_pressed = offset == 0
+		icon.modulate = Color(1.0, 0.85, 0.4) if offset == 0 else Color(0.65, 0.8, 0.9)
 		icon.pressed.connect(_on_command_dial_pressed.bind(command_id))
 		command_dial.add_child(icon)
 
@@ -1152,6 +1236,7 @@ func _update_contextual_command_hud() -> void:
 	else:
 		contextual_command_label.text = "< %s >" % _contextual_command_label(_selected_contextual_command)
 	_render_command_dial()
+	_update_command_dial_position()
 	_log_live_hud_state("command_hud_refresh")
 	if control_hints != null:
 		var command_hint := "Z/.: COMMAND  •  " if not _valid_contextual_commands.is_empty() else ""
@@ -1296,7 +1381,7 @@ func _apply_hud_layout() -> void:
 	right_panel.offset_right = -12.0
 	right_panel.offset_top = 316.0
 	$BottomBar.offset_top = -82.0 if compact else -88.0
-	status_label.offset_top = -158.0
+	status_label.offset_top = -226.0
 	status_label.offset_bottom = status_label.offset_top + 26.0
 
 func get_primary_graph_rect() -> Rect2:
@@ -1427,6 +1512,7 @@ func _update_program_bar() -> void:
 	while programs.get_child_count() < count:
 		var button := Button.new()
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.focus_mode = Control.FOCUS_NONE
 		programs.add_child(button)
 		button.pressed.connect(_on_program_selected.bind(programs.get_child_count()))
 	var slots: Array = Game.program_loadout.active_slots if Game.program_loadout != null else []
@@ -1439,6 +1525,7 @@ func _update_program_bar() -> void:
 		var marker := ">" if index == _selected_active_slot else " "
 		button.text = "%s [%s] %s" % [marker, GameplayBindings.get_binding_label(action), instance.definition.display_name.to_upper() if instance != null else "EMPTY"]
 		button.tooltip_text = "%s // binding: PROGRAM_SLOT_%d" % [instance.definition.description if instance != null else "No program installed in this loadout position.", index + 1]
+		button.focus_mode = Control.FOCUS_NONE
 		button.disabled = false
 		button.icon = instance.definition.get("icon") as Texture2D if instance != null and instance.definition.get("icon") is Texture2D else null
 	_selected_active_slot = clampi(_selected_active_slot, 0, maxi(0, count - 1)) if count > 0 else 0
@@ -1450,50 +1537,6 @@ func _update_program_bar() -> void:
 		doorstop_state_label.text = "BACKDOOR ACTIVE // %s // ONE RETURN" % (node.display_name.to_upper() if node != null else anchor.cyberspace_node_id)
 	else:
 		doorstop_state_label.text = "BACKDOOR // CLOSED"
-
-
-func _create_debug_hud() -> void:
-	# Step 2-3: Create a temporary debug HUD as a CanvasLayer to prove screen-space rendering
-	if not OS.is_debug_build():
-		return
-	
-	var debug_layer = CanvasLayer.new()
-	debug_layer.name = "DebugNetspaceHUD"
-	debug_layer.layer = 100
-	add_child(debug_layer)
-	
-	var root_control = Control.new()
-	root_control.name = "Root"
-	root_control.set_anchors_preset(Control.PRESET_FULL_RECT)
-	root_control.anchor_left = 0.0
-	root_control.anchor_right = 1.0
-	root_control.anchor_top = 0.0
-	root_control.anchor_bottom = 1.0
-	root_control.offset_left = 0
-	root_control.offset_right = 0
-	root_control.offset_top = 0
-	root_control.offset_bottom = 0
-	root_control.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	debug_layer.add_child(root_control)
-	
-	# Test label at bottom center - STEP 3
-	var test_label = Label.new()
-	test_label.name = "TestLabel"
-	test_label.text = "NETSPACE HUD TEST"
-	test_label.add_theme_font_size_override("font_size", 32)
-	test_label.add_theme_color_override("font_color", Color.YELLOW)
-	test_label.set_anchors_preset(Control.PRESET_BOTTOM_CENTER)
-	test_label.anchor_left = 0.5
-	test_label.anchor_right = 0.5
-	test_label.anchor_top = 1.0
-	test_label.anchor_bottom = 1.0
-	test_label.offset_left = -200
-	test_label.offset_right = 200
-	test_label.offset_top = -100
-	test_label.offset_bottom = -50
-	root_control.add_child(test_label)
-	
-	print("[DebugHUD] Created temporary debug HUD layer. Test label should be visible at bottom of screen.")
 
 
 func _create_slot_management_ui() -> void:
@@ -1580,7 +1623,10 @@ func _jack_out_through_doorstop() -> void:
 
 func _on_game_domain_changed(_previous_domain: int, current_domain: int) -> void:
 	visible = current_domain == Game.GameDomain.CYBERSPACE
-	if visible: GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE)
+	if visible:
+		GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE)
+		HudState.set_policy(HudState.Widget.PROGRAM_QUICKBAR, HudState.Policy.ALWAYS)
+		_update_program_bar()
 
 func _submit_selected_confrontation(action_type: ActionRequest.ActionType) -> void:
 	if selected_target_id == &"" or not target_views.has(selected_target_id):
@@ -1643,6 +1689,7 @@ func _update_top_bar() -> void:
 			objective_label.text = "OBJECTIVE // %s" % Game.mission.objective_text()
 
 func _append_action_events(request: ActionRequest, result: ActionResult) -> void:
+	if ambient_activity != null: ambient_activity.observe_simulation_events(result.events_produced)
 	event_lines.append("> %s // %s" % [request.get_action_name(), "OK" if result.success else result.reason.to_upper()])
 	for event in result.events_produced:
 		if event.get("debug_only", false) or (event.has("player_visible") and not event.player_visible):

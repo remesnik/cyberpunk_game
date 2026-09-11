@@ -1,6 +1,8 @@
 class_name StoryModeNewGameInitializer
 extends RefCounted
 
+const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.gd")
+
 const CAMPAIGN_ID := &"MAIN_CAMPAIGN"
 const ENTRY_CONTENT_ID := &"STORY_PROLOGUE"
 
@@ -28,7 +30,7 @@ static func initialize(state: PersistentGameState) -> void:
 		"optional_content": [],
 		"prologue": {"phase": &"DECK_SELECTION", "completed": false},
 	}
-	state.world_state = {"entry_state": &"MEATSPACE_PROLOGUE", "meatspace_location_id": &"BEDROOM", "time_of_day": "NIGHT"}
+	state.world_state = {"entry_state": &"MEATSPACE_PROLOGUE", "meatspace_location_id": &"BEDROOM", "time_of_day": "NIGHT", "tutorial_state": {FirstMeatspaceTutorial.STATE_KEY: FirstMeatspaceTutorial.Step.LOOK_AROUND}}
 	state.save_metadata = {"save_id": &"STORY_AUTO", "network_name": "OFFLINE", "location_name": "BEDROOM", "playtime_seconds": 0.0}
 	state.player_state = {
 		"fatigue": 35.0,

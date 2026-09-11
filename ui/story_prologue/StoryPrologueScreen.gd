@@ -1,5 +1,6 @@
 class_name StoryPrologueScreen
 extends Control
+const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.gd")
 
 @onready var phase_label: Label = %PhaseLabel
 @onready var narrative_label: Label = %NarrativeLabel
@@ -103,7 +104,10 @@ func _select_interaction(interaction_id: StringName) -> void:
 		var cost := Game.prologue_controller.choice_cost(choice)
 		var price := "  -  %d ICs" % cost if bool(interaction.get("show_costs", false)) or cost > 0 else ""
 		if cost < 0: price = "  -  Damage-based IC cost"
-		button.text = "%s%s\n%s" % [String(choice.get("label", choice.id)), price, String(choice.get("description", ""))]
+		var description := String(choice.get("description", ""))
+		if choice.get("id") == "DECK_SCOUT": description = "Carry more active programs during a run."
+		elif choice.get("id") == "DECK_BALANCED": description = "Carry more files and stored programs."
+		button.text = "%s%s\n%s" % [String(choice.get("label", choice.id)), price, description]
 		button.disabled = not Game.prologue_controller.choice_available(choice)
 		if bool(interaction.get("show_costs", false)) or button.disabled:
 			button.text += "\n" + Game.prologue_controller.choice_status(choice)
@@ -119,12 +123,16 @@ func _on_room_object_selected(object_data: Dictionary) -> void:
 	var id := StringName(object_data.id)
 	if object_data.get("primary_action") == "CLASS":
 		_select_interaction(StringName("CLASS_" + String(object_data.class_id)))
+	elif object_data.get("primary_action") == "TRAVEL":
+		var destinations := physical_interactions.get_available_meatspace_destinations()
+		result_label.text = "There is nowhere to go." if destinations.is_empty() else "Choose a destination."
 	elif object_data.get("primary_action") == "CONNECT":
 		result_label.text = "Connecting..."
 		var connected := Game.prologue_controller.connect_first_contact()
 		if not connected.success: result_label.text = String(connected.reason)
 	elif object_data.get("primary_action", "PHYSICAL") == "STORY":
 		physical_interactions.primary(id)
+		if id == &"STARTER_DECK_BOX": FirstMeatspaceTutorial.advance_to(physical_interactions.state, FirstMeatspaceTutorial.Step.CHOOSE_DECK)
 		_physical_action(id, &"STORY")
 	else:
 		var result := physical_interactions.primary(id)

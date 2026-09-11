@@ -95,12 +95,18 @@ func execute(action_type: ActionRequest.ActionType, target: Dictionary) -> Confr
 			events.append({"type": &"IDENTITY_SPOOFED", "ice_id": ice.instance_id})
 		ActionRequest.ActionType.ATTACK_PROCESS:
 			var ice := ice_controller.get_ice(validation.ice_id)
+			var hp_before := ice.integrity
+			var was_operational := ice.operational
 			var damage := maxi(1, definition.power - ice.definition.defense)
 			ice.integrity = maxi(0, ice.integrity - damage)
 			if ice.integrity == 0:
 				ice.operational = false
 				ice.state = IceState.Value.DORMANT
 			events.append({"type": &"ICE_INTEGRITY_DAMAGED", "ice_id": ice.instance_id, "damage": damage, "remaining": ice.integrity, "disabled": not ice.operational})
+			if was_operational and not ice.operational:
+				events.append({"type": &"ICE_DESTROYED", "ice_id": ice.instance_id, "node_id": ice.current_node_id})
+			knowledge.observe_ice_combat_state(ice.instance_id, ice.integrity, ice.definition.maximum_integrity, ice.operational, ice.state)
+			if OS.is_debug_build(): print("[ICE ATTACK] target_id=%s hp_before=%d damage=%d hp_after=%d" % [ice.instance_id, hp_before, damage, ice.integrity])
 		ActionRequest.ActionType.BREAK_LOCK:
 			var link := graph.get_link(validation.link_id)
 			link.locked = false

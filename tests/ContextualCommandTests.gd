@@ -22,6 +22,11 @@ func _ready() -> void:
 	_expect(display.get_valid_commands() == [&"ATTACK", &"BYPASS"], "ICE exposes only its valid canonical commands after scan")
 	display.selected_target_id = &"FILE"
 	_expect(display.get_valid_commands() == [&"ANALYZE", &"DOWNLOAD"], "files expose only valid canonical commands")
+	for kind: StringName in [&"NODE", &"ICE", &"SERVICE", &"FILE", &"DEVICE_OBJECT"]:
+		display.target_views[&"UNSCANNED"] = {"kind": kind, "scanned": false}
+		display.selected_target_id = &"UNSCANNED"
+		display._recalculate_contextual_commands(true)
+		_expect(&"SCAN" in display.get_valid_commands() and display.selected_command_id == &"SCAN", "unscanned %s defaults to Scan" % kind)
 	display._valid_contextual_commands = [&"SCAN", &"DOWNLOAD", &"DELETE"]
 	display._selected_contextual_command = &"SCAN"
 	display.cycle_contextual_command(1)

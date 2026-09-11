@@ -1,0 +1,8 @@
+[
+  {"id":"LATCH_PREP_TIP","trigger":"CLEAN_ROOM_ENTER","actor_id":"LATCH","text":"Load light. Leave a slot for whatever the network teaches you.","priority":1,"required_flags":["DECK_SELECTED"],"repeatable":false},
+  {"id":"LATCH_RUN_ACK","trigger":"RUN_RETURN","actor_id":"LATCH","text":"Saw the disconnect. Your route held together.","priority":1,"required_flags":["CLEAN_ROOM_LATCH_CONTACTED"],"success":true,"repeatable":true,"cooldown_progress":2},
+  {"id":"LATCH_MISSED_CHECKIN","trigger":"RUN_RETURN","actor_id":"LATCH","text":"Missed your carrier on the way out. Leave a cleaner exit next time.","priority":1,"required_flags":["CLEAN_ROOM_LATCH_CONTACTED"],"success":false,"repeatable":true,"cooldown_progress":3},
+  {"id":"LATCH_TRACE_WARNING","trigger":"RUN_RETURN","actor_id":"LATCH","text":"Your trace climbed. Let the deck cool before leaning on that route again.","priority":2,"required_flags":["CLEAN_ROOM_LATCH_CONTACTED"],"minimum_trace":12,"repeatable":true,"cooldown_progress":3},
+  {"id":"BBS_NEW_POSTS","trigger":"MEATSPACE_RETURN","actor_id":"BBS","text":"Three new posts on watched threads.","priority":1,"required_flags":["BBS_CONNECTED"],"repeatable":true,"cooldown_progress":2},
+  {"id":"LATCH_SIGNAL","trigger":"NETSPACE_PROGRESS","actor_id":"LATCH","text":"Latch signal present on a nearby carrier.","priority":0,"required_flags":["LATCH_CONTACTED"],"repeatable":true,"cooldown_progress":4}
+]

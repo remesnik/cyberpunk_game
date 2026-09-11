@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://cyberspace/display/NetworkDisplay.gd" id="1_display"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/SecurityLevelLegend.tscn" id="2_legend"]
@@ -7,6 +7,7 @@
 [ext_resource type="Script" path="res://cyberspace/display/CyberspaceSpatialBackdrop.gd" id="5_backdrop"]
 [ext_resource type="Script" path="res://cyberspace/display/CyberspaceWorld3D.gd" id="6_world"]
 [ext_resource type="Script" path="res://ui/input/ControlHintBar.gd" id="7_hints"]
+[ext_resource type="Script" path="res://cyberspace/display/AmbientNetworkActivity.gd" id="8_ambient"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.008, 0.025, 0.045, 0.94)
@@ -66,6 +67,17 @@ script = ExtResource("6_world")
 [node name="LinkLayer" type="Node2D" parent="."]
 unique_name_in_owner = true
 visible = false
+
+[node name="AmbientActivity" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("8_ambient")
 
 [node name="NodeLayer" type="Control" parent="."]
 unique_name_in_owner = true
@@ -357,19 +369,14 @@ layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
 text = "NO ACTION"
 
-[node name="CommandDial" type="HBoxContainer" parent="."]
+[node name="CommandOverlay" type="CanvasLayer" parent="."]
+layer = 20
+
+[node name="CommandDial" type="HBoxContainer" parent="CommandOverlay"]
 unique_name_in_owner = true
 layout_mode = 0
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_left = -250.0
-offset_top = -152.0
-offset_right = 250.0
-offset_bottom = -96.0
-grow_horizontal = 2
-grow_vertical = 0
+offset_right = 500.0
+offset_bottom = 56.0
 custom_minimum_size = Vector2(500, 56)
 alignment = 1
 theme_override_constants/separation = 10
@@ -516,7 +523,7 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
-text = "LOADED PROGRAMS"
+text = "ACTIVE PROGRAM SLOTS"
 
 [node name="RamLabel" type="Label" parent="BottomBar/Margin/Rows/Header"]
 unique_name_in_owner = true
@@ -539,32 +546,6 @@ text = "BACKDOOR // CLOSED"
 [node name="Programs" type="HBoxContainer" parent="BottomBar/Margin/Rows"]
 layout_mode = 2
 theme_override_constants/separation = 8
-
-[node name="Program1" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[1] SCANNER"
-
-[node name="Program2" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[2] SPOOF"
-
-[node name="Program3" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[3] GHOST"
-
-[node name="Program4" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[4] DECRYPT"
-
-[node name="DoorstopButton" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[5] EMPTY"
 
 [node name="DoorstopConfirmation" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true

@@ -7,6 +7,8 @@ var events: MeatspaceEnvironmentEvents
 var train: Node3D
 var side_train: Node3D
 var side_neon: Node3D
+var rooftop_activity: Node3D
+var city_lights: Node3D
 var neon: Node3D
 var city_audio: AudioStreamPlayer
 var utility_audio: AudioStreamPlayer
@@ -107,7 +109,11 @@ func apply_state(state: PersistentGameState) -> void:
 	city_audio.volume_db = float(profile.city_db)
 	utility_audio.volume_db = float(profile.utility_db)
 	train_audio.volume_db = -17.0
-	sequencer.interval_scale = float(profile.get("event_interval_scale", 1.0))
+	sequencer.apply_profile(current_time, float(profile.get("event_interval_scale", 1.0)))
+	if rooftop_activity != null: rooftop_activity.visible = bool(profile.get("rooftop_activity", false))
+	if city_lights != null: city_lights.visible = bool(profile.get("city_lights", profile.neon))
+	for id: String in layers:
+		(layers[id] as AudioStreamPlayer).volume_db = float(profile.get("layers_db", {}).get(id, -80.0))
 
 func advance_portal(delta: float) -> void:
 	var portal: Dictionary = definition.get("portal", {})
@@ -122,10 +128,16 @@ func advance_portal(delta: float) -> void:
 func _process(delta: float) -> void:
 	advance_portal(delta)
 	if sequencer != null: sequencer.advance(delta, train.visible)
+	if active and rooftop_activity != null and rooftop_activity.visible:
+		rooftop_activity.rotation.y += delta * 0.45
 
 func _build_exterior() -> void:
 	neon = Node3D.new()
 	add_child(neon)
+	city_lights = Node3D.new()
+	add_child(city_lights)
+	rooftop_activity = Node3D.new()
+	add_child(rooftop_activity)
 	for row in range(3):
 		for i in range(11):
 			var height := 1.6 + float((i * 7 + row * 3) % 9) * 0.32
@@ -138,6 +150,11 @@ func _build_exterior() -> void:
 					block(neon, Vector3(0.22, 0.3, 0.02), Vector3(x - 0.65 + column * 0.6, floor_index * 0.7 + 0.2, z + 1.02), Color("e8c278"), true)
 			if i % 3 == 0:
 				block(neon, Vector3(0.25, 1.6, 0.05), Vector3(x + 0.8, height - 2, z + 1.08), Color("ef599c"), true)
+			if i % 2 == 0:
+				block(city_lights, Vector3(0.4, 0.16, 0.03), Vector3(x - 0.4, height - 1.0, z + 1.04), Color("f3d995"), true)
+	# A few distant rooftop rotors imply activity without simulating the city.
+	for offset in [-1.2, 0.0, 1.2]:
+		block(rooftop_activity, Vector3(0.9, 0.035, 0.08), Vector3(offset, 3.0, -8.0), Color("aab8bb"))
 	block(self, Vector3(25, 0.12, 0.7), Vector3(0, 0.95, -4.8), Color("505761"))
 	train = Node3D.new()
 	add_child(train)
