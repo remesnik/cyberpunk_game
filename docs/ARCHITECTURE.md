@@ -17,3 +17,5 @@ The project is organized by gameplay responsibility:
 The authoritative design is defined in `CORE_GAMEPLAY.md`, `MOVEMENT_MODEL.md`, and `DISPLAY_MODEL.md`.
 
 The initial navigation domain lives in `cyberspace/`: definitions describe nodes and links, `NetworkGraph` owns topology and traversal rules, and `PlayerNetworkPosition` owns logical player occupancy and history. These classes extend `RefCounted` so tests and simulation do not require a loaded 3D scene.
+
+Within a network, `SphereDefinition` records persistent authored subnet membership, while `SecuritySleeve.current_members` records the mutable security boundary that exists now. Nodes retain their `sphere_id` when a sleeve is breached, split, bypassed, or disabled; current sleeve connectivity must never be used to reconstruct Sphere membership.

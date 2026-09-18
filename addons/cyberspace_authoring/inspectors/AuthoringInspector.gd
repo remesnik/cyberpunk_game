@@ -6,6 +6,7 @@ signal entry_changed
 const ConditionEditor := preload("res://addons/cyberspace_authoring/widgets/condition_editor/StructuredConditionEditor.gd")
 const ActionEditor := preload("res://addons/cyberspace_authoring/widgets/action_editor/StructuredActionEditor.gd")
 const DoorstopInspector := preload("res://addons/cyberspace_authoring/inspectors/DoorstopDefinitionInspector.gd")
+const SphereInspector := preload("res://addons/cyberspace_authoring/inspectors/SphereInspector.gd")
 
 var document: CyberspaceContentDocument
 var selected_id: StringName
@@ -26,11 +27,17 @@ func show_entry(entry_id: StringName) -> void:
 		var doorstop := DoorstopInspector.new(); _body.add_child(doorstop); doorstop.set_definition(entry)
 		doorstop.definition_changed.connect(func(patch): document.update_entry(selected_id, patch); entry_changed.emit())
 		return
+	if entry.get("_collection", &"") == &"spheres":
+		var sphere_inspector := SphereInspector.new(); _body.add_child(sphere_inspector); sphere_inspector.set_sphere(document, entry_id)
+		sphere_inspector.definition_changed.connect(func(): entry_changed.emit())
+		return
 	_add_field("ID", String(entry.id), false)
 	_add_field("DISPLAY NAME", String(entry.get("display_name", entry.get("title", ""))), true, "display_name")
 	_add_field("DESCRIPTION / TEXT", String(entry.get("description", entry.get("text", entry.get("summary", "")))), true, "description")
+	_add_choice("GAME MODE AVAILABILITY", [&"AVAILABLE_IN_ALL_MODES", &"STORY_ONLY", &"FREE_ROAM_ONLY", &"MODE_SPECIFIC_VARIANT"], StringName(entry.get("availability", document.availability)), "availability")
 	var collection: StringName = entry.get("_collection", &"")
-	if collection == &"program_definitions": _add_program_definition_fields(entry)
+	if collection == &"network_nodes": _add_node_sphere_field(entry)
+	elif collection == &"program_definitions": _add_program_definition_fields(entry)
 	elif collection == &"rewards": _add_reward_fields(entry)
 	var raw := Label.new(); raw.text = "STRUCTURED DATA\n%s" % JSON.stringify(entry, "  "); raw.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; raw.add_theme_font_size_override("font_size", 10); _body.add_child(raw)
 	if entry.has("conditions") or entry.has("trigger_conditions"):
@@ -51,6 +58,17 @@ func _add_program_definition_fields(entry: Dictionary) -> void:
 	_add_field("VERSION", String(entry.get("version", "1.0")), true, "version")
 	_add_field("RARITY", String(entry.get("rarity", &"COMMON")), true, "rarity")
 	_add_number("PROGRAMMING DURATION (REALTIME SECONDS)", float(entry.get("programming_duration", 0.0)), 0.0, 86400.0, 0.1, "programming_duration")
+
+
+func _add_node_sphere_field(entry: Dictionary) -> void:
+	var label := Label.new(); label.text = "PERSISTENT SPHERE"; _body.add_child(label)
+	var picker := OptionButton.new(); picker.tooltip_text = "Persistent subnet membership. Current Security Sleeve state is edited independently."; _body.add_child(picker)
+	picker.add_item("UNASSIGNED"); picker.set_item_metadata(0, &"")
+	var selected: StringName = entry.get("sphere_id", &"")
+	for sphere: Dictionary in document.spheres:
+		picker.add_item("%s // %s" % [sphere.get("display_name", sphere.id), sphere.id]); picker.set_item_metadata(picker.item_count - 1, sphere.id)
+		if sphere.id == selected: picker.select(picker.item_count - 1)
+	picker.item_selected.connect(func(index): document.assign_node_to_sphere(selected_id, picker.get_item_metadata(index)); entry_changed.emit())
 
 
 func _add_reward_fields(entry: Dictionary) -> void:

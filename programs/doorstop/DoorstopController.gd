@@ -4,11 +4,15 @@ extends RefCounted
 var inventory: ProgramInventory
 var loadout: ProgramLoadout
 var anchors_by_run: Dictionary = {}
+var san_controller: RefCounted
 
 
 func _init(p_inventory: ProgramInventory, p_loadout: ProgramLoadout) -> void:
 	inventory = p_inventory
 	loadout = p_loadout
+
+func configure_san_controller(controller: RefCounted) -> void:
+	san_controller = controller
 
 
 func deploy(
@@ -25,6 +29,9 @@ func deploy(
 	var instance := inventory.get_instance(program_instance_id)
 	var definition := instance.definition as DoorstopDefinition
 	var captured_resume_data := resume_data.duplicate(true)
+	if san_controller != null:
+		var relocation: Dictionary = san_controller.relocate_san(intrusion_run_id, cyberspace_node_id)
+		if not relocation.success: return _failure(relocation.reason)
 	captured_resume_data["destroy_anchor_on_return"] = definition.destroy_anchor_on_return
 	var anchor := DoorstopAnchor.new(
 		program_instance_id,

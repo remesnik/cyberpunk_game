@@ -13,6 +13,8 @@ func _init() -> void:
 	var required_nodes: Array[StringName] = [&"ENTRY", &"ACCESS_RELAY", &"ROUTER_A", &"CAM_CTL", &"FILE_CACHE", &"SEC_RELAY", &"COMM_NODE", &"OPS_SERVER", &"EXIT_GATE"]
 	_expect(required_nodes.all(func(id): return level.find_entry(id) != {}), "all required tutorial node roles are authored")
 	_expect(_link_exists(level, &"ENTRY", &"ACCESS_RELAY") and _link_exists(level, &"ACCESS_RELAY", &"ROUTER_A"), "initial topology constrains the player to a guided ingress")
+	var opening_text := JSON.stringify(level.story_sequences[0])
+	_expect("sensors detect topology" in opening_text and "but not what it is" in opening_text, "opening tutorial explains sensor-detected unknown topology")
 	_expect(_outgoing_count(level, &"ROUTER_A") >= 2, "Router A opens the first route choice")
 	_expect(level.network_links.any(func(link): return link.get("hidden", false)) and level.network_links.any(func(link): return link.get("locked", false)), "topology includes discoverable and logically gated routes")
 	_expect(level.comms_participants.any(func(participant): return participant.id == &"LATCH"), "Latch is an authored comms participant")

@@ -3,6 +3,7 @@ extends RefCounted
 
 signal transition_started(from_node_id: StringName, to_node_id: StringName, link_id: StringName)
 signal transition_completed(from_node_id: StringName, to_node_id: StringName, link_id: StringName)
+signal position_changed(from_node_id: StringName, to_node_id: StringName, link_id: StringName)
 
 var current_node_id: StringName
 var previous_node_id: StringName = &""
@@ -65,13 +66,16 @@ func complete_transition() -> void:
 	transition_destination_id = &""
 	transition_link_id = &""
 	transition_completed.emit(origin, current_node_id, completed_link_id)
+	position_changed.emit(origin, current_node_id, completed_link_id)
 
 func relocate(node_id: StringName) -> void:
 	if node_id == current_node_id:
 		return
-	previous_node_id = current_node_id
+	var origin := current_node_id
+	previous_node_id = origin
 	current_node_id = node_id
 	is_transitioning = false
 	transition_destination_id = &""
 	transition_link_id = &""
 	traversal_history.append(node_id)
+	position_changed.emit(origin, current_node_id, &"")

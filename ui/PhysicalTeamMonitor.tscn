@@ -1,8 +1,8 @@
 [gd_scene load_steps=3 format=3]
 
-[ext_resource type="Script" path="res://ui/PhysicalTeamMonitor.gd" id="1_team"]
+[ext_resource type="Script" path="res://ui/PhysicalTeamMonitor.gd" id="1"]
 
-[sub_resource type="StyleBoxFlat" id="Style_team"]
+[sub_resource type="StyleBoxFlat" id="Panel"]
 bg_color = Color(0.008, 0.022, 0.035, 0.97)
 border_width_left = 1
 border_width_top = 1
@@ -12,79 +12,97 @@ border_color = Color(1, 0.8, 0.4, 0.72)
 
 [node name="PhysicalTeamMonitor" type="PanelContainer"]
 visible = false
-layout_mode = 0
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -366.0
-offset_top = 94.0
-offset_right = -140.0
-offset_bottom = 404.0
-grow_horizontal = 2
-theme_override_styles/panel = SubResource("Style_team")
-script = ExtResource("1_team")
+custom_minimum_size = Vector2(280, 34)
+theme_override_styles/panel = SubResource("Panel")
+script = ExtResource("1")
 
-[node name="Margin" type="MarginContainer" parent="."]
+[node name="Rows" type="VBoxContainer" parent="."]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
+theme_override_constants/separation = 4
 
-[node name="Rows" type="VBoxContainer" parent="Margin"]
+[node name="Compact" type="HBoxContainer" parent="Rows"]
 layout_mode = 2
-theme_override_constants/separation = 6
 
-[node name="Title" type="Label" parent="Margin/Rows"]
+[node name="ToggleButton" type="Button" parent="Rows/Compact"]
+unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(1, 0.8, 0.4, 1)
-text = "PHYSICAL TEAM MONITOR"
+text = "TEAM STATUS  +"
+tooltip_text = "Expand team and allied hacker details"
 
-[node name="TeamSelector" type="OptionButton" parent="Margin/Rows"]
+[node name="CompactRoster" type="HBoxContainer" parent="Rows/Compact"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 4
+
+[node name="AlertLabel" type="Label" parent="Rows/Compact"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.31, 0.42, 1)
+text = "ALERT // CONTACT LOST"
+
+[node name="DetailContent" type="VBoxContainer" parent="Rows"]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+
+[node name="HackerDetails" type="Label" parent="Rows/DetailContent"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.85, 0.88, 1)
+text = "REMOTE HACKER // UNKNOWN"
+
+[node name="TeamDetail" type="VBoxContainer" parent="Rows/DetailContent"]
 unique_name_in_owner = true
 layout_mode = 2
 
-[node name="Details" type="Label" parent="Margin/Rows"]
+[node name="TeamSelector" type="OptionButton" parent="Rows/DetailContent/TeamDetail"]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="Details" type="Label" parent="Rows/DetailContent/TeamDetail"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.62, 0.85, 0.88, 1)
 theme_override_font_sizes/font_size = 11
 text = "NO TEAM CONTACTS"
 
-[node name="EncounterLabel" type="Label" parent="Margin/Rows"]
+[node name="EncounterLabel" type="Label" parent="Rows/DetailContent/TeamDetail"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(1, 0.45, 0.36, 1)
 theme_override_font_sizes/font_size = 10
-text = "DOOR_12 // APPROACHING"
+text = "NO ACTIVE ROUTE DECISION"
 
-[node name="RecordButton" type="Button" parent="Margin/Rows"]
+[node name="RecordButton" type="Button" parent="Rows/DetailContent/TeamDetail"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "RECORD TELEMETRY"
 
-[node name="Decisions" type="GridContainer" parent="Margin/Rows"]
+[node name="Decisions" type="GridContainer" parent="Rows/DetailContent/TeamDetail"]
 layout_mode = 2
 columns = 2
 
-[node name="WaitButton" type="Button" parent="Margin/Rows/Decisions"]
+[node name="WaitButton" type="Button" parent="Rows/DetailContent/TeamDetail/Decisions"]
 unique_name_in_owner = true
 layout_mode = 2
 disabled = true
 text = "WAIT"
 
-[node name="ForceButton" type="Button" parent="Margin/Rows/Decisions"]
+[node name="ForceButton" type="Button" parent="Rows/DetailContent/TeamDetail/Decisions"]
 unique_name_in_owner = true
 layout_mode = 2
 disabled = true
 text = "FORCE ENTRY"
 
-[node name="AbortButton" type="Button" parent="Margin/Rows/Decisions"]
+[node name="AbortButton" type="Button" parent="Rows/DetailContent/TeamDetail/Decisions"]
 unique_name_in_owner = true
 layout_mode = 2
 disabled = true
 text = "ABORT"
 
-[node name="AlternateButton" type="Button" parent="Margin/Rows/Decisions"]
+[node name="AlternateButton" type="Button" parent="Rows/DetailContent/TeamDetail/Decisions"]
 unique_name_in_owner = true
 layout_mode = 2
 disabled = true

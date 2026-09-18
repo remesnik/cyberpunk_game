@@ -126,9 +126,11 @@ func apply_save_state(summary: FrontendSaveSummary, can_browse_saves: bool, has_
 		continue_button.tooltip_text = "No valid resumable game was found."
 	else:
 		var details: PackedStringArray = ["LAST CONNECTION"]
+		details.append("Mode: %s" % summary.mode_label())
 		if not summary.network_name.is_empty(): details.append("Network: %s" % summary.network_name)
 		if not summary.location_name.is_empty(): details.append("Location: %s" % summary.location_name)
 		if not summary.display_timestamp.is_empty(): details.append("Timestamp: %s" % summary.display_timestamp)
+		if not summary.playtime_display.is_empty(): details.append("Runtime: %s" % summary.playtime_display)
 		%SaveStatus.text = "\n".join(details)
 		continue_button.tooltip_text = "Resume %s." % (summary.network_name if not summary.network_name.is_empty() else "the latest valid session")
 	load_button.tooltip_text = "Open saved sessions." if can_browse_saves else "No save browser is available."

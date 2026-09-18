@@ -84,3 +84,8 @@ text = "TRIGGER"
 unique_name_in_owner = true
 layout_mode = 2
 text = "RECORD LOG"
+
+[node name="StopMonitoringButton" type="Button" parent="Margin/Rows/Commands"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "STOP MONITOR"

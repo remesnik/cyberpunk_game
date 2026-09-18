@@ -11,11 +11,14 @@ extends PanelContainer
 var _inventory_ids: Array[StringName] = []
 var _loadout_ids: Array[StringName] = []
 var _task_serial := 0
+var _job_ids: Array[StringName] = []
 
 
 func _ready() -> void:
 	visible = Game.game_domain == Game.GameDomain.MEATSPACE
 	EventBus.game_domain_changed.connect(_on_domain_changed)
+	EventBus.session_started.connect(_on_session_started)
+	HudState.widget_open_requested.connect(_on_hud_widget_open_requested)
 	%JackBackInButton.pressed.connect(_jack_back_in)
 	%UpgradeButton.pressed.connect(_upgrade_deck)
 	%InstallButton.pressed.connect(_install_selected)
@@ -24,6 +27,8 @@ func _ready() -> void:
 	%ProgramButton.pressed.connect(_start_programming)
 	%CollectButton.pressed.connect(_collect_completed)
 	%StoryButton.pressed.connect(_story_interaction)
+	%AcceptJobButton.pressed.connect(_accept_selected_job)
+	%JobOption.item_selected.connect(_show_selected_job)
 	_refresh()
 
 
@@ -34,14 +39,37 @@ func _process(_delta: float) -> void:
 
 
 func _on_domain_changed(_previous: int, current: int) -> void:
-	visible = current == Game.GameDomain.MEATSPACE
+	visible = current == Game.GameDomain.MEATSPACE and Game.prologue_controller == null
 	if visible:
 		_refresh()
 
+func _on_session_started() -> void:
+	visible = Game.game_domain == Game.GameDomain.MEATSPACE and Game.prologue_controller == null
+	if visible: _refresh()
+
+func _on_hud_widget_open_requested(widget_id: int) -> void:
+	if widget_id != HudState.Widget.PROGRAM_QUICKBAR or not visible:
+		return
+	_refresh_program_options()
+	if inventory_option.item_count > 0:
+		inventory_option.grab_focus()
+	elif loadout_option.item_count > 0:
+		loadout_option.grab_focus()
+
 
 func _refresh() -> void:
-	var view := Game.suspended_doorstop_view()
-	backdoor_label.text = "CONNECTION SUSPENDED\nBackdoor remains open.\n\nACTIVE BACKDOOR\nTarget: %s\nReturn Node: %s\nIntrusion: %s\n\nOne re-entry. Returning destroys this temporary route." % [view.get("target_name", "UNKNOWN"), view.get("return_node_id", &"UNKNOWN"), view.get("intrusion_run_id", &"UNKNOWN")]
+	if Game.is_content_available(&"FREE_ROAM_HOME") and Game.game_domain == Game.GameDomain.MEATSPACE:
+		$Margin/Rows/Title.text = "FREE ROAM // HOME DECK MANAGEMENT"
+		backdoor_label.text = "LOCAL DECK BAY\nNo campaign route selected.\n\nDYNAMIC JOB BOARD: ONLINE\nKnown networks: %d\nAvailable jobs: %d\n\nConfigure your deck, write software, order equipment, or connect when ready." % [Game.persistent_game_state.world_state.get("known_network_ids", []).size(), Game.persistent_game_state.world_state.get("available_dynamic_job_ids", []).size()]
+		%JackBackInButton.text = "[CONNECT TO PUBLIC MESH]"
+		%FreeRoamJobs.visible = true
+		_refresh_free_roam_jobs()
+	else:
+		var view := Game.suspended_doorstop_view()
+		$Margin/Rows/Title.text = "MEATSPACE // SUSPENDED INTRUSION MANAGEMENT"
+		backdoor_label.text = "CONNECTION SUSPENDED\nBackdoor remains open.\n\nACTIVE BACKDOOR\nTarget: %s\nReturn Node: %s\nIntrusion: %s\n\nOne re-entry. Returning destroys this temporary route." % [view.get("target_name", "UNKNOWN"), view.get("return_node_id", &"UNKNOWN"), view.get("intrusion_run_id", &"UNKNOWN")]
+		%JackBackInButton.text = "[JACK BACK IN]"
+		%FreeRoamJobs.visible = false
 	_refresh_program_options()
 	_refresh_status()
 
@@ -68,15 +96,44 @@ func _refresh_status() -> void:
 	var manager: MeatspaceManagement = Game.meatspace_management
 	if manager == null:
 		return
-	hardware_label.text = "DECK CPU %d  //  RAM %d  //  STORAGE %d\nFICTIONAL CREDITS %d" % [manager.hardware_levels.DECK_CPU, manager.hardware_levels.DECK_RAM, manager.hardware_levels.DECK_STORAGE, Game.equipment_order_manager.credits]
+	hardware_label.text = "DECK CPU %d  //  RAM %d  //  STORAGE %d  //  SENSORS %d\nFICTIONAL CREDITS %d" % [manager.hardware_levels.DECK_CPU, manager.hardware_levels.DECK_RAM, manager.hardware_levels.DECK_STORAGE, manager.hardware_levels.get(&"DECK_SENSORS", 1), Game.equipment_order_manager.credits]
 	var tasks: PackedStringArray = []
 	for task: SoftwareProgrammingTask in manager.programming_tasks.values():
 		tasks.append("%s // %s // %.1f/%.1fs" % [task.id, SoftwareProgrammingTask.State.keys()[task.state], task.elapsed(Game.realtime_world_clock.elapsed_seconds), task.duration])
 	task_label.text = "SOFTWARE PROGRAMMING\n%s" % ("\n".join(tasks) if not tasks.is_empty() else "NO ACTIVE TASKS")
 
+func _refresh_free_roam_jobs() -> void:
+	_job_ids.clear()
+	%JobOption.clear()
+	var board: FreeRoamJobBoard = Game.free_roam_job_board
+	if board == null:
+		%JobDescription.text = "PUBLIC JOB EXCHANGE OFFLINE"
+		return
+	for job in board.available_jobs():
+		_job_ids.append(job.id)
+		%JobOption.add_item("%s // %d CR" % [job.display_name.to_upper(), job.reward_credits])
+	var targets: Array = Game.persistent_game_state.world_state.get("discoverable_network_targets", [])
+	var target_names := PackedStringArray()
+	for target: Dictionary in targets: target_names.append(String(target.get("display_name", "UNKNOWN")))
+	%TargetLabel.text = "NETWORK DIRECTORY // %s" % " | ".join(target_names)
+	_show_selected_job(0)
+
+func _show_selected_job(index: int) -> void:
+	if index < 0 or index >= _job_ids.size() or Game.free_roam_job_board == null:
+		%JobDescription.text = "NO OPEN CONTRACTS"
+		return
+	var job := Game.free_roam_job_board.catalog.get_job(_job_ids[index])
+	%JobDescription.text = "%s\nTARGET: %s // %s" % [job.description, job.target_network_id, job.target_node_id]
+
+func _accept_selected_job() -> void:
+	var index: int = %JobOption.selected
+	if index < 0 or index >= _job_ids.size() or Game.free_roam_job_board == null: return
+	var result: Dictionary = Game.free_roam_job_board.accept_job(_job_ids[index])
+	event_label.text = result.reason
+
 
 func _jack_back_in() -> void:
-	var result := Game.jack_back_in_through_doorstop()
+	var result := Game.enter_free_roam_network() if Game.is_content_available(&"FREE_ROAM_HOME") else Game.jack_back_in_through_doorstop()
 	event_label.text = result.reason
 	if not result.success:
 		Game.notify_doorstop_invalid(result.reason)

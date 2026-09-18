@@ -1,0 +1,152 @@
+{
+  "source": "Canonical list and prices supplied by user in this conversation (2026-09-06).",
+  "TODO": "Wire Repair Deck cost and repair effect to the authoritative deck-damage system when implemented. Do not assume a damage formula.",
+  "choices": [
+    {
+      "id": "RUNNING",
+      "label": "Modify deck for running",
+      "description": "Modify your deck for running.",
+      "cost_ics": 20,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "SET_FLAG",
+          "id": "DECK_RUNNING_MODIFIED"
+        },
+        {
+          "type": "SET_PLAYER_FIELD",
+          "id": "deck_running_enabled",
+          "value": true
+        }
+      ],
+      "absent_flags": [
+        "DECK_RUNNING_MODIFIED"
+      ]
+    },
+    {
+      "id": "DECK_CPU",
+      "label": "Upgrade processor",
+      "description": "Increase this deck component by one level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_CPU",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "DECK_RAM",
+      "label": "Upgrade Active Slots",
+      "description": "Increase this deck component by one level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_RAM",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "DECK_STORAGE",
+      "label": "Upgrade Storage Space",
+      "description": "Increase this deck component by one level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_STORAGE",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "DECK_SENSORS",
+      "label": "Upgrade Sensors",
+      "description": "Increase deck topology look-ahead by one Sensors level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_SENSORS",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "DECK_IO_SPEED",
+      "label": "Upgrade IOSpeed",
+      "description": "Increase this deck component by one level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_IO_SPEED",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "DECK_HARDENING",
+      "label": "Upgrade Hardening",
+      "description": "Increase this deck component by one level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_HARDENING",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "DECK_AUTO_ENCRYPTION",
+      "label": "Upgrade AutoEncryption",
+      "description": "Increase this deck component by one level.",
+      "cost_ics": 100,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [
+        {
+          "type": "MODIFY_HARDWARE",
+          "id": "DECK_AUTO_ENCRYPTION",
+          "amount": 1
+        }
+      ]
+    },
+    {
+      "id": "REPAIR",
+      "label": "Repair Deck",
+      "description": "Repair cost depends on deck damage. Damage-based repair pricing is not wired yet.",
+      "cost_ics": null,
+      "required_flags": [
+        "DECK_SELECTED"
+      ],
+      "actions": [],
+      "unavailable_reason": "Damage-based cost not yet available"
+    }
+  ]
+}

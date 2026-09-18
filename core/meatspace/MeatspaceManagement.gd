@@ -5,7 +5,8 @@ var program_inventory: ProgramInventory
 var program_loadout: ProgramLoadout
 var equipment_orders: EquipmentOrderManager
 var realtime_clock: RealtimeWorldClock
-var hardware_levels: Dictionary = {&"DECK_CPU": 1, &"DECK_RAM": 1, &"DECK_STORAGE": 1}
+signal hardware_changed(component_id: StringName, level: int)
+var hardware_levels: Dictionary = {&"DECK_CPU": 1, &"DECK_RAM": 1, &"DECK_STORAGE": 1, &"DECK_SENSORS": 1}
 var story_interactions: Array[Dictionary] = []
 var software_programming: SoftwareProgrammingManager
 var programming_tasks: Dictionary:
@@ -28,6 +29,7 @@ func upgrade_hardware(component_id: StringName, credit_cost: int) -> Dictionary:
 		return _failure("Insufficient fictional credits.")
 	equipment_orders.credits -= credit_cost
 	hardware_levels[component_id] = int(hardware_levels[component_id]) + 1
+	hardware_changed.emit(component_id, int(hardware_levels[component_id]))
 	return {"success": true, "reason": "Hardware upgraded.", "level": hardware_levels[component_id]}
 
 

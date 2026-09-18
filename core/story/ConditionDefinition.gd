@@ -1,7 +1,7 @@
 class_name ConditionDefinition
 extends RefCounted
 
-enum ConditionType { ALWAYS, FLAG_EQUALS, KNOWS_ENDPOINT, HAS_CAPABILITY, HAS_CREDENTIAL, ACTION_EQUALS, TARGET_EQUALS, CHOICE_EQUALS, STORY_EVENT_OCCURRED }
+enum ConditionType { ALWAYS, FLAG_EQUALS, KNOWS_ENDPOINT, HAS_CAPABILITY, HAS_CREDENTIAL, ACTION_EQUALS, TARGET_EQUALS, CHOICE_EQUALS, STORY_EVENT_OCCURRED, GAME_MODE }
 
 var id: StringName
 var condition_type: ConditionType
@@ -56,4 +56,7 @@ func evaluate(context: Dictionary) -> bool:
 				if payload_matches:
 					matched = true
 					break
+		ConditionType.GAME_MODE:
+			var game_state: PersistentGameState = context.get("game_state")
+			matched = game_state != null and game_state.get_game_mode() == GameMode.from_frontend_id(key)
 	return not matched if negate else matched

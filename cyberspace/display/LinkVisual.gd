@@ -11,24 +11,38 @@ var link_id: StringName = &""
 var unknown := false
 var highlighted := false
 var _phase := 0.0
+var normal_width := 2.0
+var highlight_width := 5.0
+var _base_alpha := 0.72
 
-func configure(p_link_id: StringName, start: Vector2, finish: Vector2, is_unknown: bool = false) -> void:
+func configure(p_link_id: StringName, start: Vector2, finish: Vector2, is_unknown: bool = false, config: Resource = null) -> void:
 	link_id = p_link_id
 	unknown = is_unknown
-	width = 2.0
+	normal_width = config.edge_width if config != null else 2.0
+	highlight_width = config.highlighted_edge_width if config != null else 5.0
+	width = normal_width
 	default_color = Color(CYAN, 0.24 if unknown else 0.72)
 	var direction := finish - start
 	var normal := direction.normalized().orthogonal()
-	points = PackedVector2Array([start, start + direction * 0.5 + normal * 14.0, finish])
+	points = PackedVector2Array([start, start + direction * 0.5 + normal * (config.edge_arc_offset if config != null else 14.0), finish])
 	joint_mode = Line2D.LINE_JOINT_ROUND
 	begin_cap_mode = Line2D.LINE_CAP_ROUND
 	end_cap_mode = Line2D.LINE_CAP_ROUND
 	set_process(true)
 
+func set_view_context(zoom: float, visible_node_count: int, config: Resource) -> void:
+	var detail_level: int = config.detail_level_for(zoom, visible_node_count)
+	var lod_width_scale := 1.0 if detail_level == 0 else (0.78 if detail_level == 1 else 0.58)
+	var lod_alpha := 1.0 if detail_level == 0 else (0.74 if detail_level == 1 else 0.48)
+	normal_width = maxf(0.8, float(config.edge_width) * lod_width_scale)
+	_base_alpha = (0.24 if unknown else 0.72) * lod_alpha
+	width = highlight_width if highlighted else normal_width
+	default_color = AMBER if highlighted else Color(CYAN, _base_alpha)
+
 func set_highlighted(enabled: bool) -> void:
 	highlighted = enabled
-	width = 5.0 if enabled else 2.0
-	default_color = AMBER if enabled else Color(CYAN, 0.24 if unknown else 0.72)
+	width = highlight_width if enabled else normal_width
+	default_color = AMBER if enabled else Color(CYAN, _base_alpha)
 
 func _process(delta: float) -> void:
 	_phase = fmod(_phase + delta * 4.0, TAU)

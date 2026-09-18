@@ -1,6 +1,10 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://cyberspace/display/NetworkDisplay.gd" id="1_display"]
+[ext_resource type="PackedScene" path="res://cyberspace/display/SecurityLevelLegend.tscn" id="2_legend"]
+[ext_resource type="PackedScene" path="res://cyberspace/display/CapabilityGlossary.tscn" id="3_glossary"]
+[ext_resource type="PackedScene" path="res://cyberspace/display/minimap/SphereMinimap.tscn" id="4_minimap"]
+[ext_resource type="Script" path="res://cyberspace/display/CyberspaceSpatialBackdrop.gd" id="5_backdrop"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.008, 0.025, 0.045, 0.94)
@@ -35,6 +39,17 @@ mouse_filter = 2
 color = Color(0.002, 0.008, 0.018, 1)
 show_behind_parent = true
 
+[node name="SpatialBackdrop" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("5_backdrop")
+
 [node name="LinkLayer" type="Node2D" parent="."]
 unique_name_in_owner = true
 
@@ -47,6 +62,33 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
+
+[node name="SecurityLevelLegend" parent="." instance=ExtResource("2_legend")]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 276.0
+offset_top = 94.0
+offset_right = 430.0
+offset_bottom = 130.0
+
+[node name="CapabilityGlossary" parent="." instance=ExtResource("3_glossary")]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 438.0
+offset_top = 94.0
+offset_right = 648.0
+offset_bottom = 130.0
+
+[node name="SphereMinimap" parent="." instance=ExtResource("4_minimap")]
+unique_name_in_owner = true
+layout_mode = 0
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -296.0
+offset_top = 78.0
+offset_right = -12.0
+offset_bottom = 262.0
+grow_horizontal = 0
 
 [node name="Header" type="VBoxContainer" parent="."]
 visible = false
@@ -103,7 +145,7 @@ offset_right = -28.0
 offset_bottom = -28.0
 grow_horizontal = 0
 grow_vertical = 0
-text = "SCAN LOCAL [1]"
+text = "SCAN LOCAL [R]"
 
 [node name="ServiceList" type="VBoxContainer" parent="."]
 visible = false
@@ -126,10 +168,10 @@ text = "LOCAL SERVICES // RIGHT CLICK GRAPH TO SCAN"
 [node name="TopBar" type="PanelContainer" parent="."]
 layout_mode = 0
 offset_left = 16.0
-offset_top = 14.0
+offset_top = 10.0
 anchor_right = 1.0
 offset_right = -16.0
-offset_bottom = 82.0
+offset_bottom = 66.0
 theme_override_styles/panel = SubResource("Style_panel")
 
 [node name="Margin" type="MarginContainer" parent="TopBar"]
@@ -171,12 +213,14 @@ theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
 text = "DEPTH 0  RISK 000"
 
 [node name="LeftPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
 layout_mode = 0
-offset_left = 16.0
-offset_top = 94.0
-offset_right = 264.0
+offset_left = 12.0
+offset_top = 78.0
+offset_right = 220.0
 anchor_bottom = 1.0
-offset_bottom = -154.0
+offset_bottom = -102.0
 theme_override_styles/panel = SubResource("Style_panel")
 
 [node name="Margin" type="MarginContainer" parent="LeftPanel"]
@@ -237,14 +281,16 @@ layout_mode = 2
 text = "[R] SCAN CURRENT"
 
 [node name="RightPanel" type="PanelContainer" parent="."]
+unique_name_in_owner = true
+visible = false
 layout_mode = 0
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -304.0
-offset_top = 94.0
-offset_right = -16.0
+offset_left = -276.0
+offset_top = 316.0
+offset_right = -12.0
 anchor_bottom = 1.0
-offset_bottom = -154.0
+offset_bottom = -102.0
 grow_horizontal = 0
 theme_override_styles/panel = SubResource("Style_panel")
 
@@ -274,7 +320,7 @@ autowrap_mode = 2
 
 [node name="TargetDetails" type="Label" parent="RightPanel/Margin/Readout"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(245, 100)
+custom_minimum_size = Vector2(220, 62)
 layout_mode = 2
 text = "Select a node, service, signal, or link."
 autowrap_mode = 2
@@ -374,6 +420,7 @@ text = "WAIT"
 
 [node name="EventFeed" type="Label" parent="RightPanel/Margin/Readout"]
 unique_name_in_owner = true
+visible = false
 layout_mode = 2
 size_flags_vertical = 3
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.65)
@@ -381,15 +428,31 @@ theme_override_font_sizes/font_size = 10
 text = "EVENT FEED\n> SESSION READY"
 autowrap_mode = 2
 
+[node name="EventFeedToggle" type="Button" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "EVENT LOG  +"
+tooltip_text = "Expand or collapse detailed network events"
+
+[node name="CurrentPanelToggle" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_left = 12.0
+offset_top = 78.0
+offset_right = 72.0
+offset_bottom = 108.0
+text = "NODE +"
+tooltip_text = "Collapse or expand current-node summary"
+
 [node name="BottomBar" type="PanelContainer" parent="."]
 layout_mode = 0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 16.0
-offset_top = -138.0
+offset_top = -88.0
 offset_right = -16.0
-offset_bottom = -14.0
+offset_bottom = -10.0
 grow_vertical = 0
 theme_override_styles/panel = SubResource("Style_panel")
 
@@ -398,7 +461,7 @@ layout_mode = 2
 theme_override_constants/margin_left = 14
 theme_override_constants/margin_top = 10
 theme_override_constants/margin_right = 14
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_bottom = 8
 
 [node name="Rows" type="VBoxContainer" parent="BottomBar/Margin"]
 layout_mode = 2
@@ -458,7 +521,7 @@ text = "[4] DECRYPT"
 unique_name_in_owner = true
 layout_mode = 2
 size_flags_horizontal = 3
-text = "[5] DOORSTOP"
+text = "[5] EMPTY"
 
 [node name="DoorstopConfirmation" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true

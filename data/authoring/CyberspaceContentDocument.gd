@@ -1,9 +1,9 @@
 class_name CyberspaceContentDocument
 extends Resource
 
-const SCHEMA_VERSION := 3
+const SCHEMA_VERSION := 4
 const COLLECTIONS: Array[StringName] = [
-	&"network_nodes", &"network_links", &"services", &"graffiti", &"flavor_text",
+	&"spheres", &"security_sleeves", &"network_nodes", &"network_links", &"services", &"graffiti", &"flavor_text",
 	&"story_hooks", &"story_bundles", &"story_variables", &"meatspace_locations",
 	&"realtime_endpoints", &"physical_devices", &"comms_channels", &"comms_sessions",
 	&"comms_participants", &"video_feeds", &"alarms", &"physical_teams",
@@ -22,9 +22,14 @@ const COLLECTIONS: Array[StringName] = [
 @export var title: String = "Untitled Cyberspace Content"
 @export_multiline var summary: String
 @export var tags: Array[StringName] = []
+@export_enum("AVAILABLE_IN_ALL_MODES", "STORY_ONLY", "FREE_ROAM_ONLY", "MODE_SPECIFIC_VARIANT") var availability: String = "AVAILABLE_IN_ALL_MODES"
+@export var mode_variants: Dictionary = {}
+@export var hud_guidance: Dictionary = {}
 
 @export var network_nodes: Array[Dictionary] = []
 @export var network_links: Array[Dictionary] = []
+@export var spheres: Array[Dictionary] = []
+@export var security_sleeves: Array[Dictionary] = []
 @export var services: Array[Dictionary] = []
 @export var graffiti: Array[Dictionary] = []
 @export var flavor_text: Array[Dictionary] = []
@@ -119,4 +124,39 @@ func all_entries() -> Array[Dictionary]:
 			var view := entry.duplicate(true)
 			view["_collection"] = collection_name
 			result.append(view)
+	return result
+
+
+func sphere_members(sphere_id: StringName) -> Array[StringName]:
+	## Node sphere_id is the sole authoring source of truth. Sphere node_ids is
+	## accepted only as legacy input and is never required to be edited.
+	var result: Array[StringName] = []
+	for node: Dictionary in network_nodes:
+		if StringName(node.get("sphere_id", &"")) == sphere_id:
+			result.append(StringName(node.get("id", &"")))
+	result.sort()
+	return result
+
+
+func assign_node_to_sphere(node_id: StringName, sphere_id: StringName) -> bool:
+	if sphere_id != &"" and not spheres.any(func(sphere: Dictionary): return StringName(sphere.get("id", &"")) == sphere_id):
+		return false
+	return update_entry(node_id, {"sphere_id": sphere_id})
+
+
+func sphere_connections(sphere_id: StringName) -> Array[Dictionary]:
+	var result: Array[Dictionary] = []
+	var node_spheres := {}
+	for node: Dictionary in network_nodes:
+		node_spheres[StringName(node.get("id", &""))] = StringName(node.get("sphere_id", &""))
+	for link: Dictionary in network_links:
+		var source_sphere: StringName = node_spheres.get(StringName(link.get("source", &"")), &"")
+		var destination_sphere: StringName = node_spheres.get(StringName(link.get("destination", &"")), &"")
+		if source_sphere == destination_sphere: continue
+		if source_sphere == sphere_id or destination_sphere == sphere_id:
+			var view := link.duplicate(true)
+			view["source_sphere_id"] = source_sphere
+			view["destination_sphere_id"] = destination_sphere
+			result.append(view)
+	result.sort_custom(func(a: Dictionary, b: Dictionary): return String(a.get("id", &"")) < String(b.get("id", &"")))
 	return result

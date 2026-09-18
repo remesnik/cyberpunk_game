@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://ui/frontend/frontend_root.gd" id="1"]
 [ext_resource type="PackedScene" path="res://ui/frontend/splash_screen.tscn" id="2"]
@@ -9,6 +9,8 @@
 [ext_resource type="PackedScene" path="res://ui/frontend/transitions/frontend_transition_layer.tscn" id="7_transition"]
 [ext_resource type="PackedScene" path="res://ui/frontend/load_screen.tscn" id="8_load"]
 [ext_resource type="PackedScene" path="res://ui/frontend/settings_screen.tscn" id="9_settings"]
+[ext_resource type="PackedScene" path="res://ui/frontend/game_mode_selection.tscn" id="10_mode"]
+[ext_resource type="PackedScene" path="res://ui/frontend/tutorial_prompt.tscn" id="11_tutorial"]
 
 [node name="FrontendRoot" type="Control"]
 layout_mode = 3
@@ -27,6 +29,14 @@ unique_name_in_owner = true
 unique_name_in_owner = true
 
 [node name="MainMenu" parent="." instance=ExtResource("3")]
+unique_name_in_owner = true
+visible = false
+
+[node name="GameModeSelection" parent="." instance=ExtResource("10_mode")]
+unique_name_in_owner = true
+visible = false
+
+[node name="TutorialPrompt" parent="." instance=ExtResource("11_tutorial")]
 unique_name_in_owner = true
 visible = false
 

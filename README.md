@@ -15,6 +15,8 @@ Team Alpha reaches the loading dock in roughly 45 realtime seconds. Cyber action
 1. Open Godot 4.x and import `project.godot` from this directory.
 2. Press **F6** to run the current scene or **F5** to run the project.
 
+Choosing **New Game → Story Mode** now begins in the authored meat-space bedroom prologue. Select a play-style clan and starter deck, optionally adjust the deck with the toolbox, Jack In, connect to the local BBS, and ask for practical guidance. That request launches FIRST_CONTACT and creates the first real intrusion and SAN. The current prose is intentionally temporary; the interaction flow is data-driven for later story replacement.
+
 ## Controls
 
 - **Left click:** select a node, link, service, signal, or known ICE process.

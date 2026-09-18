@@ -4,6 +4,8 @@
 
 The level teaches through network evidence and Latch, a fellow hacker connected through a prearranged realtime backchannel. Latch comments on consequences and opportunities in the fiction. He never names keys, buttons, or detached tutorial rules.
 
+The authored `hud_guidance` profile stages the production HUD alongside those lessons. Entry shows only the graph, trace/status, and objective; the first traversal reveals the Sphere Minimap; the first actively monitored external source opens the unified Monitor; binding a program reveals and briefly emphasizes the quickbar; and Team Status remains absent until Latch or another relevant contact is actually known. These are ordinary HUD policies and gameplay events, not a tutorial-only replacement interface.
+
 ## Intended progression
 
 1. `ENTRY -> ACCESS_RELAY` establishes discrete movement and action cost.

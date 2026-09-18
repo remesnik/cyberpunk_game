@@ -1,0 +1,72 @@
+[gd_resource type="Resource" script_class="FreeRoamJobCatalog" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://core/jobs/FreeRoamJobCatalog.gd" id="1_catalog"]
+[ext_resource type="Script" path="res://core/jobs/FreeRoamJobDefinition.gd" id="2_job"]
+
+[sub_resource type="Resource" id="JobData"]
+script = ExtResource("2_job")
+id = &"JOB_DATA_EXTRACTION_01"
+job_type = 0
+display_name = "Quiet Archive Pull"
+description = "Retrieve a routing manifest from a target datastore."
+target_network_id = &"CITY_NET_ALPHA"
+target_sphere_id = &"INDUSTRIAL_MESH"
+target_node_id = &"ARCHIVE_NODE"
+target_service_id = &"FREIGHT_DATASTORE"
+reward_credits = 180
+tags = Array[StringName]([&"DATA_EXTRACTION", &"STARTER"])
+
+[sub_resource type="Resource" id="JobFeed"]
+script = ExtResource("2_job")
+id = &"JOB_FEED_TAP_01"
+job_type = 1
+display_name = "Eyes on Freight"
+description = "Access and monitor a logistics telemetry feed."
+target_network_id = &"CITY_NET_ALPHA"
+target_sphere_id = &"INDUSTRIAL_MESH"
+target_node_id = &"LOGISTICS_RELAY"
+target_service_id = &"FREIGHT_TELEMETRY"
+reward_credits = 140
+tags = Array[StringName]([&"FEED_TAP", &"STARTER"])
+
+[sub_resource type="Resource" id="JobControl"]
+script = ExtResource("2_job")
+id = &"JOB_SYSTEM_CONTROL_01"
+job_type = 2
+display_name = "Cold Storage Override"
+description = "Manipulate a fictional warehouse environmental controller."
+target_network_id = &"DOCKWORKS_NET"
+target_sphere_id = &"INDUSTRIAL_MESH"
+target_node_id = &"LOGISTICS_RELAY"
+target_service_id = &"WAREHOUSE_CONTROL"
+reward_credits = 220
+tags = Array[StringName]([&"SYSTEM_CONTROL"])
+
+[sub_resource type="Resource" id="JobDatabase"]
+script = ExtResource("2_job")
+id = &"JOB_DATABASE_QUERY_01"
+job_type = 3
+display_name = "Container Index"
+description = "Acquire a specific record from the freight database."
+target_network_id = &"CITY_NET_ALPHA"
+target_sphere_id = &"INDUSTRIAL_MESH"
+target_node_id = &"ARCHIVE_NODE"
+target_service_id = &"FREIGHT_DATABASE"
+reward_credits = 160
+tags = Array[StringName]([&"DATABASE_QUERY"])
+
+[sub_resource type="Resource" id="JobRecon"]
+script = ExtResource("2_job")
+id = &"JOB_NETWORK_RECON_01"
+job_type = 4
+display_name = "Industrial Topology"
+description = "Map the known routes of the Industrial Mesh Sphere."
+target_network_id = &"CITY_NET_ALPHA"
+target_sphere_id = &"INDUSTRIAL_MESH"
+target_node_id = &"INDUSTRIAL_GATE"
+reward_credits = 120
+tags = Array[StringName]([&"NETWORK_RECON", &"STARTER"])
+
+[resource]
+script = ExtResource("1_catalog")
+jobs = Array[ExtResource("2_job")]([SubResource("JobData"), SubResource("JobFeed"), SubResource("JobControl"), SubResource("JobDatabase"), SubResource("JobRecon")])

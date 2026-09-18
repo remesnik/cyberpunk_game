@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/meatspace/interactables/MeatspaceInteractable.gd" id="1"]
+
+[node name="MeatspaceInteractable" type="Control"]
+custom_minimum_size = Vector2(80, 56)
+mouse_filter = 0
+script = ExtResource("1")

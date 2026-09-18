@@ -18,6 +18,7 @@ extends PanelContainer
 var _session_id: StringName
 var _outbound_target_ids: Array[StringName] = []
 var _outbound_choice_ids: Array[StringName] = []
+@export var active_only := false
 
 
 func _ready() -> void:
@@ -44,6 +45,7 @@ func _refresh() -> void:
 		return
 	_refresh_outbound()
 	var sessions: Array = Game.comms_manager.get_available_sessions()
+	if active_only: sessions = sessions.filter(func(session: CommsSession) -> bool: return session.monitoring or session.listening)
 	visible = not sessions.is_empty() or not _outbound_target_ids.is_empty()
 	if sessions.is_empty():
 		channel_label.text = "OUTBOUND PBX // READY"

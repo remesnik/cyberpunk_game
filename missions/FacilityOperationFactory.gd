@@ -50,6 +50,7 @@ static func create_player() -> PlayerNetworkPosition:
 static func create_knowledge(graph: NetworkGraph) -> PlayerKnowledge:
 	var knowledge := PlayerKnowledge.new()
 	knowledge.reveal_node(graph.get_node(PUBLIC_GATEWAY), KnowledgeLevel.Value.SCANNED)
+	knowledge.mark_node_visited(graph.get_node(PUBLIC_GATEWAY), &"INITIAL_POSITION")
 	knowledge.reveal_node(graph.get_node(CORP_ROUTER), KnowledgeLevel.Value.IDENTIFIED)
 	knowledge.reveal_link(graph.get_link(&"PUBLIC_CORP"), KnowledgeLevel.Value.SCANNED)
 	return knowledge
