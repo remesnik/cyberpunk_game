@@ -24,22 +24,30 @@ func _ready() -> void:
 	_expect(final_positions == display._spatial_layout.anchors, "rendered Node3D global positions exactly match the one authoritative layout mapping")
 	_expect(final_positions.values().all(func(position: Vector3): return is_equal_approx(position.y, CyberspaceSpatialLayout.NODE_BASE_HEIGHT)), "actual rendered Node3D anchors all use the fixed world height")
 	var positions_before_camera := final_positions.duplicate(true)
+	var projected_links_before := _projected_link_endpoints(display)
 	var motion_node_before: StringName = game.player_network_position.current_node_id
 	var mouse_motion := InputEventMouseMotion.new()
 	mouse_motion.position = Vector2(320, 240)
 	display._unhandled_input(mouse_motion)
 	_expect(game.player_network_position.current_node_id == motion_node_before, "mouse motion passes safely through Netspace unhandled input without changing player position")
 	world.set_camera_anchor(display._spatial_layout.world_position(game.player_network_position.current_node_id) + Vector3(2, 0, -6))
+	display._update_spatial_projection()
 	_expect(world.final_world_positions() == positions_before_camera, "moving the actual Camera3D cannot mutate rendered node transforms")
+	_expect(_links_match_anchor_projection(display) and _projected_link_endpoints(display) != projected_links_before, "camera movement reprojects paths and nodes together from the same fixed anchors")
 	world.set_camera_anchor(display._spatial_layout.world_position(game.player_network_position.current_node_id))
+	display._update_spatial_projection()
+	display.set_graph_zoom(0.65)
+	_expect(_links_match_anchor_projection(display), "zoom changes edge LOD without detaching paths from projected anchors")
 	var player_node_before_pan: StringName = game.player_network_position.current_node_id
 	var rig_before_pan: Vector3 = world.view_anchor
 	var discovered_ids: Array[StringName] = display._discovered_node_ids()
 	_expect(world.pan(Vector2(1, 1), 0.2, discovered_ids) and world.view_anchor != rig_before_pan, "manual camera pan moves the rig continuously across the network plane")
 	var first_pan_position := world.view_anchor
 	world.pan(Vector2(1, 1), 0.05, discovered_ids)
+	display._update_spatial_projection()
 	_expect(world.view_anchor != first_pan_position and game.player_network_position.current_node_id == player_node_before_pan, "continued camera pan never changes logical player position")
 	_expect(world.final_world_positions() == positions_before_camera, "manual camera pan cannot mutate node transforms")
+	_expect(_links_match_anchor_projection(display), "connection endpoints remain attached after continuous pan")
 	world.set_camera_anchor(display._spatial_layout.world_position(game.player_network_position.current_node_id)); world.finish_camera_motion()
 	for link_id: StringName in world.connection_meshes:
 		var endpoints: PackedVector3Array = display._spatial_layout.edge_world_endpoints(link_id)
@@ -55,9 +63,10 @@ func _ready() -> void:
 	var edge_click := InputEventMouseButton.new(); edge_click.pressed = true; edge_click.button_index = MOUSE_BUTTON_LEFT; edge_click.position = reachable.size - Vector2.ONE
 	reachable._gui_input(edge_click)
 	_expect(selected_from_edge[0], "clicking at the outer edge of a visible node selects it")
-	var current_center := current.position + current.size * 0.5
 	for link: LinkVisual in display.link_visuals.values():
-		_expect(link.points[0].distance_to(current_center) >= config.radius(true), "connection begins outside the current hex perimeter")
+		var source_id := StringName(link.get_meta(&"source_node_id", &""))
+		var source_center: Vector2 = display._spatial_screen_position(source_id, display.get_primary_graph_rect()) if source_id != &"" else link.points[0]
+		_expect(link.points[0].distance_to(source_center) >= float(link.get_meta(&"start_radius", 0.0)), "connection begins outside its source-node perimeter")
 		_expect(link.width < 2.0 and link.width < config.radius(false) * 0.05, "graph edges remain visually subordinate to enlarged nodes")
 	var centers: Array[Vector2] = []
 	for visual: NodeVisual in display.node_visuals.values(): centers.append(visual.position + visual.size * 0.5)
@@ -70,6 +79,25 @@ func _ready() -> void:
 	display.queue_free(); game.end_session()
 	print("%s: %d cyberspace node visualization assertions" % ["PASS" if failures == 0 else "FAIL", assertions])
 	get_tree().quit(failures)
+
+func _projected_link_endpoints(display: NetworkDisplay) -> Dictionary:
+	var result := {}
+	for link_id: StringName in display.link_visuals:
+		var link := display.link_visuals[link_id] as LinkVisual
+		if link.points.size() >= 2: result[link_id] = [link.points[0], link.points[link.points.size() - 1]]
+	return result
+
+func _links_match_anchor_projection(display: NetworkDisplay) -> bool:
+	for link: LinkVisual in display.link_visuals.values():
+		var source_id := StringName(link.get_meta(&"source_node_id", &""))
+		var destination_id := StringName(link.get_meta(&"destination_node_id", &""))
+		if source_id == &"" or destination_id == &"": continue
+		var source_center := display._spatial_screen_position(source_id, display.get_primary_graph_rect())
+		var destination_center := display._spatial_screen_position(destination_id, display.get_primary_graph_rect())
+		var expected_start := display._hex_endpoint(source_center, destination_center, float(link.get_meta(&"start_radius")) + display.visualization_config.endpoint_clearance)
+		var expected_finish := display._hex_endpoint(destination_center, source_center, float(link.get_meta(&"finish_radius")) + display.visualization_config.endpoint_clearance)
+		if not link.points[0].is_equal_approx(expected_start) or not link.points[link.points.size() - 1].is_equal_approx(expected_finish): return false
+	return true
 
 func _test_security_level_styles(config: Resource) -> void:
 	var visual := NodeVisual.new()

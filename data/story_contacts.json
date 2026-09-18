@@ -1,0 +1,27 @@
+{
+  "contacts": [
+    {
+      "contact_id": "latch",
+      "display_name": "Latch",
+      "reputation": 0,
+      "missions_offered": ["glasshouse_01"],
+      "comms_content": ["latch_intro", "latch_glasshouse_success", "latch_glasshouse_discovery", "latch_glasshouse_alarm", "latch_trace_warning", "glasshouse_exec_excerpt"],
+      "story_tags": ["ALLY", "FIXER", "NETSPACE_GUIDE"],
+      "available_interactions": [
+        {"interaction_id": "call_latch", "type": "CALL", "label": "CALL", "call_id": "latch_check_in"},
+        {"interaction_id": "read_latch_message", "type": "MESSAGE", "label": "READ MESSAGE", "required_flags": ["latch_contacted"]},
+        {"interaction_id": "ask_glasshouse", "type": "ASK_ABOUT_MISSION", "label": "ASK ABOUT PROJECT GLASSHOUSE", "mission_id": "glasshouse_01"},
+        {"interaction_id": "request_info", "type": "REQUEST_INFORMATION", "label": "REQUEST INFORMATION", "minimum_reputation": 1}
+      ]
+    }
+  ],
+  "calls": [
+    {"call_id": "latch_intro", "speaker": "Latch", "duration": 7.0, "priority": 100, "interruptible": false, "blocks_simulation": false, "completion_trigger": "latch_intro_completed", "lines": [{"time": 0.0, "speaker": "Latch", "text": "Clean signal. I'm Latch. I have a job for you."}, {"time": 2.5, "speaker": "Latch", "text": "Review Glasshouse and prep the deck. Use GO when you're ready."}, {"time": 5.0, "speaker": "Latch", "text": "Scan first. The network will tell you what the brief cannot."}]},
+    {"call_id": "latch_check_in", "speaker": "Latch", "duration": 3.0, "priority": 10, "interruptible": true, "blocks_simulation": false, "lines": [{"time": 0.0, "speaker": "Latch", "text": "Channel is clean. What do you need?"}]},
+    {"call_id": "latch_glasshouse_success", "speaker": "Latch", "duration": 4.0, "priority": 50, "interruptible": true, "blocks_simulation": false, "lines": [{"time": 0.0, "speaker": "Latch", "text": "Glasshouse received. Good work—the archive gives us names."}]},
+    {"call_id": "latch_glasshouse_discovery", "speaker": "Latch", "duration": 5.0, "priority": 55, "interruptible": true, "blocks_simulation": false, "lines": [{"time": 0.0, "speaker": "Latch", "text": "You found something the brief missed. That unknown ICE signature matters."}]},
+    {"call_id": "latch_glasshouse_alarm", "speaker": "Latch", "duration": 4.0, "priority": 60, "interruptible": true, "blocks_simulation": false, "lines": [{"time": 0.0, "speaker": "Latch", "text": "They saw the alarm. Expect tighter security next time."}]},
+    {"call_id": "latch_trace_warning", "speaker": "Latch", "duration": 4.0, "priority": 80, "interruptible": true, "blocks_simulation": false, "lines": [{"time": 0.0, "speaker": "Latch", "text": "Trace got too close. Breathe, reset, and don't force the next route."}]},
+    {"call_id": "glasshouse_exec_excerpt", "speaker": "Executive channel", "duration": 5.0, "priority": 45, "interruptible": true, "blocks_simulation": false, "lines": [{"time": 0.0, "speaker": "Executive", "text": "Move the personnel review off the books."}, {"time": 2.5, "speaker": "Unknown", "text": "Glasshouse will retain the only copy."}]}
+  ]
+}

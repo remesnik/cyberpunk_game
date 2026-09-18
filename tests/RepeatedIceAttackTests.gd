@@ -27,9 +27,10 @@ func _ready() -> void:
 	center.position = Vector2(500, 350); center.size = Vector2(100, 100); display.node_layer.add_child(center)
 	display.node_visuals[player.current_node_id] = center
 	display.target_views = _views(player.current_node_id, contact_id, knowledge.ice_records[ice.instance_id])
-	display.netspace_focus_mode = NetworkDisplay.NetspaceFocusMode.NODE
-	_expect(display._enter_local_target_mode(), "local mode opens on one node, ICE, service, and file")
-	_expect(display.local_target_visuals.size() == 4, "initial local-target count is exactly four")
+	display.netspace_view_mode = NetworkDisplay.NetspaceViewMode.NETWORK
+	_expect(display._enter_node_focus_mode(), "node focus opens on ICE, service, and file")
+	await get_tree().create_timer(NetworkDisplay.NODE_FOCUS_TRANSITION_DURATION + 0.05).timeout
+	_expect(display.local_target_visuals.size() == 3, "initial local-target count is exactly three")
 	var original_visual_id := (display.local_target_visuals[contact_id] as Button).get_instance_id()
 	var destroyed_events := 0
 	var prior_hp := ice.integrity
@@ -41,17 +42,19 @@ func _ready() -> void:
 		destroyed_events += result.events.filter(func(event: Dictionary) -> bool: return event.type == &"ICE_DESTROYED").size()
 		display.target_views = _views(player.current_node_id, contact_id, knowledge.ice_records[ice.instance_id])
 		display._reconcile_local_target_visuals(display._local_target_ids_for_node(player.current_node_id))
-		_expect(ice_controller.instances.size() == 1 and display.local_target_visuals.size() == 4, "attack %d does not multiply gameplay or local targets" % (attack_index + 1))
+		_expect(ice_controller.instances.size() == 1 and display.local_target_visuals.size() == 3, "attack %d does not multiply gameplay or local targets" % (attack_index + 1))
 		_expect((display.local_target_visuals[contact_id] as Button).get_instance_id() == original_visual_id, "attack %d updates the existing ICE visual" % (attack_index + 1))
 		_expect(display.local_target_visuals.values().filter(func(button: Button) -> bool: return button.get_meta("local_target_id") == contact_id).size() == 1, "attack %d leaves one ICE icon and no stacked status visual" % (attack_index + 1))
 	_expect(not ice.operational and destroyed_events == 1, "ICE performs one clean transition to destroyed")
 	display._select_local_target(contact_id)
 	_expect(&"ATTACK" not in display.get_valid_commands(contact_id), "destroyed ICE no longer offers Attack")
 	_expect(not controller.execute(ActionRequest.ActionType.ATTACK_PROCESS, {"kind": &"ICE", "ice_id": ice.instance_id}).success, "destroyed ICE rejects further damage")
-	display._exit_local_target_mode()
-	_expect(display._enter_local_target_mode() and display.local_target_visuals.size() == 4, "leaving and re-entering local mode creates no duplicates")
+	display._exit_node_focus_mode()
+	await get_tree().create_timer(NetworkDisplay.NODE_FOCUS_TRANSITION_DURATION + 0.05).timeout
+	_expect(display._enter_node_focus_mode() and display.local_target_visuals.size() == 3, "leaving and re-entering node focus creates no duplicates")
+	await get_tree().create_timer(NetworkDisplay.NODE_FOCUS_TRANSITION_DURATION + 0.05).timeout
 	display._reconcile_local_target_visuals(display._local_target_ids_for_node(player.current_node_id))
-	_expect(display.local_target_visuals.size() == 4 and ice_controller.instances.size() == 1, "return refresh preserves one entity and one representation")
+	_expect(display.local_target_visuals.size() == 3 and ice_controller.instances.size() == 1, "return refresh preserves one entity and one representation")
 	display.queue_free(); await get_tree().process_frame
 	print("%s: %d repeated ICE attack assertions" % ["PASS" if failures == 0 else "FAIL", assertions])
 	get_tree().quit(failures)

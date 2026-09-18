@@ -77,8 +77,7 @@ func _exit_tree() -> void:
 	if game_state != null and game_state.changed.is_connected(_refresh_state): game_state.changed.disconnect(_refresh_state)
 
 func _refresh_state() -> void:
-	var flags: Dictionary = game_state.campaign_state.get("story_flags", {}) if game_state != null else {}
-	for target: MeatspaceTarget3D in objects.values(): target.apply_state(flags)
+	for target: MeatspaceTarget3D in objects.values(): target.apply_state(game_state)
 	_set_focus(focused_id if focused_id in get_object_ids() else &"")
 
 func pick(screen_position: Vector2) -> MeatspaceTarget3D:
@@ -140,6 +139,7 @@ func get_object_ids() -> Array[StringName]:
 	return ids
 
 func focus_first() -> void:
+	if not is_inside_tree() or not is_visible_in_tree(): return
 	grab_focus()
 	var ids := get_object_ids()
 	if not ids.is_empty(): _set_focus(ids[0])

@@ -1,6 +1,8 @@
 class_name NetworkLinkDefinition
 extends RefCounted
 
+enum TraversalGateType { NONE, BLOCK_EXIT_UNTIL_RESOLVED, BLOCK_ENTRY_UNTIL_REQUIREMENT, ONE_WAY, SCRIPTED }
+
 var id: StringName
 var source: StringName
 var destination: StringName
@@ -16,6 +18,9 @@ var required_capabilities_all: Array[StringName] = []
 var required_capabilities_any: Array[StringName] = []
 var accepted_credentials: Array[StringName] = []
 var recommended_capabilities: Array[StringName] = []
+var traversal_gate_type := TraversalGateType.NONE
+var traversal_requirement: Dictionary = {}
+var blocked_reason := "ACCESS REQUIREMENT NOT MET"
 
 func _init(p_id: StringName, p_source: StringName, p_destination: StringName, p_one_way := false, p_hidden := false, p_locked := false, p_disabled := false, p_discovered := true, p_traversal_cost := 1, p_authority_requirement := 0, p_capability_requirement: StringName = &"") -> void:
 	id = p_id
@@ -58,3 +63,9 @@ func access_requirements_met(capabilities: Array[StringName], credentials: Array
 		if credentials.has(credential):
 			return true
 	return false
+
+func gate_applies(from_node_id: StringName, to_node_id: StringName) -> bool:
+	if traversal_gate_type == TraversalGateType.NONE: return false
+	# Authored source -> destination is the progression direction. Reverse travel
+	# remains a retreat path unless the author creates a second directed gate.
+	return source == from_node_id and destination == to_node_id

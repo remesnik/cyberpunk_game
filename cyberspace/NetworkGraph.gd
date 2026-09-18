@@ -7,7 +7,7 @@ signal traversal_completed(from_node_id: StringName, to_node_id: StringName, lin
 signal display_update_requested
 signal security_sleeve_changed(sleeve_id: StringName)
 
-enum TraversalError { OK, INVALID_SOURCE, INVALID_DESTINATION, NOT_CONNECTED, HIDDEN_LINK, LOCKED_LINK, DISABLED_LINK, AUTHORITY_REQUIRED, CAPABILITY_REQUIRED, INSUFFICIENT_POINTS, ALREADY_TRANSITIONING }
+enum TraversalError { OK, INVALID_SOURCE, INVALID_DESTINATION, NOT_CONNECTED, HIDDEN_LINK, LOCKED_LINK, DISABLED_LINK, AUTHORITY_REQUIRED, CAPABILITY_REQUIRED, INSUFFICIENT_POINTS, ALREADY_TRANSITIONING, SOURCE_EXIT_BLOCKED, DESTINATION_ENTRY_BLOCKED, SCRIPTED_GATE_BLOCKED }
 const LEGACY_UNASSIGNED_SPHERE_ID := &"LEGACY_UNASSIGNED_SPHERE"
 
 var nodes: Dictionary = {}
@@ -175,7 +175,7 @@ func get_visible_connected_nodes(from_node_id: StringName) -> Array[StringName]:
 			result.append(destination_id)
 	return result
 
-func validate_traversal(position: PlayerNetworkPosition, destination_id: StringName, known_link_ids: Array = []) -> Dictionary:
+func validate_traversal(position: PlayerNetworkPosition, destination_id: StringName, known_link_ids: Array = [], requirement_resolver: Callable = Callable()) -> Dictionary:
 	if position.is_transitioning:
 		return _result(TraversalError.ALREADY_TRANSITIONING)
 	if not nodes.has(position.current_node_id):
@@ -196,6 +196,11 @@ func validate_traversal(position: PlayerNetworkPosition, destination_id: StringN
 		return _result(TraversalError.DISABLED_LINK, candidate)
 	if candidate.locked:
 		return _result(TraversalError.LOCKED_LINK, candidate)
+	if candidate.gate_applies(position.current_node_id, destination_id):
+		var requirement_result := _resolve_gate(candidate, position.current_node_id, destination_id, requirement_resolver)
+		if not bool(requirement_result.get("satisfied", false)):
+			var gate_error := TraversalError.SOURCE_EXIT_BLOCKED if candidate.traversal_gate_type == NetworkLinkDefinition.TraversalGateType.BLOCK_EXIT_UNTIL_RESOLVED else (TraversalError.DESTINATION_ENTRY_BLOCKED if candidate.traversal_gate_type == NetworkLinkDefinition.TraversalGateType.BLOCK_ENTRY_UNTIL_REQUIREMENT else TraversalError.SCRIPTED_GATE_BLOCKED)
+			return _result(gate_error, candidate, String(requirement_result.get("reason", candidate.blocked_reason)), candidate.traversal_requirement, requirement_result.get("value", false))
 	if position.authority_level < candidate.authority_requirement:
 		return _result(TraversalError.AUTHORITY_REQUIRED, candidate)
 	if not candidate.access_requirements_met(position.capabilities, position.credentials):
@@ -210,8 +215,8 @@ func validate_traversal(position: PlayerNetworkPosition, destination_id: StringN
 func traverse(position: PlayerNetworkPosition, destination_id: StringName, known_link_ids: Array = []) -> Dictionary:
 	return apply_traversal(position, destination_id, known_link_ids)
 
-func apply_traversal(position: PlayerNetworkPosition, destination_id: StringName, known_link_ids: Array = []) -> Dictionary:
-	var validation := validate_traversal(position, destination_id, known_link_ids)
+func apply_traversal(position: PlayerNetworkPosition, destination_id: StringName, known_link_ids: Array = [], requirement_resolver: Callable = Callable()) -> Dictionary:
+	var validation := validate_traversal(position, destination_id, known_link_ids, requirement_resolver)
 	if validation.error != TraversalError.OK:
 		return validation
 	var link: NetworkLinkDefinition = validation.link
@@ -235,5 +240,12 @@ func find_link(from_node_id: StringName, destination_id: StringName) -> NetworkL
 			return link
 	return null
 
-func _result(error: TraversalError, link: NetworkLinkDefinition = null) -> Dictionary:
-	return {"error": error, "link": link}
+func _resolve_gate(link: NetworkLinkDefinition, from_node_id: StringName, to_node_id: StringName, resolver: Callable) -> Dictionary:
+	if link.traversal_gate_type == NetworkLinkDefinition.TraversalGateType.ONE_WAY: return {"satisfied": true, "value": true}
+	if not resolver.is_valid(): return {"satisfied": false, "value": false, "reason": link.blocked_reason}
+	var resolved: Variant = resolver.call(link.traversal_requirement.duplicate(true), from_node_id, to_node_id, link)
+	if resolved is Dictionary: return resolved
+	return {"satisfied": bool(resolved), "value": bool(resolved), "reason": link.blocked_reason}
+
+func _result(error: TraversalError, link: NetworkLinkDefinition = null, reason := "", requirement: Dictionary = {}, requirement_value: Variant = null) -> Dictionary:
+	return {"error": error, "link": link, "reason": reason, "requirement": requirement.duplicate(true), "requirement_value": requirement_value}

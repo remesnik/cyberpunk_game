@@ -1,6 +1,5 @@
 {
   "id": "BEDROOM",
-  "destinations": [],
   "objects": {
     "DOOR": {
       "verbs": [
@@ -9,7 +8,7 @@
           "text": "Check available Meatspace destinations."
         }
       ],
-      "examine": "The apartment door. It opens onto the rest of the city.",
+      "examine": "Leave home.",
       "primary_action": "TRAVEL",
       "display_name": "Door",
       "kind": "DOOR"
@@ -79,6 +78,7 @@
       },
       "examine": "A cardboard carton containing your starter deck. Two configurations, one machine.",
       "primary_action": "STORY",
+      "visible_if": {"scope": "flag", "id": "DECK_SELECTED", "operator": "equals", "value": false},
       "visibility": {
         "flag": "DECK_SELECTED",
         "equals": false
@@ -145,6 +145,7 @@
             0
           ],
           "fallbacks": [
+            {"visible_if": {"scope": "flag", "id": "glasshouse_file_acquired", "operator": "equals", "value": true}, "item": {"id": "GLASSHOUSE_ARCHIVE", "visual": "BOOK", "name": "Glasshouse personnel archive"}},
             {"when_flag": "DECK_SELECTED", "item": {"id": "DECK_MODULE", "visual": "SMALL_CASE", "name": "Starter deck module"}}
           ]
         }
@@ -281,6 +282,7 @@
       ],
       "examine": "A terminal, isolation switch, and coiled interface lead. Your connection to the local board.",
       "primary_action": "CONNECT",
+      "visible_if": {"scope": "flag", "id": "DECK_SELECTED", "operator": "equals", "value": true},
       "visual_state": {
         "assembled": "DECK_ASSEMBLED"
       },

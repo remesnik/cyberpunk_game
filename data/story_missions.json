@@ -1,0 +1,33 @@
+[
+  {
+    "mission_id": "glasshouse_01",
+    "aliases": ["PROJECT_GLASSHOUSE"],
+    "title": "PROJECT GLASSHOUSE",
+    "briefing": "Extract the personnel archive from a compact corporate subnet. The network is live; learn its services before you commit.",
+    "entry_network": "GLASSHOUSE_01",
+    "primary_objectives": [{"objective_id": "download_personnel_file", "description": "Download personnel.dat", "type": "DOWNLOAD_FILE", "target_id": "personnel.dat"}],
+    "optional_objectives": [
+      {"objective_id": "avoid_alarm", "description": "Do not trigger Alarm Service", "type": "AVOID_ALARM"},
+      {"objective_id": "scan_unknown_ice", "description": "Scan the unknown ICE", "type": "SCAN_TARGET", "target_id": "UNKNOWN_ICE"},
+      {"objective_id": "intercept_executive_comms", "description": "Intercept executive communications", "type": "INTERCEPT_STREAM", "target_id": "EXECUTIVE_COMMS"}
+    ],
+    "hidden_objectives": [],
+    "success_conditions": {"primary_objectives_complete": true},
+    "failure_conditions": [{"event": "file_destroyed", "target_id": "personnel.dat"}, {"event": "trace_completed"}],
+    "reward_definition": {"ics": 40, "optional_objective_bonus": 10, "description": "40 IC base + 10 IC per optional objective"},
+    "known_constraints": ["Alarm Service is active", "Trace pressure rises during intrusive actions"],
+    "story_metadata": {
+      "chapter": "chapter_01", "chapter_title": "FIRST CONTACT", "contact_id": "latch", "availability_flags": ["FIRST_CONTACT_COMPLETE"], "exit_node": "OBJECTIVE", "result_fields": {"personnel_file": "personnel.dat", "unknown_ice": "UNKNOWN_ICE", "executive_comms": "EXECUTIVE_COMMS"},
+      "boss_encounter": {"id": "GLASSHOUSE_WARDEN", "archetype": "WARDEN", "node_id": "WARDEN", "objective_id": "personnel.dat", "objective_title": "personnel.dat"},
+      "success_consequences": ["The Glasshouse personnel archive is now available at home."],
+      "failure_consequences": ["The run ended without a confirmed personnel archive."]
+    },
+    "story_result_rules": [
+      {"conditions": {"all": [{"scope": "trigger", "id": "success", "operator": "equals", "value": true}]}, "actions": [{"type": "set_flag", "id": "glasshouse_completed", "value": true}, {"type": "set_flag", "id": "chapter_02_available", "value": true}, {"type": "set_state", "id": "current_story_chapter", "value": "chapter_01_complete"}, {"type": "set_story_time", "value": "NIGHT"}]},
+      {"conditions": {"all": [{"scope": "trigger", "id": "files_extracted", "operator": "contains", "value": "personnel.dat"}]}, "actions": [{"type": "set_flag", "id": "glasshouse_file_acquired", "value": true}]},
+      {"conditions": {"all": [{"scope": "trigger", "id": "alarm_state", "operator": "equals", "value": true}]}, "actions": [{"type": "set_flag", "id": "glasshouse_alarm_triggered", "value": true}, {"type": "increment_value", "id": "corp_alert_level", "amount": 1}]},
+      {"conditions": {"all": [{"scope": "trigger", "id": "targets_scanned", "operator": "contains", "value": "UNKNOWN_ICE"}]}, "actions": [{"type": "set_flag", "id": "glasshouse_unknown_ice_scanned", "value": true}]},
+      {"conditions": {"all": [{"scope": "trigger", "id": "stream_intercepts", "operator": "contains", "value": "EXECUTIVE_COMMS"}]}, "actions": [{"type": "set_flag", "id": "glasshouse_exec_call_intercepted", "value": true}, {"type": "set_flag", "id": "glasshouse_exec_clue_unlocked", "value": true}]}
+    ]
+  }
+]

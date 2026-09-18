@@ -7,6 +7,7 @@ var positions := {
 	TestNetworkFactory.ROUTER_A: Vector2(300, 100),
 	TestNetworkFactory.WORKSTATION_01: Vector2(500, 180),
 }
+var local_positions := {&"SERVICE_LOCAL": Vector2(240, 260), &"FILE_LOCAL": Vector2(420, 260)}
 
 func _ready() -> void:
 	var graph := TestNetworkFactory.create_graph()
@@ -18,7 +19,7 @@ func _ready() -> void:
 		var ids: Array[StringName] = []
 		ids.assign(positions.keys())
 		return ids
-	, func() -> Array[StringName]: return [TestNetworkFactory.PUBLIC_GATEWAY] as Array[StringName], func() -> Array[StringName]: return [&"GATEWAY_ROUTER", &"ROUTER_WS01"] as Array[StringName])
+	, func() -> Array[StringName]: return [TestNetworkFactory.PUBLIC_GATEWAY] as Array[StringName], func() -> Array[StringName]: return [&"GATEWAY_ROUTER", &"ROUTER_WS01"] as Array[StringName], func() -> Dictionary: return local_positions)
 	_expect(activity.trigger(&"PACKET", {"from": TestNetworkFactory.PUBLIC_GATEWAY, "to": TestNetworkFactory.ROUTER_A, "link_id": &"GATEWAY_ROUTER"}), "packet traffic follows an existing visible connection")
 	_expect(activity.trigger(&"SERVICE_PULSE", {"node_id": TestNetworkFactory.PUBLIC_GATEWAY}), "known service activity can pulse without changing node state")
 	_expect(activity.trigger(&"REMOTE_SESSION", {"node_id": TestNetworkFactory.ROUTER_A, "role": &"MAINT"}), "remote process presence can enter a known node")
@@ -36,6 +37,14 @@ func _ready() -> void:
 	_expect(AmbientNetworkActivity.actor_color(AmbientNetworkActivity.ActorType.HACKER_UNKNOWN) == Color("ffd84d"), "unknown-hacker traffic is canonically yellow")
 	_expect(AmbientNetworkActivity.actor_color(AmbientNetworkActivity.ActorType.HACKER_FRIENDLY) == Color("58e889"), "friendly-hacker traffic is canonically green")
 	_expect(AmbientNetworkActivity.actor_color(AmbientNetworkActivity.ActorType.ICE) == Color("ff4d5f"), "ICE and security traffic is canonically red")
+	activity.reconcile_actors([{"actor_id": &"hacker_12", "node_id": TestNetworkFactory.ROUTER_A, "actor_type": AmbientNetworkActivity.ActorType.HACKER_UNKNOWN, "scope": &"ROAMING"}, {"actor_id": &"local_ice_01", "node_id": TestNetworkFactory.PUBLIC_GATEWAY, "actor_type": AmbientNetworkActivity.ActorType.ICE, "scope": &"LOCAL"}])
+	activity.reconcile_actors([{"actor_id": &"hacker_12", "node_id": TestNetworkFactory.PUBLIC_GATEWAY, "actor_type": AmbientNetworkActivity.ActorType.HACKER_UNKNOWN, "scope": &"ROAMING"}, {"actor_id": &"local_ice_01", "node_id": TestNetworkFactory.PUBLIC_GATEWAY, "actor_type": AmbientNetworkActivity.ActorType.ICE, "scope": &"LOCAL"}])
+	_expect(activity.actors.size() == 2 and activity.actor_record(&"hacker_12").node_id == TestNetworkFactory.PUBLIC_GATEWAY, "actor refresh updates stable identity instead of duplicating actors")
+	_expect(activity.actor_presentation_count(&"hacker_12") == 1 and activity.actor_presentation_count(&"local_ice_01") == 0, "Network scale shows roaming actors but suppresses service-local ICE")
+	activity.set_activity_context(AmbientNetworkActivity.ActivityScale.NODE_FOCUS, TestNetworkFactory.PUBLIC_GATEWAY)
+	_expect(activity.trigger(&"LOCAL_PACKET", {"from_target": &"SERVICE_LOCAL", "to_target": &"FILE_LOCAL", "actor_type": AmbientNetworkActivity.ActorType.NORMAL}), "Node Focus supports sparse target-local packet activity")
+	_expect(activity.events.size() <= activity.maximum_events, "local and network traffic share one bounded emission cap")
+	activity.set_activity_context(AmbientNetworkActivity.ActivityScale.NETWORK)
 	activity.maximum_events = 6
 	_expect(activity.trigger(&"PACKET", {"actor_type": AmbientNetworkActivity.ActorType.HACKER_UNKNOWN, "source_node": TestNetworkFactory.PUBLIC_GATEWAY, "destination_node": TestNetworkFactory.ROUTER_A, "speed": 1.2, "duration": 2.0, "payload_type": &"REMOTE_COPY"}), "typed traffic accepts explicit direction, speed, duration, and payload")
 	_expect(activity.events.back().source_node == TestNetworkFactory.PUBLIC_GATEWAY and activity.events.back().destination_node == TestNetworkFactory.ROUTER_A, "typed packet direction remains attached to graph topology")

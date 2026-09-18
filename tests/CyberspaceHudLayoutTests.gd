@@ -27,6 +27,8 @@ func _test_resolution(resolution: Vector2) -> void:
 	display._update_program_bar()
 	_expect(display.get_node("BottomBar/Margin/Rows/Programs").get_child_count() == 6, "%s renders every active slot at variable capacity" % resolution)
 	_expect((display.get_node("BottomBar/Margin/Rows/Programs").get_child(1) as Button).text.contains("EMPTY"), "%s renders empty active slots explicitly" % resolution)
+	var first_slot_text := (display.get_node("BottomBar/Margin/Rows/Programs").get_child(0) as Button).text
+	_expect("[1]" in first_slot_text and "Physical" not in first_slot_text, "%s active slot title uses player-facing index without leaking input metadata" % resolution)
 	var graph_rect := display.get_primary_graph_rect()
 	_expect(graph_rect.get_area() / (resolution.x * resolution.y) >= 0.35, "%s reserves the largest HUD region for graph interaction" % resolution)
 	_expect(not display.left_panel.visible and graph_rect.position.x <= 64.0, "%s current-node details start collapsed to free graph space" % resolution)

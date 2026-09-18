@@ -8,22 +8,32 @@ var assertions := 0
 func _ready() -> void:
 	var display := DISPLAY.instantiate() as NetworkDisplay
 	add_child(display)
+	display.position_model = PlayerNetworkPosition.new(&"NODE", 10)
 	display.target_views = {&"UNACTIONABLE": {"kind": &"UNKNOWN", "title": "UNKNOWN"}}
 	display.selected_target_id = &"UNACTIONABLE"
 	_expect(display.get_valid_commands() == [], "valid-command query excludes unrelated actions")
 	display.target_views = {
 		&"NODE": {"kind": &"NODE", "scanned": false},
-		&"ICE": {"kind": &"ICE", "scanned": true, "attackable": true, "bypassable": true},
-		&"FILE": {"kind": &"FILE", "scanned": true, "analyzable": true, "downloadable": true, "deletable": false},
+		&"ICE": {"kind": &"ICE", "scanned": true, "ice": {"node_id": &"NODE", "scanned": true}, "attackable": true, "bypassable": true},
+		&"FILE": {"kind": &"FILE", "scanned": true, "file": {"node_id": &"NODE", "scanned": true}, "analyzable": true, "downloadable": true, "deletable": false},
 	}
+	display.netspace_view_mode = NetworkDisplay.NetspaceViewMode.NETWORK
 	display.selected_target_id = &"NODE"
 	_expect(display.get_valid_commands() == [&"SCAN"], "unscanned nodes always expose Scan and no unrelated commands")
+	display.netspace_view_mode = NetworkDisplay.NetspaceViewMode.NODE_FOCUS
 	display.selected_target_id = &"ICE"
 	_expect(display.get_valid_commands() == [&"ATTACK", &"BYPASS"], "ICE exposes only its valid canonical commands after scan")
 	display.selected_target_id = &"FILE"
 	_expect(display.get_valid_commands() == [&"ANALYZE", &"DOWNLOAD"], "files expose only valid canonical commands")
 	for kind: StringName in [&"NODE", &"ICE", &"SERVICE", &"FILE", &"DEVICE_OBJECT"]:
-		display.target_views[&"UNSCANNED"] = {"kind": kind, "scanned": false}
+		display.netspace_view_mode = NetworkDisplay.NetspaceViewMode.NETWORK if kind == &"NODE" else NetworkDisplay.NetspaceViewMode.NODE_FOCUS
+		var view := {"kind": kind, "scanned": false}
+		if kind == &"NODE": view["node"] = {"id": &"UNSCANNED"}
+		elif kind == &"ICE": view["ice"] = {"node_id": &"NODE"}
+		elif kind == &"SERVICE": view["service"] = {"node_id": &"NODE"}
+		elif kind == &"FILE": view["file"] = {"node_id": &"NODE"}
+		elif kind == &"DEVICE_OBJECT": view["device"] = {"node_id": &"NODE"}
+		display.target_views[&"UNSCANNED"] = view
 		display.selected_target_id = &"UNSCANNED"
 		display._recalculate_contextual_commands(true)
 		_expect(&"SCAN" in display.get_valid_commands() and display.selected_command_id == &"SCAN", "unscanned %s defaults to Scan" % kind)

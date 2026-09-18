@@ -125,12 +125,29 @@ offset_right = 650.0
 offset_bottom = 74.0
 mouse_filter = 2
 
+[node name="LocalTargetLayer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="LocationLabel" type="Label" parent="Header"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
 theme_override_font_sizes/font_size = 20
 text = "CURRENT HOST  //  INITIALIZING"
+
+[node name="ViewModeLabel" type="Label" parent="Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 0.82)
+theme_override_font_sizes/font_size = 13
+text = "NETWORK MODE"
 
 [node name="ResourceLabel" type="Label" parent="Header"]
 unique_name_in_owner = true
@@ -375,9 +392,9 @@ layer = 20
 [node name="CommandDial" type="HBoxContainer" parent="CommandOverlay"]
 unique_name_in_owner = true
 layout_mode = 0
-offset_right = 500.0
-offset_bottom = 56.0
-custom_minimum_size = Vector2(500, 56)
+offset_right = 650.0
+offset_bottom = 78.0
+custom_minimum_size = Vector2(650, 78)
 alignment = 1
 theme_override_constants/separation = 10
 

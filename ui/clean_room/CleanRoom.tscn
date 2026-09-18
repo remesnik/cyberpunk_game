@@ -123,6 +123,15 @@ theme_override_styles/panel = SubResource("panel")
 layout_mode = 2
 theme_override_constants/separation = 8
 
+[node name="MissionLabel" type="Label" parent="PrepPanel/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 1)
+theme_override_font_sizes/font_size = 13
+text = "MISSION BRIEFING"
+horizontal_alignment = 1
+autowrap_mode = 2
+
 [node name="ConnectionLabel" type="Label" parent="PrepPanel/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -159,7 +168,21 @@ theme_override_colors/font_color = Color(0.04, 0.14, 0.18, 1)
 [node name="ContactButton" type="Button" parent="PrepPanel/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "CONTACT ALLY  //  LATCH"
+text = "CONTACT ALLIES"
+[node name="ContactRow" type="HBoxContainer" parent="PrepPanel/Rows"]
+layout_mode = 2
+[node name="ContactSelect" type="OptionButton" parent="PrepPanel/Rows/ContactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="ContactInteraction" type="OptionButton" parent="PrepPanel/Rows/ContactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="ContactActionButton" type="Button" parent="PrepPanel/Rows/ContactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "OPEN"
 [node name="AllyStatus" type="Label" parent="PrepPanel/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -206,6 +229,7 @@ theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 0.88)
 theme_override_font_sizes/font_size = 14
 text = "GO — enter Netspace  •  CONTROLS — review controls  •  RETURN HOME — back to Meatspace"
 horizontal_alignment = 1
+mouse_filter = 2
 
 [node name="ControlsSheet" type="Control" parent="."]
 unique_name_in_owner = true

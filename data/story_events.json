@@ -1,0 +1,13 @@
+[
+  {
+    "event_id": "latch_first_contact", "trigger": "clean_room_entered",
+    "conditions": {"all": [{"scope": "game", "id": "story_mode", "operator": "equals", "value": true}, {"scope": "flag", "id": "latch_contacted", "operator": "flag_false"}]},
+    "actions": [{"type": "start_comms", "id": "latch_intro", "contact_id": "latch", "incoming": true}, {"type": "set_flag", "id": "latch_contacted", "value": true}, {"type": "unlock_contact", "id": "latch"}, {"type": "unlock_mission", "id": "glasshouse_01"}],
+    "repeat": "once", "priority": 100
+  },
+  {"event_id": "latch_glasshouse_clean_success", "trigger": "mission_result", "conditions": {"all": [{"scope": "trigger", "id": "mission_id", "operator": "equals", "value": "glasshouse_01"}, {"scope": "trigger", "id": "success", "operator": "equals", "value": true}, {"scope": "trigger", "id": "alarm_state", "operator": "equals", "value": false}]}, "actions": [{"type": "change_reputation", "id": "latch", "amount": 1}, {"type": "start_comms", "id": "latch_glasshouse_success", "contact_id": "latch"}], "repeat": "once", "priority": 40},
+  {"event_id": "latch_glasshouse_alarm_reaction", "trigger": "mission_result", "conditions": {"all": [{"scope": "trigger", "id": "mission_id", "operator": "equals", "value": "glasshouse_01"}, {"scope": "trigger", "id": "alarm_state", "operator": "equals", "value": true}]}, "actions": [{"type": "start_comms", "id": "latch_glasshouse_alarm", "contact_id": "latch"}], "repeat": "once", "priority": 60},
+  {"event_id": "latch_glasshouse_discovery_reaction", "trigger": "mission_result", "conditions": {"all": [{"scope": "trigger", "id": "mission_id", "operator": "equals", "value": "glasshouse_01"}, {"scope": "trigger", "id": "unknown_ice_scanned", "operator": "equals", "value": true}]}, "actions": [{"type": "start_comms", "id": "latch_glasshouse_discovery", "contact_id": "latch"}], "repeat": "once", "priority": 55},
+  {"event_id": "latch_trace_failure_reaction", "trigger": "mission_failed", "conditions": {"all": [{"scope": "trigger", "id": "reason", "operator": "equals", "value": "trace"}]}, "actions": [{"type": "start_comms", "id": "latch_trace_warning", "contact_id": "latch"}], "repeat": "always", "priority": 80},
+  {"event_id": "glasshouse_exec_intercept_playback", "trigger": "stream_intercepted", "conditions": {"all": [{"scope": "trigger", "id": "stream_id", "operator": "equals", "value": "EXECUTIVE_COMMS"}]}, "actions": [{"type": "start_comms", "id": "glasshouse_exec_excerpt", "contact_id": "latch"}], "repeat": "once", "priority": 50}
+]

@@ -11,35 +11,69 @@ const CYAN := Color("48e8ff")
 const AMBER := Color("ffc857")
 
 enum ActorType { NORMAL, HACKER_UNKNOWN, HACKER_FRIENDLY, ICE }
+enum ActivityScale { NETWORK, NODE_FOCUS }
 
 var graph: NetworkGraph
 var node_position_provider: Callable
 var visible_node_provider: Callable
 var service_node_provider: Callable
 var visible_link_provider: Callable
+var local_target_position_provider: Callable
 var rng := RandomNumberGenerator.new()
 var events: Array[Dictionary] = []
+var actors: Dictionary = {}
+var activity_scale := ActivityScale.NETWORK
+var current_node_id: StringName = &""
 var elapsed := 0.0
 var next_event := 4.0
 var enabled := true
 var reduced_animation := false
-var maximum_events := 6
+var maximum_events := 8
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	rng.seed = 0x4e45545350414345
 	set_process(true)
 
-func configure(p_graph: NetworkGraph, positions: Callable, visible_nodes: Callable, service_nodes: Callable = Callable(), visible_links: Callable = Callable()) -> void:
+func configure(p_graph: NetworkGraph, positions: Callable, visible_nodes: Callable, service_nodes: Callable = Callable(), visible_links: Callable = Callable(), local_positions: Callable = Callable()) -> void:
 	graph = p_graph
 	node_position_provider = positions
 	visible_node_provider = visible_nodes
 	service_node_provider = service_nodes
 	visible_link_provider = visible_links
+	local_target_position_provider = local_positions
 	events.clear()
 	elapsed = 0.0
 	next_event = rng.randf_range(2.0, 4.5)
 	queue_redraw()
+
+func set_activity_context(scale: int, node_id: StringName = &"") -> void:
+	activity_scale = scale
+	current_node_id = node_id
+	queue_redraw()
+
+func reconcile_actors(records: Array[Dictionary]) -> void:
+	var seen := {}
+	for source: Dictionary in records:
+		var actor_id := StringName(source.get("actor_id", source.get("id", &"")))
+		if actor_id == &"": continue
+		seen[actor_id] = true
+		var record := actors.get(actor_id, {}) as Dictionary
+		record.merge(source, true)
+		record["actor_id"] = actor_id
+		actors[actor_id] = record
+	for value: Variant in actors.keys():
+		if not seen.has(value): actors.erase(value)
+	queue_redraw()
+
+func actor_record(actor_id: StringName) -> Dictionary:
+	return (actors.get(actor_id, {}) as Dictionary).duplicate(true)
+
+func actor_presentation_count(actor_id: StringName) -> int:
+	if not actors.has(actor_id): return 0
+	var actor := actors[actor_id] as Dictionary
+	if activity_scale == ActivityScale.NETWORK: return 0 if StringName(actor.get("scope", &"ROAMING")) == &"LOCAL" else 1
+	return 1 if StringName(actor.get("node_id", &"")) == current_node_id else 0
 
 func _process(delta: float) -> void:
 	if not enabled or graph == null or not is_visible_in_tree(): return
@@ -50,7 +84,7 @@ func _process(delta: float) -> void:
 	next_event -= delta
 	if next_event <= 0.0 and events.size() < maximum_events:
 		_start_random_event()
-		next_event = rng.randf_range(2.5, 5.5)
+		next_event = rng.randf_range(2.0, 4.5)
 	queue_redraw()
 
 func trigger(type: StringName, data: Dictionary = {}) -> bool:
@@ -76,7 +110,7 @@ func trigger(type: StringName, data: Dictionary = {}) -> bool:
 func observe_simulation_events(simulation_events: Array[Dictionary]) -> void:
 	for source: Dictionary in simulation_events:
 		match StringName(source.get("type", &"")):
-			&"ICE_MOVED_DEBUG": trigger(&"ICE_TRANSIT", {"from": source.get("from", &""), "to": source.get("to", &""), "actor_type": ActorType.ICE, "payload_type": &"ICE_MOVEMENT"})
+			&"ICE_MOVED_DEBUG": trigger(&"ICE_TRANSIT", {"actor_id": source.get("ice_id", &""), "from": source.get("from", &""), "to": source.get("to", &""), "actor_type": ActorType.ICE, "payload_type": &"ICE_MOVEMENT"})
 			&"SCAN_PULSE": trigger(&"SERVICE_PULSE", {"node_id": source.get("node_id", &"")})
 			&"ALARM_TRIGGERED", &"PLAYER_DETECTED": trigger_alarm(StringName(source.get("node_id", source.get("to", &""))))
 
@@ -93,10 +127,13 @@ func trigger_alarm(origin: StringName) -> void:
 			if link != null: trigger(&"ALARM_ROUTE", {"from": origin, "to": neighbor, "link_id": link.id, "actor_type": ActorType.ICE, "payload_type": &"SECURITY_RESPONSE"})
 
 func _start_random_event() -> void:
+	if activity_scale == ActivityScale.NODE_FOCUS:
+		_start_local_event()
+		return
 	var visible := _visible_nodes()
 	if visible.is_empty(): return
 	var roll := rng.randi_range(0, 9)
-	if roll <= 4:
+	if roll <= 5:
 		var links := _visible_links(visible)
 		if links.is_empty(): return
 		var link: NetworkLinkDefinition = links[rng.randi_range(0, links.size() - 1)]
@@ -112,7 +149,20 @@ func _start_random_event() -> void:
 		if service_nodes.is_empty(): service_nodes = visible
 		trigger(&"SERVICE_PULSE", {"node_id": service_nodes[rng.randi_range(0, service_nodes.size() - 1)]})
 	else:
-		trigger(&"REMOTE_SESSION", {"node_id": visible[rng.randi_range(0, visible.size() - 1)], "role": [&"REMOTE", &"MAINT", &"SYSOP"][rng.randi_range(0, 2)], "actor_type": ActorType.NORMAL})
+		var node_id := visible[rng.randi_range(0, visible.size() - 1)]
+		var role := [&"USER", &"MAINT", &"SYSOP"][rng.randi_range(0, 2)] as StringName
+		trigger(&"REMOTE_SESSION", {"actor_id": StringName("ambient_%s_%s" % [String(node_id).to_lower(), String(role).to_lower()]), "node_id": node_id, "role": role, "actor_type": ActorType.NORMAL})
+
+func _start_local_event() -> void:
+	var positions := _local_positions()
+	var ids: Array = positions.keys()
+	ids.sort_custom(func(a: Variant, b: Variant) -> bool: return String(a) < String(b))
+	if ids.size() >= 2:
+		var start_index := rng.randi_range(0, ids.size() - 1)
+		var finish_index := posmod(start_index + rng.randi_range(1, ids.size() - 1), ids.size())
+		trigger(&"LOCAL_PACKET", {"from_target": StringName(ids[start_index]), "to_target": StringName(ids[finish_index]), "actor_type": ActorType.NORMAL, "speed": rng.randf_range(0.85, 1.15)})
+	elif ids.size() == 1:
+		trigger(&"LOCAL_PULSE", {"local_target_id": StringName(ids[0])})
 
 static func actor_color(actor_type: int) -> Color:
 	match actor_type:
@@ -123,12 +173,17 @@ static func actor_color(actor_type: int) -> Color:
 
 func _duration_for(type: StringName) -> float:
 	match type:
-		&"PACKET", &"ICE_TRANSIT", &"ALARM_ROUTE": return 1.4
+		&"PACKET", &"ICE_TRANSIT", &"ALARM_ROUTE", &"LOCAL_PACKET": return 1.4
 		&"SERVICE_PULSE", &"ALARM": return 1.8
+		&"LOCAL_PULSE": return 1.6
 		&"REMOTE_SESSION": return 4.5
 	return 1.5
 
 func _event_is_renderable(event: Dictionary) -> bool:
+	if event.has("from_target") and event.has("to_target"):
+		var local := _local_positions()
+		return local.has(StringName(event.from_target)) and local.has(StringName(event.to_target))
+	if event.has("local_target_id"): return _local_positions().has(StringName(event.local_target_id))
 	if event.has("node_id"): return _position(StringName(event.node_id)) != Vector2.INF
 	if event.has("from") and event.has("to"):
 		var link := graph.find_link(StringName(event.from), StringName(event.to))
@@ -164,11 +219,19 @@ func _visible_links(visible: Array[StringName]) -> Array[NetworkLinkDefinition]:
 func _position(node_id: StringName) -> Vector2:
 	return node_position_provider.call(node_id) if node_position_provider.is_valid() else Vector2.INF
 
+func _local_positions() -> Dictionary:
+	return local_target_position_provider.call() as Dictionary if local_target_position_provider.is_valid() else {}
+
 func _draw() -> void:
+	if activity_scale == ActivityScale.NETWORK: _draw_network_actors()
 	for event: Dictionary in events:
+		var type := StringName(event.type)
+		if activity_scale == ActivityScale.NETWORK and type in [&"LOCAL_PACKET", &"LOCAL_PULSE"]: continue
+		if activity_scale == ActivityScale.NODE_FOCUS and type not in [&"LOCAL_PACKET", &"LOCAL_PULSE", &"SERVICE_PULSE", &"ALARM"]: continue
+		if activity_scale == ActivityScale.NODE_FOCUS and event.has("node_id") and StringName(event.node_id) != current_node_id: continue
 		var progress := clampf(float(event.age) * float(event.get("speed", 1.0)) / maxf(0.01, float(event.duration)), 0.0, 1.0)
 		var fade := sin(progress * PI)
-		match StringName(event.type):
+		match type:
 			&"PACKET", &"ICE_TRANSIT", &"ALARM_ROUTE":
 				var start := _position(StringName(event.from)); var finish := _position(StringName(event.to))
 				var color := actor_color(int(event.get("actor_type", ActorType.NORMAL)))
@@ -177,7 +240,7 @@ func _draw() -> void:
 				draw_circle(position, 4.0, Color(color, 0.9 * fade))
 			&"SERVICE_PULSE", &"ALARM":
 				var center := _position(StringName(event.node_id))
-				var color := AMBER if event.type == &"ALARM" else CYAN
+				var color := ICE_COLOR if event.type == &"ALARM" else CYAN
 				var radius := 25.0 if reduced_animation else lerpf(18.0, 54.0, progress)
 				draw_circle(center, radius, Color(color, fade * 0.7), false, 2.0, true)
 			&"REMOTE_SESSION":
@@ -186,3 +249,36 @@ func _draw() -> void:
 				var color := actor_color(int(event.get("actor_type", ActorType.NORMAL)))
 				draw_colored_polygon(points, Color(color, 0.72 * fade))
 				draw_string(ThemeDB.fallback_font, center + Vector2(10, 4), String(event.role), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(color, 0.65 * fade))
+			&"LOCAL_PACKET":
+				var local := _local_positions()
+				var start := Vector2(local.get(StringName(event.from_target), Vector2.INF)); var finish := Vector2(local.get(StringName(event.to_target), Vector2.INF))
+				if start == Vector2.INF or finish == Vector2.INF: continue
+				var color := actor_color(int(event.get("actor_type", ActorType.NORMAL)))
+				draw_line(start, finish, Color(color, 0.08 + fade * 0.2), 1.5, true)
+				draw_circle(start.lerp(finish, 0.5 if reduced_animation else progress), 3.5, Color(color, fade * 0.8))
+			&"LOCAL_PULSE":
+				var center := Vector2(_local_positions().get(StringName(event.local_target_id), Vector2.INF))
+				if center != Vector2.INF: draw_circle(center, lerpf(24.0, 52.0, progress), Color(CYAN, fade * 0.42), false, 2.0, true)
+
+func _draw_network_actors() -> void:
+	var ordered: Array = actors.keys()
+	ordered.sort_custom(func(a: Variant, b: Variant) -> bool: return String(a) < String(b))
+	for value: Variant in ordered:
+		var actor_id := StringName(value)
+		var actor := actors[actor_id] as Dictionary
+		if StringName(actor.get("scope", &"ROAMING")) == &"LOCAL": continue
+		var center := _position(StringName(actor.get("node_id", &"")))
+		if center == Vector2.INF: continue
+		var angle := float(posmod(hash(actor_id), 360)) * PI / 180.0
+		center += Vector2(cos(angle), sin(angle)) * 42.0
+		var type := int(actor.get("actor_type", ActorType.NORMAL))
+		var color := actor_color(type)
+		match type:
+			ActorType.ICE:
+				var points := PackedVector2Array([center + Vector2(0, -7), center + Vector2(7, 6), center + Vector2(-7, 6)])
+				draw_colored_polygon(points, Color(color, 0.86))
+			ActorType.HACKER_UNKNOWN, ActorType.HACKER_FRIENDLY:
+				var points := PackedVector2Array([center + Vector2(0, -7), center + Vector2(7, 0), center + Vector2(0, 7), center + Vector2(-7, 0)])
+				draw_colored_polygon(points, Color(color, 0.86))
+			_:
+				draw_circle(center, 5.0, Color(color, 0.82))

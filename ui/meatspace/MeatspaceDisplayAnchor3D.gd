@@ -22,9 +22,12 @@ func _resolve_fallback(state: PersistentGameState) -> Dictionary:
 	var flags: Dictionary = state.campaign_state.get("story_flags", {})
 	var inventory: Array = state.player_state.get("inventory", [])
 	for candidate: Dictionary in authored_fallbacks:
+		if candidate.has("visible_if") and not StoryBindingEvaluator.matches(candidate.visible_if, state): continue
+		if candidate.has("hidden_if") and StoryBindingEvaluator.matches(candidate.hidden_if, state): continue
 		if candidate.has("when_flag") and bool(flags.get(candidate.when_flag, false)) != bool(candidate.get("equals", true)): continue
 		if candidate.has("inventory_id") and not inventory.any(func(entry: Variant) -> bool:
-			return (entry is Dictionary and String(entry.get("id", entry.get("item_id", ""))) == String(candidate.inventory_id)) or String(entry) == String(candidate.inventory_id)):
+			if entry is Dictionary: return String(entry.get("id", entry.get("item_id", ""))) == String(candidate.inventory_id)
+			return String(entry) == String(candidate.inventory_id)):
 			continue
 		return candidate.get("item", {}).duplicate(true)
 	return {}

@@ -118,7 +118,7 @@ func _refresh_dressing() -> void:
 	var hardware: Dictionary = game_state.player_state.get("hardware", {}) if game_state != null else {}
 	for record: Dictionary in dressing.values():
 		var entry: Dictionary = record.definition
-		var shown := game_state != null
+		var shown := game_state != null and StoryBindingEvaluator.visible(entry, game_state)
 		if entry.has("when_flag"): shown = shown and bool(flags.get(entry.when_flag, false)) == bool(entry.get("equals", true))
 		if entry.has("inventory_id"):
 			shown = shown and inventory.any(func(value: Variant) -> bool: return (value is Dictionary and String(value.get("id", "")) == String(entry.inventory_id)) or String(value) == String(entry.inventory_id))

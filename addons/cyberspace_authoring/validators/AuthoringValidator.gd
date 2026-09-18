@@ -43,6 +43,9 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 		if link.get("source", &"") not in node_ids: issues.append(_issue("ERROR", "NETWORK", link.id, "Link source does not exist."))
 		if link.get("destination", &"") not in node_ids: issues.append(_issue("ERROR", "NETWORK", link.id, "Link destination does not exist."))
 		if int(link.get("traversal_cost", 0)) < 0: issues.append(_issue("ERROR", "NETWORK", link.id, "Traversal cost cannot be negative."))
+		var gate := StringName(link.get("traversal_gate", link.get("gate", &"NONE"))).to_upper()
+		if gate not in [&"NONE", &"BLOCK_EXIT_UNTIL_RESOLVED", &"BLOCK_ENTRY_UNTIL_REQUIREMENT", &"ONE_WAY", &"SCRIPTED"]: issues.append(_issue("ERROR", "NETWORK GATES", link.id, "Unknown traversal gate type '%s'." % gate))
+		elif gate not in [&"NONE", &"ONE_WAY"] and (link.get("traversal_requirement", link.get("requirement", {})) as Dictionary).is_empty(): issues.append(_issue("ERROR", "NETWORK GATES", link.id, "Traversal gate requires an authored requirement."))
 		var source := document.find_entry(link.get("source", &"")); var destination := document.find_entry(link.get("destination", &""))
 		if not source.is_empty() and not destination.is_empty():
 			var source_sphere: StringName = source.get("sphere_id", &""); var destination_sphere: StringName = destination.get("sphere_id", &"")
@@ -118,6 +121,7 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 			issues.append(_issue("ERROR", "PROGRAM REWARDS", reward.id, "Reward source type is invalid."))
 		var source_id: StringName = reward.get("source_id", &"")
 		if not _valid_reward_source(document, source_type, source_id): issues.append(_issue("ERROR", "PROGRAM REWARDS", reward.id, "Reward source reference is missing or incompatible with its source type."))
+	_validate_story_mode_authoring(issues, document)
 	if issues.is_empty(): issues.append(_issue("INFO", "GENERAL", document.document_id, "VALIDATE ALL passed with no issues."))
 	return issues
 
@@ -197,3 +201,35 @@ func _validate_mission_event_nodes(issues: Array[Dictionary], document: Cyberspa
 		for branch: Dictionary in node.get("branches", []):
 			if branch.get("next_id", &"") not in ids: issues.append(_issue("ERROR", "MISSION SEQUENCE", node.id, "Branch outcome references a missing event node."))
 func _issue(level: String, category: String, id: StringName, message: String) -> Dictionary: return {"level": level, "category": category, "entry_id": id, "message": message}
+
+func _validate_story_mode_authoring(issues: Array[Dictionary], document: CyberspaceContentDocument) -> void:
+	var flags := _ids(document.story_variables); var missions := _ids(document.missions); var contacts := _ids(document.contacts); var calls := _ids(document.contact_comms); var objectives := _ids(document.objectives)
+	var valid_actions: Array[StringName] = [&"set_flag", &"set_value", &"increment_value", &"set_state", &"unlock_contact", &"change_reputation", &"start_comms", &"start_dialogue", &"add_objective", &"complete_objective", &"fail_objective", &"unlock_mission", &"change_room_object_state", &"give_ics", &"remove_ics", &"advance_story_time", &"set_story_time"]
+	var event_ids: Dictionary = {}
+	for event: Dictionary in document.authored_story_events:
+		var event_id := StringName(event.get("event_id", event.get("id", &"")))
+		if event_ids.has(event_id): issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Duplicate event ID."))
+		event_ids[event_id] = true
+		if StringName(event.get("trigger", &"")).is_empty(): issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Event trigger is missing."))
+		for action: Dictionary in event.get("actions", []):
+			var type := StringName(action.get("type", &"")).to_lower(); var reference := StringName(action.get("id", &""))
+			if type not in valid_actions: issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Unknown story action '%s'." % type)); continue
+			if type in [&"set_flag", &"set_value", &"increment_value"] and reference not in flags: issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Action references unknown story variable '%s'." % reference))
+			if type in [&"unlock_contact", &"change_reputation"] and reference not in contacts: issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Action references missing contact '%s'." % reference))
+			if type == &"unlock_mission" and reference not in missions: issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Action references missing mission '%s'." % reference))
+			if type in [&"add_objective", &"complete_objective", &"fail_objective"] and reference not in objectives: issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Action references missing objective '%s'." % reference))
+			if type == &"start_comms" and reference not in calls: issues.append(_issue("ERROR", "STORY EVENTS", event_id, "Action references missing comms call '%s'." % reference))
+	for contact: Dictionary in document.contacts:
+		for mission_id: Variant in contact.get("missions_offered", []):
+			if mission_id not in missions: issues.append(_issue("ERROR", "CONTACTS", contact.id, "Contact offers missing mission '%s'." % mission_id))
+		for call_id: Variant in contact.get("comms_content", []):
+			if call_id not in calls: issues.append(_issue("ERROR", "CONTACTS", contact.id, "Contact references missing comms '%s'." % call_id))
+	for mission: Dictionary in document.missions:
+		var local_objectives: Dictionary = {}
+		for collection: String in ["primary_objectives", "optional_objectives", "hidden_objectives"]:
+			for objective: Dictionary in mission.get(collection, []):
+				var objective_id := StringName(objective.get("objective_id", &"")); if local_objectives.has(objective_id): issues.append(_issue("ERROR", "MISSIONS", mission.id, "Duplicate objective '%s'." % objective_id)); local_objectives[objective_id] = true
+	for binding: Dictionary in document.room_bindings:
+		if String(binding.get("scene_node_path", "")).strip_edges().is_empty(): issues.append(_issue("ERROR", "ROOM BINDINGS", binding.id, "Scene node binding is missing."))
+		for key: String in ["visible_if", "hidden_if"]:
+			var rule: Dictionary = binding.get(key, {}); if rule.get("scope", &"flag") == &"flag" and rule.get("id", &"") != &"" and rule.get("id") not in flags: issues.append(_issue("ERROR", "ROOM BINDINGS", binding.id, "%s references unknown story flag '%s'." % [key, rule.get("id")]))

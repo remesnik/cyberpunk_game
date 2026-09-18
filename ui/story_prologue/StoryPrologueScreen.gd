@@ -11,6 +11,8 @@ const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.
 @onready var choice_list: VBoxContainer = %ChoiceList
 @onready var result_label: Label = %ResultLabel
 @onready var bedroom: PlayerBedroom = %PlayerBedroom
+@onready var location_host: Control = %LocationHost
+@onready var travel_fade: ColorRect = %TravelFade
 @onready var action_panel: MeatspaceActionPanel = %ActionPanel
 @onready var time_selector: OptionButton = %TimeSelector
 var physical_interactions := MeatspaceInteractionController.new()
@@ -18,6 +20,11 @@ var physical_interactions := MeatspaceInteractionController.new()
 var debug_label: Label
 var selected_object: Dictionary = {}
 var observed_state: PersistentGameState
+var current_location_view: MeatspaceRoomView3D
+var loaded_location_id: StringName = &""
+var travel_selector_open := false
+var travel_buttons: Array[Button] = []
+var _travel_focus_armed := true
 
 func _ready() -> void:
 	EventBus.session_started.connect(_refresh)
@@ -26,7 +33,8 @@ func _ready() -> void:
 	action_panel.action_requested.connect(_physical_action)
 	time_selector.hide()
 	action_panel.hide()
-	%DismissChoices.pressed.connect(func() -> void: choice_panel.get_parent().hide())
+	%DismissChoices.pressed.connect(_dismiss_choices)
+	GameplayBindings.semantic_action_triggered.connect(_on_semantic_action)
 	debug_label = Label.new()
 	debug_label.position = Vector2(18, 65)
 	debug_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -46,11 +54,17 @@ func _update_status() -> void:
 	var state := physical_interactions.state
 	if debug_label != null:
 		debug_label.visible = OS.is_debug_build() and show_progression_debug
-		if debug_label.visible: debug_label.text = JSON.stringify(Game.prologue_controller.progression_view(), "  ")
+		if debug_label.visible: debug_label.text = JSON.stringify(_chapter_debug_view(), "  ")
 	var time := String(state.world_state.get("time_of_day", "NIGHT"))
-	phase_label.text = "BEDROOM  //  %s  //  FATIGUE %d  //  %d ICs" % [time, int(state.player_state.get("fatigue", 0)), int(state.player_state.get("credits", 0))]
+	var location := physical_interactions.get_location_definition(physical_interactions.current_meatspace_location())
+	phase_label.text = "%s  //  %s  //  FATIGUE %d  //  %d ICs" % [String(location.get("display_name", "MEATSPACE")).to_upper(), time, int(state.player_state.get("fatigue", 0)), int(state.player_state.get("credits", 0))]
 	for index in range(time_selector.item_count):
 		if time_selector.get_item_text(index) == time: time_selector.select(index)
+
+func _chapter_debug_view() -> Dictionary:
+	var story := StoryState.new(Game.persistent_game_state)
+	var run: Dictionary = Game.story_mission_system.active_run if Game.story_mission_system != null else {}
+	return {"chapter": story.get_state(&"current_story_chapter", &"intro"), "deck_choice": Game.persistent_game_state.player_state.get("selected_deck_variant", &""), "active_slots": Game.persistent_game_state.player_state.get("active_slot_count", 2), "latch_unlocked": story.is_contact_unlocked(&"latch"), "mission_status": Game.story_mission_system.status(&"glasshouse_01") if Game.story_mission_system != null else &"LOCKED", "objectives": run.get("objectives", {}), "trace": Game.trace_level, "alarm": run.get("alarm_triggered", false), "flags": Game.persistent_game_state.campaign_state.get("story_flags", {}), "chapter_complete": story.get_flag(&"glasshouse_completed")}
 
 func _state_changed() -> void:
 	_update_status()
@@ -67,6 +81,7 @@ func _refresh() -> void:
 	var controller: MeatspacePrologueController = Game.prologue_controller
 	bedroom.bind_state(controller.game_state if controller != null else null)
 	physical_interactions.configure(bedroom.location_definition, controller.game_state if controller != null else null)
+	_show_current_location()
 	if observed_state != physical_interactions.state:
 		if observed_state != null and observed_state.changed.is_connected(_state_changed): observed_state.changed.disconnect(_state_changed)
 		observed_state = physical_interactions.state
@@ -86,7 +101,8 @@ func _refresh() -> void:
 		interaction_list.add_child(button)
 	choice_panel.visible = false
 	choice_panel.get_parent().hide()
-	bedroom.call_deferred("focus_first")
+	travel_selector_open = false
+	if current_location_view != null: current_location_view.call_deferred("focus_first")
 
 func _select_interaction(interaction_id: StringName) -> void:
 	var selected := Game.prologue_controller.select_interaction(interaction_id)
@@ -124,8 +140,7 @@ func _on_room_object_selected(object_data: Dictionary) -> void:
 	if object_data.get("primary_action") == "CLASS":
 		_select_interaction(StringName("CLASS_" + String(object_data.class_id)))
 	elif object_data.get("primary_action") == "TRAVEL":
-		var destinations := physical_interactions.get_available_meatspace_destinations()
-		result_label.text = "There is nowhere to go." if destinations.is_empty() else "Choose a destination."
+		_open_travel_selector()
 	elif object_data.get("primary_action") == "CONNECT":
 		result_label.text = "Connecting..."
 		var connected := Game.prologue_controller.connect_first_contact()
@@ -172,7 +187,95 @@ func _clear(container: Container) -> void:
 		container.remove_child(child)
 		child.queue_free()
 
+func _show_current_location() -> void:
+	var location_id := physical_interactions.current_meatspace_location()
+	if loaded_location_id == location_id and current_location_view != null: return
+	for child in location_host.get_children():
+		location_host.remove_child(child); child.queue_free()
+	loaded_location_id = location_id
+	bedroom.visible = location_id == &"HOME"
+	if bedroom.visible:
+		current_location_view = bedroom
+		bedroom.bind_state(physical_interactions.state)
+		return
+	var location := physical_interactions.get_location_definition(location_id)
+	var packed := load(String(location.get("scene_path", ""))) as PackedScene
+	if packed == null:
+		result_label.text = "Destination scene unavailable."
+		physical_interactions.travel_to(&"HOME")
+		loaded_location_id = &""
+		_show_current_location()
+		return
+	current_location_view = packed.instantiate() as MeatspaceRoomView3D
+	location_host.add_child(current_location_view)
+	current_location_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	current_location_view.object_selected.connect(_on_room_object_selected)
+	current_location_view.bind_state(physical_interactions.state)
+
+func _open_travel_selector() -> void:
+	var destinations := physical_interactions.get_available_meatspace_destinations()
+	if destinations.is_empty():
+		result_label.text = "There is nowhere to go."
+		return
+	travel_selector_open = true
+	choice_panel.visible = true
+	choice_panel.get_parent().show()
+	choice_title.text = "WHERE TO?"
+	choice_prompt.text = "SELECT A DESTINATION"
+	%DismissChoices.text = "CANCEL"
+	choice_panel.move_child(%DismissChoices, choice_panel.get_child_count() - 1)
+	_clear(choice_list)
+	travel_buttons.clear()
+	for destination: Dictionary in destinations:
+		var button := Button.new()
+		button.name = "Travel_%s" % destination.id
+		button.text = String(destination.display_name).to_upper()
+		button.tooltip_text = String(destination.get("description", ""))
+		button.custom_minimum_size = Vector2(0, 54)
+		button.pressed.connect(_travel_to.bind(StringName(destination.id)))
+		choice_list.add_child(button)
+		travel_buttons.append(button)
+	if not travel_buttons.is_empty(): travel_buttons[0].grab_focus()
+
+func _travel_to(destination_id: StringName) -> void:
+	var result := physical_interactions.travel_to(destination_id)
+	if not result.get("success", false):
+		result_label.text = String(result.get("reason", "Travel unavailable.")); return
+	travel_selector_open = false
+	choice_panel.get_parent().hide()
+	_show_current_location()
+	var destination: Dictionary = result.destination
+	phase_label.text = "MEATSPACE  //  %s" % String(destination.display_name).to_upper()
+	result_label.text = String(destination.description)
+	travel_fade.show(); travel_fade.modulate.a = 1.0
+	var tween := create_tween(); tween.tween_property(travel_fade, "modulate:a", 0.0, 0.18); tween.tween_callback(travel_fade.hide)
+	if current_location_view != null: current_location_view.call_deferred("focus_first")
+
+func _cancel_travel_selector() -> void:
+	travel_selector_open = false
+	choice_panel.get_parent().hide()
+	if current_location_view != null: current_location_view.grab_focus()
+
+func _dismiss_choices() -> void:
+	if travel_selector_open: _cancel_travel_selector()
+	else: choice_panel.get_parent().hide()
+
+func _on_semantic_action(action_id: StringName) -> void:
+	if travel_selector_open and action_id == &"back_action": _cancel_travel_selector()
+
+func _process(_delta: float) -> void:
+	if not travel_selector_open: return
+	var direction := GameplayBindings.focus_vector()
+	if absf(direction.y) < 0.35: _travel_focus_armed = true
+	elif _travel_focus_armed and not travel_buttons.is_empty():
+		_travel_focus_armed = false
+		var focused := get_viewport().gui_get_focus_owner()
+		var index := travel_buttons.find(focused)
+		travel_buttons[posmod(index + (1 if direction.y > 0 else -1), travel_buttons.size())].grab_focus()
+
 func _unhandled_key_input(event: InputEvent) -> void:
+	if travel_selector_open and event.is_action_pressed(&"ui_cancel"):
+		_cancel_travel_selector(); accept_event(); return
 	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
 		show_progression_debug = not show_progression_debug
 		_update_status()
