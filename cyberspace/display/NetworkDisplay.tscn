@@ -1,10 +1,13 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://cyberspace/display/NetworkDisplay.gd" id="1_display"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/SecurityLevelLegend.tscn" id="2_legend"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/CapabilityGlossary.tscn" id="3_glossary"]
 [ext_resource type="PackedScene" path="res://cyberspace/display/minimap/SphereMinimap.tscn" id="4_minimap"]
 [ext_resource type="Script" path="res://cyberspace/display/CyberspaceSpatialBackdrop.gd" id="5_backdrop"]
+[ext_resource type="Script" path="res://cyberspace/display/CyberspaceWorld3D.gd" id="6_world"]
+[ext_resource type="Script" path="res://ui/input/ControlHintBar.gd" id="7_hints"]
+[ext_resource type="Script" path="res://cyberspace/display/AmbientNetworkActivity.gd" id="8_ambient"]
 
 [sub_resource type="StyleBoxFlat" id="Style_panel"]
 bg_color = Color(0.008, 0.025, 0.045, 0.94)
@@ -50,8 +53,31 @@ grow_vertical = 2
 mouse_filter = 2
 script = ExtResource("5_backdrop")
 
+[node name="SpatialWorld3D" type="SubViewportContainer" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("6_world")
+
 [node name="LinkLayer" type="Node2D" parent="."]
 unique_name_in_owner = true
+visible = false
+
+[node name="AmbientActivity" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("8_ambient")
 
 [node name="NodeLayer" type="Control" parent="."]
 unique_name_in_owner = true
@@ -99,12 +125,29 @@ offset_right = 650.0
 offset_bottom = 74.0
 mouse_filter = 2
 
+[node name="LocalTargetLayer" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
 [node name="LocationLabel" type="Label" parent="Header"]
 unique_name_in_owner = true
 layout_mode = 2
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 1)
 theme_override_font_sizes/font_size = 20
 text = "CURRENT HOST  //  INITIALIZING"
+
+[node name="ViewModeLabel" type="Label" parent="Header"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 0.82)
+theme_override_font_sizes/font_size = 13
+text = "NETWORK MODE"
 
 [node name="ResourceLabel" type="Label" parent="Header"]
 unique_name_in_owner = true
@@ -331,6 +374,30 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.75)
 text = "ACTION COST // --"
 
+[node name="ContextualTargetLabel" type="Label" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.65)
+text = "NO TARGET"
+
+[node name="ContextualCommandLabel" type="Label" parent="RightPanel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.785, 0.341, 1)
+text = "NO ACTION"
+
+[node name="CommandOverlay" type="CanvasLayer" parent="."]
+layer = 20
+
+[node name="CommandDial" type="HBoxContainer" parent="CommandOverlay"]
+unique_name_in_owner = true
+layout_mode = 0
+offset_right = 650.0
+offset_bottom = 78.0
+custom_minimum_size = Vector2(650, 78)
+alignment = 1
+theme_override_constants/separation = 10
+
 [node name="ActionButtons" type="HBoxContainer" parent="RightPanel/Margin/Readout"]
 layout_mode = 2
 
@@ -473,7 +540,7 @@ layout_mode = 2
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.7)
-text = "LOADED PROGRAMS"
+text = "ACTIVE PROGRAM SLOTS"
 
 [node name="RamLabel" type="Label" parent="BottomBar/Margin/Rows/Header"]
 unique_name_in_owner = true
@@ -497,34 +564,26 @@ text = "BACKDOOR // CLOSED"
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="Program1" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[1] SCANNER"
-
-[node name="Program2" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[2] SPOOF"
-
-[node name="Program3" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[3] GHOST"
-
-[node name="Program4" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[4] DECRYPT"
-
-[node name="DoorstopButton" type="Button" parent="BottomBar/Margin/Rows/Programs"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-text = "[5] EMPTY"
-
 [node name="DoorstopConfirmation" type="ConfirmationDialog" parent="."]
 unique_name_in_owner = true
 title = "DOORSTOP"
 dialog_text = "DEPLOY DOORSTOP?\n\nCreates a temporary return route to this node.\nThis copy will be destroyed.\nJacking back in consumes the return route."
 ok_button_text = "DEPLOY AND BURN"
+
+[node name="ControlHints" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 18.0
+offset_top = -116.0
+offset_right = -18.0
+offset_bottom = -92.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.65)
+horizontal_alignment = 1
+mouse_filter = 2
+script = ExtResource("7_hints")
+keyboard_text = "WASD: PAN  •  Z/C: COMMAND  •  ENTER: EXECUTE  •  U: CLASS SKILL  •  F: PROGRAM  •  Q/E: SLOT  •  ESC: BACK"
+gamepad_text = "LEFT STICK: PAN  •  D-PAD: COMMAND/TARGET  •  A: EXECUTE  •  RT: PROGRAM  •  LB/RB: SLOT  •  R3: RECENTER"

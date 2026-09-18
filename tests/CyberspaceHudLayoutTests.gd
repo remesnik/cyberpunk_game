@@ -14,12 +14,21 @@ func _ready() -> void:
 	get_tree().quit(failures)
 
 func _test_resolution(resolution: Vector2) -> void:
+	var previous_inventory := Game.program_inventory
+	var previous_loadout := Game.program_loadout
+	Game.program_inventory = ProgramInventory.new()
+	Game.program_loadout = ProgramLoadout.new(6)
 	var display := DISPLAY.instantiate() as NetworkDisplay
 	add_child(display)
 	display.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	display.position = Vector2.ZERO
 	display.size = resolution
 	display._apply_hud_layout()
+	display._update_program_bar()
+	_expect(display.get_node("BottomBar/Margin/Rows/Programs").get_child_count() == 6, "%s renders every active slot at variable capacity" % resolution)
+	_expect((display.get_node("BottomBar/Margin/Rows/Programs").get_child(1) as Button).text.contains("EMPTY"), "%s renders empty active slots explicitly" % resolution)
+	var first_slot_text := (display.get_node("BottomBar/Margin/Rows/Programs").get_child(0) as Button).text
+	_expect("[1]" in first_slot_text and "Physical" not in first_slot_text, "%s active slot title uses player-facing index without leaking input metadata" % resolution)
 	var graph_rect := display.get_primary_graph_rect()
 	_expect(graph_rect.get_area() / (resolution.x * resolution.y) >= 0.35, "%s reserves the largest HUD region for graph interaction" % resolution)
 	_expect(not display.left_panel.visible and graph_rect.position.x <= 64.0, "%s current-node details start collapsed to free graph space" % resolution)
@@ -28,6 +37,22 @@ func _test_resolution(resolution: Vector2) -> void:
 	_expect(not display.event_feed.visible, "%s detailed event log starts collapsed" % resolution)
 	_expect(display.sphere_minimap.get_rect().end.y <= display.right_panel.get_rect().position.y, "%s minimap does not overlap contextual target panel" % resolution)
 	_expect(graph_rect.end.y <= resolution.y - 160.0, "%s graph clears status, monitor, and quick-slot strips" % resolution)
+	var projected := Control.new(); projected.position = Vector2(420, 330); projected.size = Vector2(100, 80); display.node_layer.add_child(projected)
+	display.node_visuals[&"HUD_TARGET"] = projected
+	display.target_views[&"HUD_TARGET"] = {"kind": &"NODE", "node": {"id": &"HUD_TARGET"}}
+	display.selected_target_id = &"HUD_TARGET"; display._valid_contextual_commands = [&"SCAN"]; display._selected_contextual_command = &"SCAN"
+	var dial_instance := display.command_dial.get_instance_id()
+	display._render_command_dial(); display._update_command_dial_position()
+	_expect(display.command_dial.get_parent() is CanvasLayer and (display.command_dial.get_parent() as CanvasLayer).layer > 0, "%s command dial renders in an unoccluded HUD CanvasLayer" % resolution)
+	var first_dial_position := display.command_dial.position
+	projected.position += Vector2(120, 45); display._update_command_dial_position()
+	_expect(display.command_dial.position != first_dial_position and is_equal_approx(display.command_dial.position.x - first_dial_position.x, 120.0), "%s command dial follows the projected target while the map pans" % resolution)
+	projected.position = Vector2(-200, -200); display._update_command_dial_position()
+	_expect(display.command_dial.position.x >= 12 and display.command_dial.position.y >= 12, "%s command dial clamps inside the near viewport edge" % resolution)
+	projected.position = resolution + Vector2(200, 200); display._update_command_dial_position()
+	_expect(display.command_dial.get_rect().end.x <= resolution.x - 12 and display.command_dial.get_rect().end.y <= resolution.y - 12, "%s command dial clamps inside the far viewport edge" % resolution)
+	display.target_views[&"SECOND_TARGET"] = {"kind": &"NODE", "node": {"id": &"SECOND_TARGET"}}; display.node_visuals[&"SECOND_TARGET"] = projected; display.selected_target_id = &"SECOND_TARGET"; display._update_command_dial_position()
+	_expect(display.command_dial.get_instance_id() == dial_instance, "%s target changes reuse the single command dial" % resolution)
 	display._context_panel_requested = true
 	display._refresh_context_panel_visibility()
 	_expect(display.right_panel.visible, "%s selected target can claim contextual rail" % resolution)
@@ -36,6 +61,8 @@ func _test_resolution(resolution: Vector2) -> void:
 	display._on_monitor_presentation_changed(true, false)
 	_expect(display.right_panel.visible, "%s collapsing Monitor restores requested target details" % resolution)
 	display.queue_free()
+	Game.program_inventory = previous_inventory
+	Game.program_loadout = previous_loadout
 
 func _test_contextual_monitors() -> void:
 	var dock := MONITOR_DOCK.instantiate() as RealtimeMonitorDock

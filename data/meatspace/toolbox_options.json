@@ -3,12 +3,23 @@
   "TODO": "Wire Repair Deck cost and repair effect to the authoritative deck-damage system when implemented. Do not assume a damage formula.",
   "choices": [
     {
+      "id": "ASSEMBLE_DECK",
+      "label": "ASSEMBLE DECK",
+      "description": "Seat the starter components, route the leads, and close the chassis.",
+      "cost_ics": 0,
+      "required_flags": ["DECK_SELECTED"],
+      "absent_flags": ["DECK_ASSEMBLED"],
+      "actions": [
+        {"type": "SET_FLAG", "id": "DECK_ASSEMBLED"}
+      ]
+    },
+    {
       "id": "RUNNING",
       "label": "Modify deck for running",
       "description": "Modify your deck for running.",
       "cost_ics": 20,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -31,7 +42,7 @@
       "description": "Increase this deck component by one level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -47,7 +58,7 @@
       "description": "Increase this deck component by one level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -63,7 +74,7 @@
       "description": "Increase this deck component by one level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -79,7 +90,7 @@
       "description": "Increase deck topology look-ahead by one Sensors level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -95,7 +106,7 @@
       "description": "Increase this deck component by one level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -111,7 +122,7 @@
       "description": "Increase this deck component by one level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -127,7 +138,7 @@
       "description": "Increase this deck component by one level.",
       "cost_ics": 100,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [
         {
@@ -143,7 +154,7 @@
       "description": "Repair cost depends on deck damage. Damage-based repair pricing is not wired yet.",
       "cost_ics": null,
       "required_flags": [
-        "DECK_SELECTED"
+        "DECK_ASSEMBLED"
       ],
       "actions": [],
       "unavailable_reason": "Damage-based cost not yet available"

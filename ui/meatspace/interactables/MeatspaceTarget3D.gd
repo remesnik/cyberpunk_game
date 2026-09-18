@@ -25,11 +25,14 @@ func activate() -> void:
 func bind_visual(node: Node3D, property: StringName, key: StringName, inactive: Variant, active: Variant) -> void:
 	visual_bindings.append({"node": node, "property": property, "key": key, "inactive": inactive, "active": active})
 
-func apply_state(flags: Dictionary) -> void:
-	var rule: Dictionary = authored_data.get("visibility", {})
-	visible = rule.is_empty() or bool(flags.get(rule.get("flag", ""), false)) == bool(rule.get("equals", true))
+func apply_state(source: Variant) -> void:
+	var state := source as PersistentGameState if source is PersistentGameState else null
+	var flags: Dictionary = state.campaign_state.get("story_flags", {}) if state != null else ((source as Dictionary) if source is Dictionary else {})
+	visible = StoryBindingEvaluator.visible(authored_data, state) if state != null else (authored_data.get("visibility", {}).is_empty() or bool(flags.get(authored_data.get("visibility", {}).get("flag", ""), false)) == bool(authored_data.get("visibility", {}).get("equals", true)))
 	collision_layer = 1 if visible else 0
 	var bindings: Dictionary = authored_data.get("visual_state", {})
 	for binding: Dictionary in visual_bindings:
-		var flag := StringName(bindings.get(binding.key, &""))
-		binding.node.set(binding.property, binding.active if bool(flags.get(flag, false)) else binding.inactive)
+		var authored: Variant = bindings.get(binding.key, &"")
+		var active := StoryBindingEvaluator.matches(authored if authored is Dictionary else {"scope": "flag", "id": authored, "value": true}, state) if state != null else bool(flags.get(StringName(authored), false))
+		binding.node.set(binding.property, binding.active if active else binding.inactive)
+	set_meta("story_variant", StoryBindingEvaluator.variant(authored_data, state))

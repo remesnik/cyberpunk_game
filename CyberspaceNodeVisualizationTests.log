@@ -1,0 +1,42 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+ERROR: Failed to read the root certificate store.
+   at: get_system_ca_certificates (platform/windows/os_windows.cpp:2582)
+[NetspaceHUD] reason=program_bar_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=0 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=true size=(650.0, 78.0) position=(0.0, 0.0)
+[NetspaceHUD] reason=program_bar_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=0 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=false size=(650.0, 78.0) position=(0.0, 0.0)
+[NetspaceHUD] reason=command_hud_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=0 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=false size=(650.0, 78.0) position=(0.0, 0.0)
+
+========== NETSPACE SCENE TRACE ==========
+LIVE_ROOT_PATH: /root/CyberspaceNodeVisualizationTests/NetworkDisplay
+VIEWPORT_NAME: root
+VISIBLE_IN_TREE: true | SELF_VISIBLE: true
+BOTTOMBAR_CHILD_EXISTS: true
+BOTTOMBAR_VISIBLE: true | BOTTOMBAR_POSITION: (16.0, 1832.0) | SIZE: (1888.0, 78.0)
+BOTTOMBAR_RECT: [P: (16.0, 1832.0), S: (1888.0, 78.0)]
+COMMAND_DIAL_EXISTS: true
+COMMAND_DIAL_VISIBLE: false | POSITION: (0.0, 0.0) | SIZE: (650.0, 78.0)
+=========================================
+
+[NetspaceHUD] reason=session_started hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=0 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=false size=(650.0, 78.0) position=(0.0, 0.0)
+[NetspaceHUD] reason=program_bar_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=0 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=false size=(650.0, 78.0) position=(0.0, 0.0)
+[NetspaceHUD] reason=command_hud_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=0 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=false size=(650.0, 78.0) position=(0.0, 0.0)
+[NetspaceHUD] reason=command_hud_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target=PUBLIC_GATEWAY view_mode=0 valid_commands=[&"SCAN"] selected=SCAN selected_index=0 rendered_icon_count=1 visible=true size=(650.0001, 78.0) position=(506.1994, 1319.493)
+[NetspaceTarget] view_mode=0 focused_node_id=PUBLIC_GATEWAY focused_local_target_id= resolved_target=PUBLIC_GATEWAY
+[NetspaceHUD] reason=command_hud_refresh hud_instance=NetworkDisplay active_slot_bar_instance=true command_dial_instance=true visible=true
+[DeckSlots] active_slot_count=2 loaded_program_count=1 rendered_slot_widgets=2 bar_visible=true bar_size=(1888.0, 78.0) bar_position=(16.0, 1832.0) viewport_size=(1920.0, 1920.0)
+[CommandDial] target= view_mode=1 valid_commands=[] selected= selected_index=-1 rendered_icon_count=0 visible=false size=(650.0, 78.0) position=(635.0, 1734.0)
+PASS: 68 cyberspace node visualization assertions

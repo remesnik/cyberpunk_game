@@ -11,6 +11,7 @@ static func initialize(state: PersistentGameState, run_introduction := false) ->
 	state.campaign_state = {}
 	state.player_state = {
 		"deck_id": &"FIELD_DECK_MK1",
+		"active_slot_count": 2,
 		"hardware": {&"DECK_CPU": 1, &"DECK_RAM": 2, &"DECK_STORAGE": 2, &"DECK_SENSORS": 1},
 		"owned_programs": [
 			{"instance_id": &"FREEROAM_SERVICE_PROBE_001", "definition_id": &"SERVICE_PROBE"},

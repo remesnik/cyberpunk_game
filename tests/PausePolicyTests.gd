@@ -17,6 +17,12 @@ func _run() -> void:
 	policy.hard_pause_available = true
 	policy.set_mode(PausePolicyScript.Mode.GAMEPLAY)
 	_expect(policy.allows_cyberspace_actions() and policy.allows_realtime_advance(), "gameplay enables cyber actions and realtime")
+	var start_event := InputEventAction.new()
+	start_event.action = &"pause_game"; start_event.pressed = true
+	policy._unhandled_input(start_event)
+	_expect(policy.mode == PausePolicyScript.Mode.HARD_PAUSE, "controller Start uses the same pause policy as keyboard pause")
+	policy._unhandled_input(start_event)
+	_expect(policy.mode == PausePolicyScript.Mode.GAMEPLAY, "controller Start resumes through the shared pause policy")
 
 	var clock = RealtimeClockScript.new()
 	root.add_child(clock)

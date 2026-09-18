@@ -1,4 +1,5 @@
 extends Node
+const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.gd")
 
 const CyberspaceClockScript := preload("res://core/CyberspaceClock.gd")
 const RealtimeWorldClockScript := preload("res://core/RealtimeWorldClock.gd")
@@ -58,7 +59,14 @@ const ContentAvailabilityScript := preload("res://core/content/ContentAvailabili
 const FreeRoamJobBoardScript := preload("res://core/jobs/FreeRoamJobBoard.gd")
 const MeatspaceAutosaveServiceScript := preload("res://core/save/MeatspaceAutosaveService.gd")
 const MeatspacePrologueControllerScript := preload("res://core/story/MeatspacePrologueController.gd")
+const NetworkResidueStateScript := preload("res://core/game_state/NetworkResidueState.gd")
+const SocialMessageInboxScript := preload("res://core/story/SocialMessageInbox.gd")
+const StoryEventSystemScript := preload("res://core/story/StoryEventSystem.gd")
+const StoryMissionSystemScript := preload("res://core/story/StoryMissionSystem.gd")
+const RealtimeCommsServiceScript := preload("res://core/story/RealtimeCommsService.gd")
+const StoryContactSystemScript := preload("res://core/story/StoryContactSystem.gd")
 const SensorTopologyControllerScript := preload("res://cyberspace/SensorTopologyController.gd")
+const NetspaceBossEncounterScript := preload("res://cyberspace/bosses/NetspaceBossEncounter.gd")
 
 enum GameDomain { CYBERSPACE, MEATSPACE, CLEAN_ROOM }
 
@@ -97,6 +105,12 @@ var evidence_archive: Variant
 var realtime_story_router: Variant
 var story_action_log: Array[Dictionary] = []
 var story_messages: Array[Dictionary] = []
+var social_inbox: SocialMessageInbox
+var story_event_system: StoryEventSystem
+var story_mission_system: StoryMissionSystem
+var realtime_contact_comms: RealtimeCommsService
+var story_contact_system: StoryContactSystem
+var active_boss_encounter: NetspaceBossEncounter
 var story_graffiti: Array[Dictionary] = []
 var realtime_event_log: Array[Dictionary] = []
 var last_video_action_result: VideoFeedActionResult
@@ -134,6 +148,7 @@ var doorstop_programming_definition: DoorstopDefinition
 var doorstop_suspension_policy: DoorstopSuspensionPolicy
 var suspended_intrusion_advancer: SuspendedIntrusionAdvancer
 var suspended_security_level := 0
+var network_residue: NetworkResidueState
 var temporary_cyberspace_effects: Array[Dictionary] = []
 var suspended_intrusion_events: Array[Dictionary] = []
 var suspended_replacement_ice_factory: Callable
@@ -204,6 +219,8 @@ func _configure_content_availability() -> void:
 	content_availability.register_content(&"FREE_ROAM_HOME", &"FREE_ROAM_ONLY", {}, {&"kind": &"FREE_ROAM_WORLD"})
 	var first_contact := load("res://data/authoring/first_contact.tres") as CyberspaceContentDocument
 	content_availability.register_document(first_contact)
+	var glasshouse := load("res://data/authoring/glasshouse_01.tres") as CyberspaceContentDocument
+	content_availability.register_document(glasshouse)
 	content_availability.register_content(&"FIRST_CONTACT_FREE_ROAM_TUTORIAL", &"FREE_ROAM_ONLY", {}, {
 		&"kind": &"AUTHORED_NETWORK",
 		&"runtime_document_path": first_contact.resource_path,
@@ -229,11 +246,23 @@ func enter_free_roam_network() -> Dictionary:
 
 func enter_netspace_from_clean_room() -> Dictionary:
 	if game_domain != GameDomain.CLEAN_ROOM: return {"success": false, "reason": "The Clean-Room is not active."}
+	if is_story_mode() and story_mission_system != null:
+		if story_mission_system.active_mission_id.is_empty():
+			for mission_id: Variant in story_mission_system.definitions:
+				if story_mission_system.status(StringName(mission_id)) == StoryMissionSystem.AVAILABLE:
+					var started := story_mission_system.start_mission(StringName(mission_id))
+					if not started.success: return started
+					persistent_game_state.campaign_state["pending_entry_content_id"] = StringName(started.entry_network)
+					start_session()
+					break
+		if story_mission_system.active_mission_id.is_empty(): return {"success": false, "reason": "No Story mission is available."}
 	var previous := game_domain
 	game_domain = GameDomain.CYBERSPACE
 	if intrusion_session != null and intrusion_session.lifecycle in [IntrusionSession.Lifecycle.ABORTED, IntrusionSession.Lifecycle.COMPLETED]: intrusion_session.lifecycle = IntrusionSession.Lifecycle.ACTIVE
 	persistent_game_state.world_state["entry_state"] = &"ACTIVE_NETWORK"
+	FirstMeatspaceTutorial.advance_to(persistent_game_state, FirstMeatspaceTutorial.Step.COMPLETE)
 	EventBus.game_domain_changed.emit(previous, game_domain)
+	publish_story_trigger(&"netspace_entered")
 	EventBus.network_display_update_requested.emit()
 	return {"success": true, "reason": "Entering Netspace."}
 
@@ -243,6 +272,8 @@ func return_home_from_clean_room() -> Dictionary:
 	game_domain = GameDomain.MEATSPACE
 	persistent_game_state.world_state["entry_state"] = &"MEATSPACE"
 	EventBus.game_domain_changed.emit(previous, game_domain)
+	publish_story_trigger(&"meatspace_entered", {"source": &"clean_room"})
+	if social_inbox != null: social_inbox.evaluate(&"MEATSPACE_RETURN", {"progress": int(save_metadata_run_count())})
 	var save_error := request_meatspace_autosave(MeatspaceAutosaveServiceScript.Reason.RETURN_TO_MEATSPACE, {&"source": &"CLEAN_ROOM"})
 	return {"success": true, "reason": "Returned home." if save_error == OK else "Returned home, but autosave failed.", "save_error": save_error}
 
@@ -251,6 +282,8 @@ func return_to_clean_room(reason := "Run connection closed.") -> Dictionary:
 	var previous := game_domain
 	game_domain = GameDomain.CLEAN_ROOM
 	persistent_game_state.world_state["entry_state"] = &"CLEAN_ROOM"
+	if social_inbox != null: social_inbox.evaluate(&"RUN_RETURN", {"success": true, "trace": trace_level, "progress": int(action_clock.current_tick if action_clock != null else 0)})
+	publish_story_trigger(&"netspace_exited", {"reason": reason, "trace": trace_level})
 	EventBus.game_domain_changed.emit(previous, game_domain)
 	if clean_room_controller != null: clean_room_controller.enter()
 	return {"success": true, "reason": reason}
@@ -260,7 +293,10 @@ func enter_meatspace(reason: int = MeatspaceAutosaveServiceScript.Reason.RETURN_
 	var previous := game_domain
 	game_domain = GameDomain.MEATSPACE
 	persistent_game_state.world_state["entry_state"] = &"MEATSPACE"
+	if social_inbox != null: social_inbox.evaluate(&"MEATSPACE_RETURN", {"progress": int(action_clock.current_tick if action_clock != null else 0)})
 	EventBus.game_domain_changed.emit(previous, game_domain)
+	publish_story_trigger(&"netspace_exited", metadata)
+	publish_story_trigger(&"meatspace_entered", metadata)
 	var error := request_meatspace_autosave(reason, metadata)
 	return {"success": error == OK, "reason": "Entered meat space." if error == OK else "Entered meat space, but autosave failed.", "save_error": error}
 
@@ -268,21 +304,52 @@ func jack_out_normally() -> Dictionary:
 	if not session_active or intrusion_session == null or intrusion_session.lifecycle != IntrusionSession.Lifecycle.ACTIVE:
 		return {"success": false, "reason": "No active intrusion can be disconnected."}
 	intrusion_session.lifecycle = IntrusionSession.Lifecycle.ABORTED
+	if story_mission_system != null and not story_mission_system.active_mission_id.is_empty(): story_mission_system.fail_active_run(&"abort", {"trace": trace_level})
 	return return_to_clean_room("Disconnected to the Clean-Room.")
+
+func fail_story_run(reason: StringName, context: Dictionary = {}) -> Dictionary:
+	if game_domain != GameDomain.CYBERSPACE or story_mission_system == null or story_mission_system.active_mission_id.is_empty(): return {"success": false, "reason": "No Story mission run is active."}
+	if intrusion_session != null: intrusion_session.lifecycle = IntrusionSession.Lifecycle.FAILED
+	var result := story_mission_system.fail_active_run(reason, context)
+	publish_story_trigger(&"mission_failed", {"reason": reason, "trace": context.get("trace", trace_level)})
+	var transition := return_to_clean_room("Trace completed. Ejected to the Clean-Room." if reason == &"trace" else "Run ended. Returned to the Clean-Room.")
+	return {"success": true, "result": result.get("result"), "debrief": result.get("debrief", {}), "transition": transition}
 
 func complete_intrusion_and_return_to_meatspace(completion_data: Dictionary = {}) -> Dictionary:
 	if intrusion_session == null: return {"success": false, "reason": "No intrusion is active."}
 	var completed := intrusion_session.complete_normally(completion_data)
 	if not completed.success: return completed
+	if story_mission_system != null and not story_mission_system.active_mission_id.is_empty(): resolve_story_mission()
+	publish_story_trigger(&"mission_completed", completion_data)
 	if persistent_game_state.game_mode == GameMode.Value.STORY and active_content_document != null and active_content_document.document_id == &"FIRST_CONTACT":
 		persistent_game_state.campaign_state.get_or_add("story_flags", {})["FIRST_CONTACT_COMPLETE"] = true
 		var completed_ids: Array = persistent_game_state.campaign_state.get("completed_mission_ids", [])
 		if "FIRST_CONTACT" not in completed_ids: completed_ids.append("FIRST_CONTACT")
 		persistent_game_state.campaign_state["completed_mission_ids"] = completed_ids
+		if story_mission_system != null: story_mission_system.refresh_availability()
 	return return_to_clean_room("Run complete. Returned to the Clean-Room.")
 
 func serialize_persistent_state() -> Dictionary:
 	return persistent_game_state.to_save_data()
+
+func publish_story_trigger(trigger: StringName, context: Dictionary = {}) -> Array[Dictionary]:
+	if story_mission_system != null: story_mission_system.observe(trigger, context)
+	if story_event_system == null: return []
+	var results := story_event_system.publish(trigger, context)
+	if story_mission_system != null: story_mission_system.refresh_availability()
+	return results
+
+func make_story_mission_available(mission_id: StringName) -> bool:
+	return story_mission_system != null and story_mission_system.make_available(mission_id)
+
+func start_story_mission(mission_id: StringName) -> Dictionary:
+	return story_mission_system.start_mission(mission_id) if story_mission_system != null else {"success": false, "reason": "Story missions are unavailable."}
+
+func resolve_story_mission() -> Dictionary:
+	if story_mission_system == null: return {"success": false, "reason": "Story missions are unavailable."}
+	var result := story_mission_system.resolve_active_mission()
+	if result.success and equipment_order_manager != null: equipment_order_manager.credits = int(persistent_game_state.player_state.get("credits", equipment_order_manager.credits))
+	return result
 
 func restore_persistent_state(data: Dictionary) -> void:
 	persistent_game_state = PersistentGameStateScript.from_save_data(data)
@@ -377,6 +444,10 @@ func _synchronize_persistent_state_from_runtime() -> void:
 			&"hackers": player_knowledge.hacker_records.duplicate(true),
 			&"observation_tick": player_knowledge.current_observation_tick,
 		}
+	if network_residue != null:
+		network_residue.capture_runtime(network_graph, ice_controller, physical_alarm_manager)
+		world["network_residue"] = network_residue.to_save_data()
+	world["network_security_level"] = maxi(int(world.get("network_security_level", 0)), suspended_security_level)
 	if intrusion_session != null:
 		var anchor := intrusion_session.suspended_anchor
 		var san: Variant = san_controller.get_san(intrusion_run_id) if san_controller != null else null
@@ -407,6 +478,15 @@ func _restore_saved_meatspace_runtime() -> void:
 	var world: Dictionary = persistent_game_state.world_state
 	if StringName(world.get("entry_state", &"")) != &"MEATSPACE": return
 	_restore_saved_programming_tasks(world.get("programming_tasks", []))
+	var saved_knowledge: Dictionary = world.get("network_knowledge", {})
+	if player_knowledge != null and not saved_knowledge.is_empty():
+		player_knowledge.node_records = _string_name_keyed(saved_knowledge.get("nodes", {}))
+		player_knowledge.link_records = _string_name_keyed(saved_knowledge.get("links", {}))
+		player_knowledge.sphere_records = _string_name_keyed(saved_knowledge.get("spheres", {}))
+		player_knowledge.service_records = _string_name_keyed(saved_knowledge.get("services", {}))
+		player_knowledge.ice_records = _string_name_keyed(saved_knowledge.get("ice", {}))
+		player_knowledge.hacker_records = _string_name_keyed(saved_knowledge.get("hackers", {}))
+		player_knowledge.current_observation_tick = int(saved_knowledge.get("observation_tick", 0))
 	var snapshot: Dictionary = world.get("intrusion_snapshot", {})
 	if snapshot.is_empty(): return
 	var resume: Dictionary = snapshot.get("resume_state", {})
@@ -526,6 +606,7 @@ func start_session() -> void:
 	sphere_tracker.sphere_changed.connect(EventBus.sphere_changed.emit)
 	cyberspace_clock = CyberspaceClockScript.new()
 	action_clock = cyberspace_clock
+	_create_authored_boss_encounter()
 	realtime_world_clock.start(true)
 	realtime_process_manager.bind_clock(realtime_world_clock)
 	if is_runtime_bundle_active(&"FACILITY_OPERATION_PROTOTYPE"):
@@ -540,6 +621,23 @@ func start_session() -> void:
 		_create_debug_operation_pressure()
 		_create_debug_realtime_story()
 	_create_shared_equipment_economy()
+	social_inbox = SocialMessageInboxScript.new()
+	var social_definitions: Variant = JSON.parse_string(FileAccess.get_file_as_string("res://data/social_messages.json"))
+	social_inbox.configure(persistent_game_state, social_definitions if social_definitions is Array else [])
+	social_inbox.message_delivered.connect(EventBus.social_message_delivered.emit)
+	story_event_system = StoryEventSystemScript.new()
+	story_event_system.configure(persistent_game_state)
+	for error: String in story_event_system.load_file("res://data/story_events.json"): push_error(error)
+	story_mission_system = StoryMissionSystemScript.new()
+	story_mission_system.configure(persistent_game_state, story_event_system)
+	for error: String in story_mission_system.load_file("res://data/story_missions.json"): push_error(error)
+	realtime_contact_comms = RealtimeCommsServiceScript.new()
+	story_contact_system = StoryContactSystemScript.new()
+	story_contact_system.configure(persistent_game_state, story_mission_system, realtime_contact_comms)
+	for error: String in story_contact_system.load_file("res://data/story_contacts.json"): push_error(error)
+	story_event_system.register_action_handler(&"start_comms", story_contact_system.start_comms_action)
+	realtime_contact_comms.subtitle_presented.connect(_on_contact_subtitle)
+	realtime_contact_comms.call_completed.connect(_on_contact_call_completed)
 	_create_free_roam_job_board()
 	_create_program_loadout(active_content_profile.get("kind", &"") != &"MEATSPACE_PROLOGUE")
 	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {})
@@ -559,6 +657,14 @@ func start_session() -> void:
 	else:
 		FacilityOperationFactory.populate_ice(ice_controller)
 		player_knowledge.detect_ice(&"FACILITY_SENTINEL_01")
+	network_residue = NetworkResidueStateScript.new()
+	network_residue.configure(persistent_game_state.world_state.get("network_residue", {}))
+	network_residue.advance(Time.get_unix_time_from_system())
+	network_residue.apply_to_graph(network_graph)
+	network_residue.apply_to_ice(ice_controller)
+	network_residue.apply_to_knowledge(player_knowledge)
+	network_residue.apply_to_alarms(physical_alarm_manager)
+	suspended_security_level = int(persistent_game_state.world_state.get("network_security_level", suspended_security_level))
 	hacker_npc_manager = HackerNPCManager.new()
 	hacker_npc_manager.name = "HackerNPCManager"
 	add_child(hacker_npc_manager)
@@ -607,6 +713,24 @@ func start_session() -> void:
 		add_child(entry_guidance)
 		entry_guidance.configure(active_content_document, persistent_game_state, player_network_position.current_node_id)
 
+func _create_authored_boss_encounter() -> void:
+	active_boss_encounter = null
+	if story_mission_system == null or story_mission_system.active_mission_id.is_empty(): return
+	var definition := story_mission_system.definitions.get(story_mission_system.active_mission_id) as MissionDefinition
+	if definition == null: return
+	var boss: Dictionary = definition.story_metadata.get("boss_encounter", {})
+	if boss.is_empty(): return
+	var archetype_name := StringName(boss.get("archetype", &"WARDEN")); var archetype_index := NetspaceBossEncounterScript.Archetype.keys().find(String(archetype_name))
+	if archetype_index < 0: return
+	active_boss_encounter = NetspaceBossEncounterScript.create(archetype_index as NetspaceBossEncounter.Archetype, StringName(boss.get("id", &"GLASSHOUSE_WARDEN")), StringName(boss.get("node_id", &"WARDEN")), network_graph)
+	active_boss_encounter.configure_objective(StringName(boss.get("objective_id", &"personnel.dat")), String(boss.get("objective_title", "personnel.dat")))
+	active_boss_encounter.bind_action_clock(action_clock, player_network_position)
+	active_boss_encounter.state_changed.connect(func(snapshot: Dictionary) -> void: publish_story_trigger(&"boss_state_changed", snapshot))
+	active_boss_encounter.event_emitted.connect(_on_authored_boss_event)
+
+func _on_authored_boss_event(event: Dictionary) -> void:
+	if StringName(event.get("type", &"")) == &"ALARM_ESCALATED": publish_story_trigger(&"alarm_triggered", {"service_id": &"ALARM_SERVICE", "source": &"WARDEN"})
+
 
 func _create_program_loadout(create_connection := true) -> void:
 	_intrusion_sequence += 1
@@ -617,7 +741,7 @@ func _create_program_loadout(create_connection := true) -> void:
 	game_domain = GameDomain.CYBERSPACE
 	program_inventory = ProgramInventoryScript.new()
 	program_inventory.instance_added.connect(_on_program_instance_added)
-	program_loadout = ProgramLoadoutScript.new(5)
+	program_loadout = ProgramLoadoutScript.new(active_slot_capacity())
 	var standard = DoorstopDefinitionScript.new(&"DOORSTOP_STANDARD", "Doorstop", "1.0")
 	doorstop_programming_definition = standard
 	standard.rarity = &"UNCOMMON"
@@ -655,7 +779,7 @@ func _create_program_loadout(create_connection := true) -> void:
 	meatspace_management = MeatspaceManagementScript.new()
 	meatspace_management.configure(program_inventory, program_loadout, equipment_order_manager, realtime_world_clock)
 	clean_room_controller = CleanRoomController.new()
-	clean_room_controller.configure(persistent_game_state, meatspace_management)
+	clean_room_controller.configure(persistent_game_state, meatspace_management, social_inbox, story_event_system, story_mission_system, story_contact_system)
 	if not persistent_game_state.player_state.is_empty():
 		meatspace_management.hardware_levels = (persistent_game_state.player_state.get("hardware", {}) as Dictionary).duplicate(true)
 		equipment_order_manager.credits = int(persistent_game_state.player_state.get("credits", 0))
@@ -666,6 +790,14 @@ func _create_program_loadout(create_connection := true) -> void:
 		meatspace_management.software_programming.add_resource(&"MEMORY_SHARD", 12)
 		meatspace_management.software_programming.add_resource(&"ROUTING_KERNEL", 6)
 		meatspace_management.software_programming.add_resource(&"GHOST_SIGNATURE", 2)
+
+
+func active_slot_capacity() -> int:
+	if persistent_game_state == null: return 2
+	var variant := StringName(persistent_game_state.player_state.get("selected_deck_variant", ""))
+	if variant == &"MORE_SLOTS": return 3
+	if variant == &"MORE_STORAGE": return 2
+	return clampi(int(persistent_game_state.player_state.get("active_slot_count", 2)), 2, 3)
 
 func _create_persistent_starter_programs() -> void:
 	var definitions := {}
@@ -680,12 +812,11 @@ func _create_persistent_starter_programs() -> void:
 		program_loadout.install(StringName(instance_id), program_inventory)
 
 func _on_hardware_changed(component_id: StringName, level: int) -> void:
-	if component_id != &"DECK_SENSORS" or sensor_topology == null: return
 	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {}).duplicate(true)
 	hardware[component_id] = level
 	persistent_game_state.player_state["hardware"] = hardware
 	persistent_game_state.emit_changed()
-	sensor_topology.set_sensors_rating(level)
+	if component_id == &"DECK_SENSORS" and sensor_topology != null: sensor_topology.set_sensors_rating(level)
 
 func _create_free_roam_job_board() -> void:
 	free_roam_job_board = null
@@ -715,6 +846,12 @@ func end_session() -> void:
 	action_clock = null
 	cyberspace_clock = null
 	ice_controller = null
+	network_residue = null
+	social_inbox = null
+	story_event_system = null
+	story_mission_system = null
+	story_contact_system = null
+	realtime_contact_comms = null
 	if hacker_npc_manager != null:
 		hacker_npc_manager.queue_free()
 	hacker_npc_manager = null
@@ -784,6 +921,7 @@ func _ensure_realtime_world_clock() -> void:
 	comms_manager = CommsManagerScript.new()
 	comms_manager.name = "CommsInterceptionManager"
 	add_child(comms_manager)
+	comms_manager.intercept_started.connect(_on_story_comms_intercepted)
 	outbound_comms_manager = OutboundManagerScript.new()
 	outbound_comms_manager.name = "OutboundCommsManager"
 	add_child(outbound_comms_manager)
@@ -793,6 +931,7 @@ func _ensure_realtime_world_clock() -> void:
 	physical_alarm_manager = PhysicalAlarmManagerScript.new()
 	physical_alarm_manager.name = "PhysicalAlarmManager"
 	add_child(physical_alarm_manager)
+	physical_alarm_manager.alarm_state_changed.connect(_on_story_alarm_state_changed)
 	physical_team_manager = TeamManagerScript.new()
 	physical_team_manager.name = "PhysicalTeamManager"
 	add_child(physical_team_manager)
@@ -1242,6 +1381,25 @@ func request_traversal(destination_node_id: StringName) -> ActionResult:
 	var cost := link.traversal_cost if link != null else 0
 	return request_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.MOVE, destination_node_id, cost))
 
+func traversal_preview(destination_node_id: StringName) -> Dictionary:
+	if network_graph == null or player_network_position == null: return {"error": NetworkGraph.TraversalError.INVALID_SOURCE, "reason": "NO ACTIVE NETWORK"}
+	return network_graph.validate_traversal(player_network_position, destination_node_id, player_knowledge.link_records.keys() if player_knowledge != null else [], Callable(self, "_resolve_traversal_requirement"))
+
+func _resolve_traversal_requirement(requirement: Dictionary, _from_node_id: StringName, _to_node_id: StringName, _link: NetworkLinkDefinition) -> Dictionary:
+	var type := StringName(requirement.get("type", &"story_flag")).to_lower(); var satisfied := false; var value: Variant = false
+	match type:
+		&"boss_resolved":
+			var encounter_id := StringName(requirement.get("encounter_id", &""))
+			value = active_boss_encounter != null and (encounter_id.is_empty() or active_boss_encounter.id == encounter_id) and active_boss_encounter.is_resolved(); satisfied = bool(value)
+		&"story_flag":
+			value = StoryState.new(persistent_game_state).get_flag(StringName(requirement.get("id", &""))); satisfied = bool(value) == bool(requirement.get("value", true))
+		&"mission_objective":
+			var objective: Dictionary = story_mission_system.active_run.get("objectives", {}).get(StringName(requirement.get("id", &"")), {}) if story_mission_system != null else {}; value = objective.get("state", &""); satisfied = value == requirement.get("state", ObjectiveDefinition.COMPLETED)
+		&"mission_status":
+			value = story_mission_system.status(StringName(requirement.get("id", &""))) if story_mission_system != null else &"LOCKED"; satisfied = value == requirement.get("state", StoryMissionSystem.COMPLETED)
+		&"scripted": satisfied = false
+	return {"satisfied": satisfied, "value": value, "reason": String(requirement.get("blocked_reason", "ACCESS REQUIREMENT NOT MET"))}
+
 func request_action(request: ActionRequest) -> ActionResult:
 	if not session_active or action_clock == null:
 		return ActionResult.new(false, 0, "No active simulation clock.")
@@ -1584,11 +1742,63 @@ func _on_knowledge_tick_advanced(_previous_tick: int, current_tick: int, _amount
 
 
 func _on_action_resolved_team_support(_request: ActionRequest, result: ActionResult) -> void:
+	if result.success:
+		for gameplay_event: Dictionary in result.events_produced: _route_mission_gameplay_event(gameplay_event)
+	if result.success and social_inbox != null:
+		social_inbox.evaluate(&"NETSPACE_PROGRESS", {"progress": int(action_clock.current_tick if action_clock != null else 0), "events": result.events_produced})
+	if result.success and network_residue != null:
+		network_residue.observe_events(result.events_produced, Time.get_unix_time_from_system())
+		network_residue.apply_to_graph(network_graph)
+		network_residue.apply_to_ice(ice_controller)
+		network_residue.apply_to_knowledge(player_knowledge)
+		persistent_game_state.world_state["network_residue"] = network_residue.to_save_data()
 	if not result.success or team_support_encounter == null:
 		return
 	for event: Dictionary in result.events_produced:
 		if event.get("type", &"") == &"SERVICE_COMPROMISED":
 			team_support_encounter.unlock_from_cyberspace(event.get("service_id", &""))
+
+func _route_mission_gameplay_event(event: Dictionary) -> void:
+	var type := StringName(event.get("type", &""))
+	match type:
+		&"DATA_EXTRACTED": publish_story_trigger(&"file_downloaded", {"file_id": event.get("resource_id", &"")})
+		&"DATA_DESTROYED", &"FILE_DESTROYED": publish_story_trigger(&"file_destroyed", {"file_id": event.get("resource_id", event.get("file_id", &""))})
+		&"SCAN_COMPLETED": publish_story_trigger(&"target_scanned", event)
+		&"SERVICE_DISABLED", &"SERVICE_COMPROMISED": publish_story_trigger(&"service_disabled", event)
+		&"ALARM_TRIGGERED": publish_story_trigger(&"alarm_triggered", event)
+		&"TRACE_COMPLETED": publish_story_trigger(&"trace_completed", event)
+		&"NODE_ENTERED", &"PLAYER_MOVED":
+			var reached_id := StringName(event.get("node_id", event.get("target", &"")))
+			publish_story_trigger(&"node_reached", {"node_id": reached_id})
+			_maybe_complete_story_mission_on_exit(reached_id)
+		&"COMMS_INTERCEPTED": publish_story_trigger(&"stream_intercepted", {"stream_id": event.get("session_id", event.get("source_id", &""))})
+
+func _on_story_comms_intercepted(session_id: StringName) -> void:
+	publish_story_trigger(&"stream_intercepted", {"stream_id": session_id})
+
+func _maybe_complete_story_mission_on_exit(node_id: StringName) -> void:
+	if story_mission_system == null or story_mission_system.active_mission_id.is_empty(): return
+	var definition := story_mission_system.definitions.get(story_mission_system.active_mission_id) as MissionDefinition
+	if definition == null or StringName(definition.story_metadata.get("exit_node", &"")) != node_id: return
+	for objective: Dictionary in story_mission_system.active_run.get("objectives", {}).values():
+		if bool(objective.get("required", false)) and objective.get("state") != ObjectiveDefinition.COMPLETED: return
+	call_deferred("complete_intrusion_and_return_to_meatspace", {"exit_node": node_id})
+
+func _on_story_alarm_state_changed(alarm_id: StringName, _previous: int, current: int) -> void:
+	if current == PhysicalAlarmInstance.State.TRIGGERED: publish_story_trigger(&"alarm_triggered", {"service_id": alarm_id})
+
+func _process(delta: float) -> void:
+	if realtime_contact_comms != null: realtime_contact_comms.advance(delta)
+
+func _on_contact_subtitle(line: Dictionary) -> void:
+	story_messages.append(line.duplicate(true))
+	HudState.diegetic_lesson_requested.emit(StringName(line.get("speaker", &"CONTACT")), StringName(line.get("call_id", &"CONTACT_CALL")), [String(line.get("text", ""))])
+
+func _on_contact_call_completed(call_id: StringName, completion_trigger: StringName) -> void:
+	if not completion_trigger.is_empty(): publish_story_trigger(completion_trigger, {"call_id": call_id})
+
+func save_metadata_run_count() -> int:
+	return int(persistent_game_state.save_metadata.get("completed_runs", action_clock.current_tick if action_clock != null else 0))
 
 func _validate_action(request: ActionRequest) -> Dictionary:
 	if confrontation_controller != null and confrontation_controller.has_action(request.action_type):
@@ -1623,9 +1833,10 @@ func _validate_action(request: ActionRequest) -> Dictionary:
 				return {"success": false, "reason": "Video command cost mismatch.", "events": []}
 			return {"success": true, "reason": "", "events": []}
 		ActionRequest.ActionType.MOVE:
-			var validation := network_graph.validate_traversal(player_network_position, StringName(request.target), player_knowledge.link_records.keys())
+			var validation := traversal_preview(StringName(request.target))
+			_log_traversal_evaluation(player_network_position.current_node_id, StringName(request.target), validation)
 			if validation.error != NetworkGraph.TraversalError.OK:
-				return {"success": false, "reason": NetworkGraph.TraversalError.keys()[validation.error], "events": []}
+				return {"success": false, "reason": String(validation.get("reason", NetworkGraph.TraversalError.keys()[validation.error])), "events": []}
 			var link: NetworkLinkDefinition = validation.link
 			if request.cost != link.traversal_cost:
 				return {"success": false, "reason": "Traversal cost mismatch.", "events": []}
@@ -1702,7 +1913,7 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 			return {"success": last_video_action_result.success, "reason": last_video_action_result.reason, "events": last_video_action_result.to_events()}
 		ActionRequest.ActionType.MOVE:
 			var origin := player_network_position.current_node_id
-			var result := network_graph.apply_traversal(player_network_position, StringName(request.target), player_knowledge.link_records.keys())
+			var result := network_graph.apply_traversal(player_network_position, StringName(request.target), player_knowledge.link_records.keys(), Callable(self, "_resolve_traversal_requirement"))
 			var move_events: Array[Dictionary] = [{"type": &"PLAYER_MOVED", "target": request.target}]
 			if result.error == NetworkGraph.TraversalError.OK:
 				player_knowledge.observe_traversal(network_graph, origin, StringName(request.target))
@@ -1710,8 +1921,11 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 				var recovered := failure_controller.recover_at(player_network_position.current_node_id)
 				if not recovered.is_empty():
 					move_events.append({"type": &"CRASH_CACHE_RECOVERED", "resources": recovered})
-				move_events.append_array(mission.check_completion())
-				if mission.mission_complete:
+				# Free Roam and other missionless runtime bundles share traversal.
+				# Mission completion is an optional observer of a successful move.
+				if is_instance_valid(mission):
+					move_events.append_array(mission.check_completion())
+				if is_instance_valid(mission) and mission.mission_complete:
 					var committed := anchor_controller.commit_resources(player_network_position.current_node_id, resource_state)
 					if not committed.is_empty():
 						move_events.append({"type": &"VOLATILE_DATA_COMMITTED", "resources": committed})
@@ -1737,6 +1951,11 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 			return {"success": transfer.success, "reason": transfer.reason, "events": transfer.events}
 	return {"success": false, "reason": "Unsupported action.", "events": []}
 
+func _log_traversal_evaluation(from_node_id: StringName, to_node_id: StringName, validation: Dictionary) -> void:
+	if not OS.is_debug_build(): return
+	var link: NetworkLinkDefinition = validation.get("link")
+	print("[Traversal] from=%s to=%s adjacent=%s edge_direction_valid=%s requirement=%s requirement_value=%s result=%s" % [from_node_id, to_node_id, str(link != null), str(link != null and link.connects_from(from_node_id)), JSON.stringify(validation.get("requirement", {})), str(validation.get("requirement_value", true)), "ALLOWED" if validation.error == NetworkGraph.TraversalError.OK else "BLOCKED"])
+
 func _update_ice(tick: int, _request: ActionRequest) -> Array[Dictionary]:
 	var events := ice_controller.update(_request.cost, _request)
 	events.push_front({"type": &"ICE_UPDATED", "tick": tick, "player_visible": false})
@@ -1755,6 +1974,10 @@ func _update_trace(tick: int, _request: ActionRequest) -> Array[Dictionary]:
 	trace_level += increase
 	var events: Array[Dictionary] = [{"type": &"TRACE_UPDATED", "tick": tick, "increase": increase, "trace": trace_level, "player_visible": increase != 0}]
 	if trace_level >= PayrollMissionController.TRACE_FAILURE_THRESHOLD:
+		if story_mission_system != null and not story_mission_system.active_mission_id.is_empty():
+			events.append({"type": &"TRACE_COMPLETED", "trace": trace_level, "player_visible": true})
+			call_deferred("fail_story_run", &"trace", {"trace": trace_level})
+			return events
 		var failure_node := player_network_position.current_node_id
 		failure_controller.force_disconnect_at_current_node(tick)
 		trace_level = 5

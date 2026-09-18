@@ -1,7 +1,7 @@
 class_name PersistentGameState
 extends Resource
 
-const CURRENT_SCHEMA_VERSION := 4
+const CURRENT_SCHEMA_VERSION := 5
 const LEGACY_DEFAULT_MODE := GameMode.Value.STORY
 
 @export var schema_version := CURRENT_SCHEMA_VERSION
@@ -49,6 +49,7 @@ static func from_save_data(data: Dictionary) -> PersistentGameState:
 	state.player_state = (data.get("player_state", {}) as Dictionary).duplicate(true)
 	state.world_state = (data.get("world_state", {}) as Dictionary).duplicate(true)
 	state.save_metadata = (data.get("save_metadata", {}) as Dictionary).duplicate(true)
+	StoryState.ensure_defaults(state)
 	state.schema_version = CURRENT_SCHEMA_VERSION
 	return state
 

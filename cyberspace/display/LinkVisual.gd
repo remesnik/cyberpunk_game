@@ -14,6 +14,7 @@ var _phase := 0.0
 var normal_width := 2.0
 var highlight_width := 5.0
 var _base_alpha := 0.72
+var runtime_state: StringName = &"ACTIVE"
 
 func configure(p_link_id: StringName, start: Vector2, finish: Vector2, is_unknown: bool = false, config: Resource = null) -> void:
 	link_id = p_link_id
@@ -43,6 +44,16 @@ func set_highlighted(enabled: bool) -> void:
 	highlighted = enabled
 	width = highlight_width if enabled else normal_width
 	default_color = AMBER if enabled else Color(CYAN, _base_alpha)
+
+func set_runtime_state(state: StringName) -> void:
+	runtime_state = state
+	if highlighted: return
+	match state:
+		&"BLOCKED": default_color = Color(0.55, 0.6, 0.65, 0.72); width = maxf(normal_width, 3.0)
+		&"HOSTILE": default_color = Color(1.0, 0.2, 0.25, 0.86); width = maxf(normal_width, 3.5)
+		&"DISABLED": default_color = Color(0.25, 0.3, 0.34, 0.24); width = maxf(0.8, normal_width * 0.7)
+		&"ONE_WAY": default_color = Color(1.0, 0.78, 0.25, 0.78); width = maxf(normal_width, 2.5)
+		_: default_color = Color(CYAN, _base_alpha); width = normal_width
 
 func _process(delta: float) -> void:
 	_phase = fmod(_phase + delta * 4.0, TAU)

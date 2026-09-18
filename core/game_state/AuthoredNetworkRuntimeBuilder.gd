@@ -18,15 +18,23 @@ static func build_graph(document: CyberspaceContentDocument, is_available: Calla
 			var service := document.find_entry(service_id)
 			if not service.is_empty() and _entry_available(service, is_available):
 				node.add_service(service_id, String(service.get("display_name", service_id)), int(service.get("security_level", 0)), _string_names(service.get("vulnerabilities", [])), _string_names(service.get("tags", [])))
+				if not node.services.is_empty(): node.services[node.services.size() - 1].merge(service, true)
 		graph.add_node(node)
 	for data: Dictionary in document.network_links:
 		if not _entry_available(data, is_available): continue
 		if not graph.nodes.has(StringName(data.get("source", &""))) or not graph.nodes.has(StringName(data.get("destination", &""))): continue
-		graph.add_link(NetworkLinkDefinition.new(
+		var link := NetworkLinkDefinition.new(
 			StringName(data.get("id", &"")), StringName(data.get("source", &"")), StringName(data.get("destination", &"")),
 			bool(data.get("one_way", false)), bool(data.get("hidden", false)), bool(data.get("locked", false)), bool(data.get("disabled", false)),
 			false, int(data.get("traversal_cost", 1)), int(data.get("authority_requirement", 0)), StringName(data.get("capability_requirement", &""))
-		))
+		)
+		var gate_name := StringName(data.get("traversal_gate", data.get("gate", &"NONE"))).to_upper()
+		var gate_index := NetworkLinkDefinition.TraversalGateType.keys().find(String(gate_name))
+		if gate_index >= 0: link.traversal_gate_type = gate_index as NetworkLinkDefinition.TraversalGateType
+		link.traversal_requirement = (data.get("traversal_requirement", data.get("requirement", {})) as Dictionary).duplicate(true)
+		link.blocked_reason = String(data.get("blocked_reason", "ACCESS REQUIREMENT NOT MET"))
+		if link.traversal_gate_type == NetworkLinkDefinition.TraversalGateType.ONE_WAY: link.one_way = true
+		graph.add_link(link)
 	return graph
 
 static func build_player(document: CyberspaceContentDocument, graph: NetworkGraph = null) -> PlayerNetworkPosition:

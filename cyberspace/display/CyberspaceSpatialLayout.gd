@@ -2,9 +2,9 @@ class_name CyberspaceSpatialLayout
 extends RefCounted
 
 const NODE_BASE_HEIGHT := 0.0
-const LAYER_DEPTH := 7.0
-const BRANCH_WIDTH := 6.4
-const CAMERA_DISTANCE := 11.0
+const LAYER_DEPTH := 12.0
+const BRANCH_WIDTH := 10.0
+const CAMERA_DISTANCE := 26.0
 const FOCAL_LENGTH := 620.0
 
 var anchors: Dictionary = {}
@@ -19,9 +19,13 @@ var camera_from := Vector3.ZERO
 var camera_to := Vector3.ZERO
 var transition_progress := 1.0
 var _camera_initialized := false
+var _graph_instance_id := 0
 
 func configure(graph: NetworkGraph, preferred_root: StringName) -> void:
 	if graph == null: clear(); return
+	var graph_instance_id := graph.get_instance_id()
+	if _graph_instance_id != 0 and _graph_instance_id != graph_instance_id: clear()
+	_graph_instance_id = graph_instance_id
 	if root_id == &"":
 		root_id = preferred_root
 		_build_initial_layout(graph)
@@ -32,22 +36,25 @@ func configure(graph: NetworkGraph, preferred_root: StringName) -> void:
 
 func clear() -> void:
 	anchors.clear(); depths.clear(); lanes.clear(); primary_parents.clear(); edge_endpoints.clear(); edge_lengths.clear()
-	root_id = &""; camera_anchor = Vector3.ZERO; transition_progress = 1.0; _camera_initialized = false
+	root_id = &""; camera_anchor = Vector3.ZERO; transition_progress = 1.0; _camera_initialized = false; _graph_instance_id = 0
 
 func _build_initial_layout(graph: NetworkGraph) -> void:
 	var traversal := _rooted_traversal(graph)
 	depths = traversal.depths; primary_parents = traversal.parents
-	var next_leaf := [0.0]
-	_assign_subtree_lane(root_id, traversal.children, next_leaf)
-	var root_lane := float(lanes.get(root_id, 0.0))
-	for id_value: Variant in lanes.keys(): lanes[id_value] = float(lanes[id_value]) - root_lane
 	var ids: Array = graph.nodes.keys(); ids.sort_custom(_sort_ids)
-	var disconnected_lane: float = float(next_leaf[0])
+	var layers: Dictionary = {}
 	for id_value: Variant in ids:
 		var id := StringName(id_value)
 		if not depths.has(id):
-			depths[id] = _deepest_layer() + 1; lanes[id] = disconnected_lane; disconnected_lane += 1.0
-		_commit_anchor(id)
+			depths[id] = _deepest_layer() + 1
+		var layer: Array = layers.get(int(depths[id]), [])
+		layer.append(id); layers[int(depths[id])] = layer
+	for depth_value: Variant in layers:
+		var layer: Array = layers[depth_value]
+		for index in layer.size():
+			var id := StringName(layer[index])
+			lanes[id] = float(index) - float(layer.size() - 1) * 0.5
+			_commit_anchor(id)
 
 func _rooted_traversal(graph: NetworkGraph) -> Dictionary:
 	var result_depths := {}; var parents := {}; var children := {}

@@ -1,0 +1,675 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Godot active slot regression",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ActiveProgramSlotTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focused tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace HUD test",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot project headless launch",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"--quit-after",
+				"3"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual command tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual command tests rerun",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual command tests final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot input regression tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot HUD regression tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual final tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot semantic final tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace HUD final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace headless launch",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"--quit-after",
+				"3"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus tests rerun",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus HUD tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus input tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus final tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus project launch",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"--quit-after",
+				"3"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace focus HUD regression",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot integrated focus regression",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot integrated focus regression rerun",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot integrated focus regression final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot integrated focus regression clean",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot integrated input test",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot integrated HUD test",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot active slot test",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ActiveProgramSlotTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual command test",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot camera movement regression",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceNodeVisualizationTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot final headless launch",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"--quit-after",
+				"3"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot starter slot tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/StarterDeckSlotTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual dial tests",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual dial tests rerun",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot import Netspace SVG assets",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--editor",
+				"--import",
+				"--path",
+				"."
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual dial tests final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual dial clean test",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot starter slot final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/StarterDeckSlotTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot active slot final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ActiveProgramSlotTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot focus final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot focus clean final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/NetspaceFocusModeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot contextual clean final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/ContextualCommandTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot Netspace HUD final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceHudLayoutTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot input final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot prologue deck regression",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/MeatspacePrototypeTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot camera movement final",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/CyberspaceNodeVisualizationTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot final project launch",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"--quit-after",
+				"3"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot final input verification",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/GameplayActionBindingTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot final headless verification",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"--quit-after",
+				"3"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Godot live Netspace HUD integration",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/StoryPrologueIntegrationTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Live Main scene Netspace verification",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/StoryPrologueIntegrationTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		},
+		{
+			"label": "Live Main scene Netspace verification rerun",
+			"type": "shell",
+			"command": ".\\Godot_v4.7-stable_win64_console.exe",
+			"args": [
+				"--headless",
+				"--path",
+				".",
+				"res://tests/StoryPrologueIntegrationTests.tscn"
+			],
+			"isBackground": false,
+			"problemMatcher": []
+		}
+	]
+}

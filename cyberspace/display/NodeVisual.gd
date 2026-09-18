@@ -18,6 +18,7 @@ var is_unknown := false
 var is_destination := false
 var is_security_visible := false
 var is_selectable := false
+var traversal_blocked := false
 var security_level := 0
 var level_known := false
 var capability_types: Array[int] = []
@@ -164,6 +165,10 @@ func set_destination_emphasis(enabled: bool) -> void:
 	is_destination = enabled
 	queue_redraw()
 
+func set_traversal_blocked(blocked: bool) -> void:
+	traversal_blocked = blocked
+	queue_redraw()
+
 func resolved_level_style() -> Resource:
 	if visualization_config == null:
 		return DEFAULT_VISUALIZATION_CONFIG.style_for_level(security_level, level_known and not is_unknown)
@@ -298,6 +303,9 @@ func _draw() -> void:
 		var unknown_style: Resource = visualization_config.style_for_level(0, false)
 		fill_color = (unknown_style.get("fill_color") as Color).lerp(fill_color, resolve_progress)
 		border_color = (unknown_style.get("border_color") as Color).lerp(border_color, resolve_progress)
+	if traversal_blocked:
+		fill_color = fill_color.lerp(Color(0.10, 0.11, 0.13, fill_color.a), 0.72)
+		border_color = Color(0.78, 0.38, 0.28, 0.9)
 	var intensity := float(style.get("intensity"))
 	var pulse_amount := float(style.get("pulse_amount"))
 	var current_pulse := 0.5

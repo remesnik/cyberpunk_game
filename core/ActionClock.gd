@@ -21,6 +21,9 @@ func register_trace_updater(updater: Callable) -> void:
 func register_network_updater(updater: Callable) -> void:
 	_register_once(_network_updaters, updater)
 
+func unregister_network_updater(updater: Callable) -> void:
+	_network_updaters.erase(updater)
+
 func resolve_action(request: ActionRequest, validator: Callable, applier: Callable) -> ActionResult:
 	if _resolving:
 		return _finish(request, ActionResult.new(false, 0, "Another action is resolving."))

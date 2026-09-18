@@ -1,6 +1,7 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://ui/clean_room/CleanRoom.gd" id="1"]
+[ext_resource type="Script" path="res://ui/input/ControlHintBar.gd" id="2_hints"]
 
 [sub_resource type="StyleBoxFlat" id="panel"]
 bg_color = Color(1, 1, 1, 0.92)
@@ -87,6 +88,22 @@ theme_override_styles/hover = SubResource("go")
 text = "GO\nNETSPACE"
 tooltip_text = "Enter the prepared Netspace run."
 
+[node name="ControlsButton" type="Button" parent="."]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -158.0
+offset_top = 24.0
+offset_right = -24.0
+offset_bottom = 66.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.04, 0.28, 0.34, 0.82)
+theme_override_font_sizes/font_size = 15
+text = "?  CONTROLS"
+tooltip_text = "Open the controls reference."
+
 [node name="PrepPanel" type="PanelContainer" parent="."]
 layout_mode = 1
 anchors_preset = 7
@@ -105,6 +122,15 @@ theme_override_styles/panel = SubResource("panel")
 [node name="Rows" type="VBoxContainer" parent="PrepPanel"]
 layout_mode = 2
 theme_override_constants/separation = 8
+
+[node name="MissionLabel" type="Label" parent="PrepPanel/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 1)
+theme_override_font_sizes/font_size = 13
+text = "MISSION BRIEFING"
+horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="ConnectionLabel" type="Label" parent="PrepPanel/Rows"]
 unique_name_in_owner = true
@@ -142,7 +168,30 @@ theme_override_colors/font_color = Color(0.04, 0.14, 0.18, 1)
 [node name="ContactButton" type="Button" parent="PrepPanel/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
-text = "CONTACT ALLY  //  LATCH"
+text = "CONTACT ALLIES"
+[node name="ContactRow" type="HBoxContainer" parent="PrepPanel/Rows"]
+layout_mode = 2
+[node name="ContactSelect" type="OptionButton" parent="PrepPanel/Rows/ContactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="ContactInteraction" type="OptionButton" parent="PrepPanel/Rows/ContactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="ContactActionButton" type="Button" parent="PrepPanel/Rows/ContactRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "OPEN"
+[node name="AllyStatus" type="Label" parent="PrepPanel/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+horizontal_alignment = 1
+text = "LATCH // OFFLINE    NO NEW MESSAGES"
+[node name="InboxButton" type="Button" parent="PrepPanel/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "READ MESSAGE"
 [node name="MessageLabel" type="Label" parent="PrepPanel/Rows"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(0, 38)
@@ -164,3 +213,125 @@ offset_bottom = -24.0
 grow_vertical = 0
 text = "⌂  RETURN HOME"
 tooltip_text = "Leave the Clean-Room and return to Meatspace."
+
+[node name="TutorialHint" type="Label" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_left = 210.0
+offset_top = 78.0
+offset_right = -210.0
+offset_bottom = 112.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 0.88)
+theme_override_font_sizes/font_size = 14
+text = "GO — enter Netspace  •  CONTROLS — review controls  •  RETURN HOME — back to Meatspace"
+horizontal_alignment = 1
+mouse_filter = 2
+
+[node name="ControlsSheet" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+
+[node name="Dim" type="ColorRect" parent="ControlsSheet"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.92, 0.95, 0.95, 0.82)
+
+[node name="Sheet" type="PanelContainer" parent="ControlsSheet"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -510.0
+offset_top = -340.0
+offset_right = 510.0
+offset_bottom = 340.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("panel")
+
+[node name="Margin" type="MarginContainer" parent="ControlsSheet/Sheet"]
+layout_mode = 2
+theme_override_constants/margin_left = 28
+theme_override_constants/margin_top = 22
+theme_override_constants/margin_right = 28
+theme_override_constants/margin_bottom = 22
+
+[node name="Rows" type="VBoxContainer" parent="ControlsSheet/Sheet/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="ControlsSheet/Sheet/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.03, 0.18, 0.22, 1)
+theme_override_font_sizes/font_size = 24
+text = "CONTROLS  //  QUICK REFERENCE"
+
+[node name="Rule" type="HSeparator" parent="ControlsSheet/Sheet/Margin/Rows"]
+layout_mode = 2
+
+[node name="Columns" type="HBoxContainer" parent="ControlsSheet/Sheet/Margin/Rows"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 28
+
+[node name="PrimaryBindings" type="Label" parent="ControlsSheet/Sheet/Margin/Rows/Columns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(390, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 14
+
+[node name="AlternateBindings" type="Label" parent="ControlsSheet/Sheet/Margin/Rows/Columns"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(390, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 12
+
+[node name="Grammar" type="Label" parent="ControlsSheet/Sheet/Margin/Rows"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 0.9)
+theme_override_font_sizes/font_size = 13
+text = "NETSPACE GRAMMAR  //  RIGHT STICK: WHAT am I targeting?   D-PAD LEFT/RIGHT: WHAT command?   A/CROSS: DO IT   •   LB/RB: WHICH slot?   RT: RUN   •   LT: MANAGE"
+horizontal_alignment = 1
+
+[node name="CloseControlsButton" type="Button" parent="ControlsSheet/Sheet/Margin/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+text = "B / CIRCLE  •  ESCAPE   //   CLOSE"
+
+[node name="ControlHints" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 200.0
+offset_top = -64.0
+offset_right = -24.0
+offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.04, 0.28, 0.34, 0.8)
+horizontal_alignment = 2
+text = "ARROWS: SELECT  •  ENTER: CONFIRM  •  ESC: BACK"
+script = ExtResource("2_hints")
+keyboard_text = "ARROWS: SELECT  •  ENTER: CONFIRM  •  ESC: BACK"
+gamepad_text = "RIGHT STICK / D-PAD: SELECT  •  A: CONFIRM  •  B: BACK  •  Y: LOADOUT"

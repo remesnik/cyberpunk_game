@@ -616,6 +616,17 @@ func report_ice(instance_id: StringName, node_id: StringName, state: IceState.Va
 	reveal_node_capability(node_id, NodeCapabilityType.Value.ICE, &"ICE_OBSERVATION", instance_id)
 	knowledge_changed.emit()
 
+func observe_ice_combat_state(instance_id: StringName, integrity: int, maximum_integrity: int, operational: bool, state: IceState.Value) -> void:
+	if not ice_records.has(instance_id): return
+	var record := (ice_records[instance_id] as Dictionary).duplicate(true)
+	record["integrity"] = maxi(0, integrity)
+	record["maximum_integrity"] = maxi(1, maximum_integrity)
+	record["operational"] = operational
+	record["attackable"] = operational
+	record["state"] = state
+	ice_records[instance_id] = record
+	knowledge_changed.emit()
+
 func mark_ice_position_stale(instance_id: StringName) -> void:
 	if not ice_records.has(instance_id): return
 	var record := (ice_records[instance_id] as Dictionary).duplicate(true)

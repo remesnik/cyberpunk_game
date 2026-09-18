@@ -1,6 +1,18 @@
 {
   "id": "BEDROOM",
   "objects": {
+    "DOOR": {
+      "verbs": [
+        {
+          "id": "TRAVEL",
+          "text": "Check available Meatspace destinations."
+        }
+      ],
+      "examine": "Leave home.",
+      "primary_action": "TRAVEL",
+      "display_name": "Door",
+      "kind": "DOOR"
+    },
     "BED": {
       "verbs": [
         {
@@ -66,6 +78,7 @@
       },
       "examine": "A cardboard carton containing your starter deck. Two configurations, one machine.",
       "primary_action": "STORY",
+      "visible_if": {"scope": "flag", "id": "DECK_SELECTED", "operator": "equals", "value": false},
       "visibility": {
         "flag": "DECK_SELECTED",
         "equals": false
@@ -75,7 +88,7 @@
       "verbs": [
         {
           "id": "EXAMINE",
-          "text": "A battered steel case. The handle has outlasted two sets of tools."
+          "text": "Toolbox — install hardware and upgrades. The handle has outlasted two sets of tools."
         },
         {
           "id": "OPEN",
@@ -94,7 +107,7 @@
       "visual_state": {
         "open": "TOOLBOX_OPEN"
       },
-      "examine": "A battered steel case. The handle has outlasted two sets of tools.",
+      "examine": "Toolbox — install hardware and upgrades. The handle has outlasted two sets of tools.",
       "primary_action": "STORY",
       "phase_interactions": {
         "DECK_SELECTION": "TOOLBOX",
@@ -118,6 +131,10 @@
             -0.32,
             1.09,
             0
+          ],
+          "fallbacks": [
+            {"inventory_id": "BASIC_NETWORK_ADAPTER", "item": {"id": "BASIC_NETWORK_ADAPTER", "visual": "SMALL_CASE", "name": "Network adapter"}},
+            {"when_flag": "LATCH_CONTACTED", "item": {"id": "FIELD_MANUAL", "visual": "BOOK", "name": "Marked-up field manual"}}
           ]
         },
         {
@@ -126,6 +143,10 @@
             0.32,
             1.09,
             0
+          ],
+          "fallbacks": [
+            {"visible_if": {"scope": "flag", "id": "glasshouse_file_acquired", "operator": "equals", "value": true}, "item": {"id": "GLASSHOUSE_ARCHIVE", "visual": "BOOK", "name": "Glasshouse personnel archive"}},
+            {"when_flag": "DECK_SELECTED", "item": {"id": "DECK_MODULE", "visual": "SMALL_CASE", "name": "Starter deck module"}}
           ]
         }
       ],
@@ -184,10 +205,25 @@
               "value": false
             }
           ]
+        },
+        {
+          "id": "RAISE_BLINDS",
+          "when_flag": "WINDOW_BLINDS_RAISED",
+          "equals": false,
+          "text": "The blinds gather above the glass, exposing the skyline.",
+          "actions": [{"type": "SET_FLAG", "id": "WINDOW_BLINDS_RAISED", "value": true}]
+        },
+        {
+          "id": "LOWER_BLINDS",
+          "when_flag": "WINDOW_BLINDS_RAISED",
+          "equals": true,
+          "text": "The blinds settle back into pale horizontal stripes.",
+          "actions": [{"type": "SET_FLAG", "id": "WINDOW_BLINDS_RAISED", "value": false}]
         }
       ],
       "visual_state": {
-        "open": "WINDOW_OPEN"
+        "open": "WINDOW_OPEN",
+        "blinds": "WINDOW_BLINDS_RAISED"
       },
       "examine": "Venetian blinds stripe the skyline. Beyond the glass: rooftop utilities, signal towers, and a city that never quite sleeps.",
       "primary_action": "PHYSICAL"
@@ -246,6 +282,10 @@
       ],
       "examine": "A terminal, isolation switch, and coiled interface lead. Your connection to the local board.",
       "primary_action": "CONNECT",
+      "visible_if": {"scope": "flag", "id": "DECK_SELECTED", "operator": "equals", "value": true},
+      "visual_state": {
+        "assembled": "DECK_ASSEMBLED"
+      },
       "visibility": {
         "flag": "DECK_SELECTED",
         "equals": true
@@ -288,10 +328,25 @@
               "value": false
             }
           ]
+        },
+        {
+          "id": "RAISE_BLINDS",
+          "when_flag": "WINDOW_TABLE_BLINDS_RAISED",
+          "equals": false,
+          "text": "The side-window blinds lift clear.",
+          "actions": [{"type": "SET_FLAG", "id": "WINDOW_TABLE_BLINDS_RAISED", "value": true}]
+        },
+        {
+          "id": "LOWER_BLINDS",
+          "when_flag": "WINDOW_TABLE_BLINDS_RAISED",
+          "equals": true,
+          "text": "The side-window blinds lower.",
+          "actions": [{"type": "SET_FLAG", "id": "WINDOW_TABLE_BLINDS_RAISED", "value": false}]
         }
       ],
       "visual_state": {
-        "open": "WINDOW_TABLE_OPEN"
+        "open": "WINDOW_TABLE_OPEN",
+        "blinds": "WINDOW_TABLE_BLINDS_RAISED"
       },
       "examine": "Venetian blinds stripe the skyline. Beyond the glass: rooftop utilities, signal towers, and a city that never quite sleeps.",
       "primary_action": "PHYSICAL",
@@ -300,6 +355,15 @@
       "display_name": "Table window"
     }
   },
+  "dressing": [
+    {"id": "CHAIR_JACKET", "position": [2.6, 1.02, 3.02], "when_flag": "DECK_SELECTED", "item": {"visual": "BACKPACK", "name": "Work backpack"}},
+    {"id": "DESK_CUP", "position": [-1.28, 1.03, -2.28], "when_flag": "DECK_SELECTED", "item": {"visual": "CUP", "name": "Stained coffee cup"}},
+    {"id": "DESK_CABLE", "position": [0.08, 1.04, -2.02], "when_flag": "TOOLBOX_OPEN", "item": {"visual": "CABLE", "name": "Loose patch cable"}},
+    {"id": "DESK_TAKEOUT", "position": [-1.0, 1.04, -2.03], "when_flag": "BBS_READ", "item": {"visual": "FOOD", "name": "Empty food carton"}},
+    {"id": "CPU_UPGRADE", "position": [0.58, 1.08, -2.08], "hardware_id": "DECK_CPU", "minimum_level": 2, "item": {"visual": "SMALL_CASE", "name": "Upgraded processor module"}},
+    {"id": "RAM_UPGRADE", "position": [0.88, 1.06, -2.08], "hardware_id": "DECK_RAM", "minimum_level": 2, "item": {"visual": "CABLE", "name": "Expanded memory assembly"}}
+    ,{"id": "MESSAGE_WAITING", "position": [1.25, 1.61, -2.18], "requires_unread": true, "item": {"visual": "BOOK", "name": "Message waiting indicator"}}
+  ],
   "environment": {
     "profiles": {
       "DAY": {
@@ -314,7 +378,9 @@
           "distant_traffic": -22,
           "night_electric": -48
         },
-        "event_interval_scale": 1
+        "event_interval_scale": 1,
+        "rooftop_activity": true,
+        "city_lights": false
       },
       "DUSK": {
         "sky": "ad6870",
@@ -328,7 +394,9 @@
           "distant_traffic": -27,
           "night_electric": -36
         },
-        "event_interval_scale": 1.2
+        "event_interval_scale": 1.2,
+        "rooftop_activity": true,
+        "city_lights": true
       },
       "NIGHT": {
         "sky": "101a32",
@@ -342,7 +410,9 @@
           "distant_traffic": -38,
           "night_electric": -26
         },
-        "event_interval_scale": 1.65
+        "event_interval_scale": 1.65,
+        "rooftop_activity": false,
+        "city_lights": true
       },
       "DAWN": {
         "sky": "b0959f",
@@ -356,7 +426,9 @@
           "distant_traffic": -40,
           "night_electric": -42
         },
-        "event_interval_scale": 1.9
+        "event_interval_scale": 1.9,
+        "rooftop_activity": false,
+        "city_lights": false
       }
     },
     "window_flag": "WINDOW_OPEN",
@@ -376,7 +448,11 @@
       "WINDOW_OPEN",
       "WINDOW_TABLE_OPEN"
     ],
-    "layers": [],
+    "layers": [
+      {"id": "rooftop_wind", "path": "res://assets/meatspace/audio/rooftop_wind.wav"},
+      {"id": "distant_traffic", "path": "res://assets/meatspace/audio/distant_traffic.wav"},
+      {"id": "night_electric", "path": "res://assets/meatspace/audio/night_electric.wav"}
+    ],
     "portal": {
       "closed_gain": 0.4,
       "open_gain": 1.0,
@@ -392,6 +468,7 @@
           "id": "car_horn_realistic_01",
           "path": "res://assets/meatspace/audio/car_horn_realistic_01.wav",
           "category": "horn",
+          "times": ["DAY", "DUSK"],
           "volume_db": -21,
           "cooldown": 35
         },
@@ -399,6 +476,7 @@
           "id": "car_horn_realistic_02",
           "path": "res://assets/meatspace/audio/car_horn_realistic_02.wav",
           "category": "horn",
+          "times": ["DAY", "DUSK", "DAWN"],
           "volume_db": -22,
           "cooldown": 35
         },
@@ -406,6 +484,7 @@
           "id": "car_horn_realistic_03",
           "path": "res://assets/meatspace/audio/car_horn_realistic_03.wav",
           "category": "horn",
+          "times": ["DAY", "DUSK"],
           "volume_db": -23,
           "cooldown": 35
         },
@@ -413,6 +492,7 @@
           "id": "ambulance_distant_long_fade",
           "path": "res://assets/meatspace/audio/ambulance_distant_long_fade.wav",
           "category": "siren",
+          "times": ["NIGHT"],
           "volume_db": -25,
           "cooldown": 65
         },
@@ -420,6 +500,7 @@
           "id": "fire_engine_from_reference_transformed_10blocks",
           "path": "res://assets/meatspace/audio/fire_engine_from_reference_transformed_10blocks.wav",
           "category": "siren",
+          "times": ["NIGHT", "DAWN"],
           "volume_db": -27,
           "cooldown": 65
         },
@@ -427,6 +508,7 @@
           "id": "helicopter_over_building_6s_doppler",
           "path": "res://assets/meatspace/audio/helicopter_over_building_6s_doppler.wav",
           "category": "helicopter",
+          "times": ["NIGHT"],
           "volume_db": -28,
           "cooldown": 80
         }

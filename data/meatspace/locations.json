@@ -1,0 +1,49 @@
+{
+  "locations": [
+    {
+      "id": "HOME",
+      "display_name": "Home",
+      "scene_path": "res://ui/story_prologue/PlayerBedroom.tscn",
+      "description": "Your apartment and deck workspace.",
+      "unlocked": true,
+      "return_destination": "HOME",
+      "destinations": ["CHINATOWN", "LITTLE_TANZANIA", "CBD", "HACKER_CLUB"]
+    },
+    {
+      "id": "CHINATOWN",
+      "display_name": "Chinatown",
+      "scene_path": "res://ui/meatspace/locations/Chinatown.tscn",
+      "description": "Rain-bright storefronts and late-night electronics counters.",
+      "unlocked": true,
+      "return_destination": "HOME",
+      "destinations": ["HOME"]
+    },
+    {
+      "id": "LITTLE_TANZANIA",
+      "display_name": "Little Tanzania",
+      "scene_path": "res://ui/meatspace/locations/LittleTanzania.tscn",
+      "description": "A compact neighborhood plaza alive with food stalls and radios.",
+      "unlocked": true,
+      "return_destination": "HOME",
+      "destinations": ["HOME"]
+    },
+    {
+      "id": "CBD",
+      "display_name": "CBD",
+      "scene_path": "res://ui/meatspace/locations/CBD.tscn",
+      "description": "The corporate district after office hours.",
+      "unlocked": true,
+      "return_destination": "HOME",
+      "destinations": ["HOME"]
+    },
+    {
+      "id": "HACKER_CLUB",
+      "display_name": "Hacker Club",
+      "scene_path": "res://ui/meatspace/locations/HackerClub.tscn",
+      "description": "A basement venue running on patched cables and borrowed bandwidth.",
+      "unlocked": true,
+      "return_destination": "HOME",
+      "destinations": ["HOME"]
+    }
+  ]
+}

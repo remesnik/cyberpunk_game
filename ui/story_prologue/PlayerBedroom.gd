@@ -1,10 +1,15 @@
 class_name PlayerBedroom
 extends MeatspaceRoomView3D
+const FirstMeatspaceTutorial = preload("res://core/story/FirstMeatspaceTutorial.gd")
 ## Geometry only: authored definitions and the controller own all story behavior.
 @export var definition: MeatspacePrologueDefinition = preload("res://data/authoring/story_prologue.tres")
 var location_definition: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://data/meatspace/bedroom.json"))
 var exterior: MeatspaceEnvironment3D
 var display_anchors: Array[MeatspaceDisplayAnchor3D] = []
+var dressing: Dictionary = {}
+var onboarding_prompt: Label
+var onboarding_emphasis: Node3D
+var tutorial_step := FirstMeatspaceTutorial.Step.COMPLETE
 const WOOD := Color("655043")
 const METAL := Color("303e46")
 const POSTERS := {
@@ -68,7 +73,12 @@ func _build_room() -> void:
 	window_data.merge({"id": &"WINDOW", "kind": &"WINDOW", "display_name": "WINDOW", "interaction_text": "[ EXAMINE ]"})
 	_build_prop(window_data)
 	_build_prop(location_definition.objects.WINDOW_TABLE)
+	var door_data: Dictionary = location_definition.objects.DOOR.duplicate(true)
+	door_data["id"] = &"DOOR"
+	_build_prop(door_data)
 	_build_chair()
+	_build_dressing()
+	_build_onboarding_cue()
 	exterior = MeatspaceEnvironment3D.new()
 	world.add_child(exterior)
 	exterior.configure(location_definition.environment, settings)
@@ -82,12 +92,39 @@ func _sync_environment() -> void:
 func bind_state(state: PersistentGameState) -> void:
 	if exterior != null and state != game_state: exterior.set_active(false)
 	super.bind_state(state)
+	_refresh_onboarding()
 	_sync_environment()
 
 func _refresh_state() -> void:
 	super._refresh_state()
 	if exterior != null: exterior.apply_state(game_state)
 	for anchor: MeatspaceDisplayAnchor3D in display_anchors: anchor.apply_state(game_state)
+	_refresh_dressing()
+	_refresh_onboarding()
+
+func _build_dressing() -> void:
+	for entry: Dictionary in location_definition.get("dressing", []):
+		var holder := Node3D.new()
+		holder.name = String(entry.id)
+		var p: Array = entry.position
+		holder.position = Vector3(p[0], p[1], p[2])
+		world.add_child(holder)
+		MeatspaceDisplayAnchor3D.build_item(holder, entry.get("item", {}))
+		dressing[StringName(entry.id)] = {"node": holder, "definition": entry}
+
+func _refresh_dressing() -> void:
+	var flags: Dictionary = game_state.campaign_state.get("story_flags", {}) if game_state != null else {}
+	var inventory: Array = game_state.player_state.get("inventory", []) if game_state != null else []
+	var hardware: Dictionary = game_state.player_state.get("hardware", {}) if game_state != null else {}
+	for record: Dictionary in dressing.values():
+		var entry: Dictionary = record.definition
+		var shown := game_state != null and StoryBindingEvaluator.visible(entry, game_state)
+		if entry.has("when_flag"): shown = shown and bool(flags.get(entry.when_flag, false)) == bool(entry.get("equals", true))
+		if entry.has("inventory_id"):
+			shown = shown and inventory.any(func(value: Variant) -> bool: return (value is Dictionary and String(value.get("id", "")) == String(entry.inventory_id)) or String(value) == String(entry.inventory_id))
+		if entry.has("hardware_id"): shown = shown and int(hardware.get(entry.hardware_id, 0)) >= int(entry.get("minimum_level", 2))
+		if entry.get("requires_unread", false): shown = shown and not game_state.world_state.get("social_inbox", {}).get("messages", []).filter(func(message: Dictionary) -> bool: return not bool(message.get("read", false))).is_empty()
+		(record.node as Node3D).visible = shown
 
 func _build_prop(data: Dictionary) -> void:
 	var target := MeatspaceTarget3D.new()
@@ -105,6 +142,7 @@ func _build_prop(data: Dictionary) -> void:
 		&"TABLE": pos = Vector3(2.55, 0, 1.25); bounds = Vector3(1.35, 1.25, 1.65)
 		&"SHELF": pos = Vector3(3.1, 0, -0.65); bounds = Vector3(0.65, 2.4, 1.4)
 		&"JACK": pos = Vector3(1.25, 0.99, -2.25); bounds = Vector3(0.6, 0.7, 0.55)
+		&"DOOR": pos = Vector3(-3.48, 0, 2.55); bounds = Vector3(1.15, 2.35, 0.16)
 		&"POSTER":
 			var index := [&"POSTER_VIRUS", &"POSTER_PHREAKER", &"POSTER_WAREZ"].find(StringName(data.id))
 			pos = Vector3(-2.65 + index * 1.3, 1.95, -2.89)
@@ -134,6 +172,7 @@ func _build_prop(data: Dictionary) -> void:
 			for i in range(9):
 				var slat := _block(target, Vector3(1.55, 0.025, 0.10), Vector3(0, 0.18 + i * 0.14, 0.12), Color("b5b39b"))
 				slat.rotation_degrees.x = -15
+				target.bind_visual(slat, &"rotation_degrees", &"blinds", Vector3(-15, 0, 0), Vector3(70, 0, 0))
 			_block(target, Vector3(0.014, 1.35, 0.014), Vector3(0.6, 0.7, 0.17), Color("ded7b7"))
 		&"DESK": _table(target, Vector3.ZERO, Vector3(3.5, 0.95, 1.0))
 		&"BED":
@@ -144,6 +183,7 @@ func _build_prop(data: Dictionary) -> void:
 			_block(target, Vector3(1.65, 1.0, 0.12), Vector3(0, 0.5, -1.4), WOOD)
 		&"BOX", &"TOOLBOX":
 			var color := Color("aa8051") if kind == &"BOX" else Color("813f35")
+			target.set_meta("visual_profile", "kraft_cardboard_flaps_tape_corrugation" if kind == &"BOX" else "painted_toolbox_handle_latches_seams_wear")
 			var w := bounds.x
 			var d := bounds.z
 			var h := bounds.y * 0.8
@@ -156,9 +196,18 @@ func _build_prop(data: Dictionary) -> void:
 			lid.position = Vector3(0, h, -d / 2)
 			_block(lid, Vector3(w + 0.04, 0.055, d), Vector3(0, 0, d / 2), color)
 			if kind == &"TOOLBOX":
-				_block(lid, Vector3(0.24, 0.08, 0.07), Vector3(0, 0.06, d / 2), METAL)
+				var handle_root := Node3D.new(); handle_root.name = "CarryHandle"; lid.add_child(handle_root)
+				_block(handle_root, Vector3(0.28, 0.045, 0.055), Vector3(0, 0.14, d / 2), METAL)
+				for x in [-0.14, 0.14]: _block(handle_root, Vector3(0.045, 0.16, 0.055), Vector3(x, 0.07, d / 2), METAL)
+				for x in [-0.2, 0.2]:
+					var latch := _block(target, Vector3(0.1, 0.13, 0.035), Vector3(x, h * 0.63, d / 2 + 0.025), Color("b7aaa0")); latch.name = "Latch"
+				var seam := _block(target, Vector3(w + 0.03, 0.025, 0.025), Vector3(0, h * 0.72, d / 2 + 0.026), Color("4c2522")); seam.name = "LidSeam"
+				for x in [-w * 0.42, w * 0.42]: _block(target, Vector3(0.035, h * 0.7, 0.018), Vector3(x, h * 0.38, d / 2 + 0.027), Color("c37a64"))
 			else:
-				_block(lid, Vector3(0.12, 0.008, d), Vector3(0, 0.032, d / 2), Color("d5bd83"))
+				var tape := _block(lid, Vector3(0.14, 0.012, d + 0.02), Vector3(0, 0.035, d / 2), Color("d9bd7c")); tape.name = "TapeSeam"
+				for x in [-w * 0.32, w * 0.32]:
+					for y in range(4):
+						var flute := _block(target, Vector3(0.012, 0.012, d + 0.01), Vector3(x + y * 0.018, h + 0.003, 0), Color("765334")); flute.name = "Corrugation"
 			target.bind_visual(lid, &"rotation_degrees", &"open", Vector3.ZERO, Vector3(-110, 0, 0))
 			if kind == &"BOX":
 				var contents := Node3D.new()
@@ -179,6 +228,7 @@ func _build_prop(data: Dictionary) -> void:
 				anchor.name = String(anchor_data.id)
 				var p: Array = anchor_data.position
 				anchor.position = Vector3(p[0], p[1], p[2])
+				anchor.authored_fallbacks = anchor_data.get("fallbacks", [])
 				target.add_child(anchor)
 				display_anchors.append(anchor)
 		&"SHELF":
@@ -190,10 +240,20 @@ func _build_prop(data: Dictionary) -> void:
 				for i in range(7):
 					_block(target, Vector3(0.44, 0.32 + (i % 3) * 0.06, 0.12), Vector3(-0.06, y + 0.23, -0.62 + i * 0.2), Color("8f7354").darkened((i % 3) * 0.17))
 		&"JACK":
-			_block(target, Vector3(0.6, 0.1, 0.5), Vector3(0, 0.05, 0), METAL)
-			_block(target, Vector3(0.12, 0.3, 0.12), Vector3(0, 0.22, -0.1), METAL)
-			_block(target, Vector3(0.58, 0.42, 0.16), Vector3(0, 0.44, -0.1), METAL)
-			_block(target, Vector3(0.48, 0.32, 0.01), Vector3(0, 0.44, -0.01), Color("70b8a0"))
+			target.set_meta("state_model", "NOT_PRESENT/PARTIALLY_ASSEMBLED/ASSEMBLED")
+			var partial := Node3D.new(); partial.name = "PartiallyAssembled"; target.add_child(partial)
+			_block(partial, Vector3(0.6, 0.08, 0.5), Vector3(0, 0.04, 0), METAL)
+			var board := _block(partial, Vector3(0.49, 0.035, 0.38), Vector3(0, 0.095, 0), Color("416d59")); board.name = "ExposedBoard"
+			for x in [-0.16, 0.0, 0.16]: _block(partial, Vector3(0.08, 0.045, 0.12), Vector3(x, 0.13, -0.04), Color("242d31"))
+			var loose := _block(partial, Vector3(0.42, 0.025, 0.035), Vector3(0.08, 0.16, 0.19), Color("d8a94a")); loose.name = "LooseCable"; loose.rotation_degrees.y = -18
+			var removed_cover := _block(partial, Vector3(0.55, 0.025, 0.42), Vector3(-0.42, 0.06, 0), METAL.lightened(0.08)); removed_cover.name = "RemovedCover"; removed_cover.rotation_degrees.z = 72
+			var assembled := Node3D.new(); assembled.name = "Assembled"; target.add_child(assembled)
+			_block(assembled, Vector3(0.6, 0.14, 0.5), Vector3(0, 0.07, 0), METAL)
+			_block(assembled, Vector3(0.12, 0.3, 0.12), Vector3(0, 0.27, -0.1), METAL)
+			_block(assembled, Vector3(0.58, 0.42, 0.16), Vector3(0, 0.49, -0.1), METAL)
+			var screen := _block(assembled, Vector3(0.48, 0.32, 0.01), Vector3(0, 0.49, -0.01), Color("70b8a0")); screen.name = "ActiveDisplay"
+			target.bind_visual(partial, &"visible", &"assembled", true, false)
+			target.bind_visual(assembled, &"visible", &"assembled", false, true)
 		&"POSTER":
 			var mesh := MeshInstance3D.new()
 			var quad := QuadMesh.new()
@@ -217,6 +277,92 @@ func _build_prop(data: Dictionary) -> void:
 			badge.position = Vector3(0, -0.11, 0.035)
 			selected.add_child(badge)
 			target.bind_visual(selected, &"visible", &"selected", false, true)
+		&"DOOR":
+			target.rotation_degrees.y = 90
+			_block(target, Vector3(1.15, 2.3, 0.12), Vector3(0, 1.15, 0), Color("776b5e"))
+			for x in [-0.62, 0.62]: _block(target, Vector3(0.08, 2.45, 0.18), Vector3(x, 1.22, 0), WOOD.darkened(0.18))
+			_block(target, Vector3(1.32, 0.08, 0.18), Vector3(0, 2.43, 0), WOOD.darkened(0.18))
+			var knob := MeshInstance3D.new()
+			var knob_mesh := SphereMesh.new(); knob_mesh.radius = 0.055; knob_mesh.height = 0.11
+			knob.mesh = knob_mesh; knob.position = Vector3(0.42, 1.08, 0.1)
+			var knob_material := StandardMaterial3D.new(); knob_material.albedo_color = Color("b8a36b"); knob.material_override = knob_material
+			target.add_child(knob)
+
+func _build_onboarding_cue() -> void:
+	onboarding_prompt = Label.new()
+	onboarding_prompt.name = "BedroomOnboardingPrompt"
+	onboarding_prompt.set_anchors_preset(Control.PRESET_CENTER_BOTTOM)
+	onboarding_prompt.position = Vector2(-270, -116)
+	onboarding_prompt.custom_minimum_size = Vector2(540, 48)
+	onboarding_prompt.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	onboarding_prompt.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	onboarding_prompt.add_theme_color_override("font_color", Color("eef8f5"))
+	var style := StyleBoxFlat.new(); style.bg_color = Color(0.02, 0.035, 0.045, 0.86); style.corner_radius_top_left = 5; style.corner_radius_top_right = 5; style.corner_radius_bottom_left = 5; style.corner_radius_bottom_right = 5
+	onboarding_prompt.add_theme_stylebox_override("normal", style)
+	onboarding_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(onboarding_prompt)
+	onboarding_emphasis = Node3D.new()
+	onboarding_emphasis.name = "OnboardingEmphasis"
+	var light := OmniLight3D.new(); light.name = "SoftPulse"; light.light_color = Color("e7c45b"); light.light_energy = 0.55; light.omni_range = 1.35; light.position = Vector3(0, 0.5, 0)
+	onboarding_emphasis.add_child(light)
+	(objects[&"STARTER_DECK_BOX"] as MeatspaceTarget3D).add_child(onboarding_emphasis)
+	GameplayBindings.device_mode_changed.connect(_on_onboarding_device_changed)
+	_on_onboarding_device_changed(GameplayBindings.device_mode)
+
+func _refresh_onboarding() -> void:
+	tutorial_step = FirstMeatspaceTutorial.reconcile(game_state)
+	if onboarding_prompt == null or onboarding_emphasis == null: return
+	onboarding_prompt.visible = tutorial_step < FirstMeatspaceTutorial.Step.ENTER_CLEAN_ROOM
+	_on_onboarding_device_changed(GameplayBindings.device_mode)
+	var target_id: StringName = &""
+	if tutorial_step in [FirstMeatspaceTutorial.Step.LOOK_AROUND, FirstMeatspaceTutorial.Step.INSPECT_OBJECT, FirstMeatspaceTutorial.Step.OPEN_BOX, FirstMeatspaceTutorial.Step.CHOOSE_DECK]: target_id = &"STARTER_DECK_BOX"
+	elif tutorial_step == FirstMeatspaceTutorial.Step.USE_TOOLBOX: target_id = &"TOOLBOX"
+	elif tutorial_step == FirstMeatspaceTutorial.Step.USE_COMPUTER: target_id = &"JACK_IN_INTERFACE"
+	set_tutorial_emphasis(target_id, target_id != &"")
+
+func set_tutorial_emphasis(target_id: StringName, enabled: bool) -> void:
+	if onboarding_emphasis == null: return
+	onboarding_emphasis.visible = enabled and objects.has(target_id) and (objects[target_id] as MeatspaceTarget3D).visible
+	if not onboarding_emphasis.visible: return
+	var target := objects[target_id] as MeatspaceTarget3D
+	if onboarding_emphasis.get_parent() != target: onboarding_emphasis.reparent(target, false)
+	onboarding_emphasis.position = Vector3(0, 0.5, 0)
+	onboarding_emphasis.set_meta("target_id", target_id)
+
+func _advance_tutorial(step: FirstMeatspaceTutorial.Step) -> void:
+	tutorial_step = FirstMeatspaceTutorial.advance_to(game_state, step)
+	_refresh_onboarding()
+
+func _on_onboarding_device_changed(mode: int) -> void:
+	if onboarding_prompt == null: return
+	var gamepad := mode == GameplayBindings.DeviceMode.GAMEPAD
+	match tutorial_step:
+		FirstMeatspaceTutorial.Step.LOOK_AROUND: onboarding_prompt.text = "Use the Right Stick or D-pad to select an object." if gamepad else "Move the cursor over an object to examine it."
+		FirstMeatspaceTutorial.Step.INSPECT_OBJECT, FirstMeatspaceTutorial.Step.OPEN_BOX: onboarding_prompt.text = "Press A / Cross to interact." if gamepad else "Click to interact."
+		FirstMeatspaceTutorial.Step.CHOOSE_DECK: onboarding_prompt.text = "Choose your starter deck direction."
+		FirstMeatspaceTutorial.Step.USE_TOOLBOX: onboarding_prompt.text = "Finish assembling the deck."
+		FirstMeatspaceTutorial.Step.USE_COMPUTER: onboarding_prompt.text = "Connect to your deck."
+		_: onboarding_prompt.text = ""
+
+func _gui_input(event: InputEvent) -> void:
+	if tutorial_step == FirstMeatspaceTutorial.Step.LOOK_AROUND and event is InputEventMouseMotion and pick(event.position) != null: _advance_tutorial(FirstMeatspaceTutorial.Step.INSPECT_OBJECT)
+	super._gui_input(event)
+
+func focus_in_screen_direction(direction: Vector2) -> void:
+	var previous := focused_id
+	super.focus_in_screen_direction(direction)
+	if tutorial_step == FirstMeatspaceTutorial.Step.LOOK_AROUND and focused_id != &"" and focused_id != previous: _advance_tutorial(FirstMeatspaceTutorial.Step.INSPECT_OBJECT)
+
+func _on_prop_selected(id: StringName) -> void:
+	if id == &"STARTER_DECK_BOX" and tutorial_step <= FirstMeatspaceTutorial.Step.INSPECT_OBJECT: _advance_tutorial(FirstMeatspaceTutorial.Step.OPEN_BOX)
+	elif id == &"JACK_IN_INTERFACE" and tutorial_step == FirstMeatspaceTutorial.Step.USE_COMPUTER: _advance_tutorial(FirstMeatspaceTutorial.Step.ENTER_CLEAN_ROOM)
+	super._on_prop_selected(id)
+
+func _process(delta: float) -> void:
+	super._process(delta)
+	if tutorial_step < FirstMeatspaceTutorial.Step.ENTER_CLEAN_ROOM and onboarding_emphasis != null and onboarding_emphasis.visible:
+		var light := onboarding_emphasis.get_node_or_null("SoftPulse") as OmniLight3D
+		if light != null: light.light_energy = 0.48 + sin(Time.get_ticks_msec() * 0.003) * 0.12
 
 func _table(parent: Node3D, pos: Vector3, dimensions: Vector3) -> void:
 	_block(parent, Vector3(dimensions.x, 0.1, dimensions.z), pos + Vector3(0, dimensions.y, 0), WOOD)

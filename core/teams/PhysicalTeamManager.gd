@@ -39,7 +39,10 @@ func add_team(instance: PhysicalTeamInstance) -> bool:
 
 
 func get_player_views(realtime_now: float) -> Array[Dictionary]:
-	if team_knowledge == null: return []
+	# A manager can briefly outlive its session-owned knowledge resource while the
+	# UI is unloading. Treat that transition as an empty view instead of calling
+	# through a freed (Nil) object.
+	if not is_instance_valid(team_knowledge): return []
 	return team_knowledge.get_all_views(realtime_now)
 
 

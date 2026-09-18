@@ -54,6 +54,11 @@ func _default_entry(collection_name: StringName, id: StringName) -> Dictionary:
 		entry.merge({"optional": true, "completion_conditions": [], "reward_ids": []}, true)
 	elif collection_name == &"meatspace_interactions":
 		entry.merge({"physical_location_id": &"", "conditions": [], "actions": [], "reward_ids": []}, true)
+	elif collection_name == &"authored_story_events": entry.merge({"event_id": id, "trigger": &"", "conditions": {"all": []}, "actions": [], "repeat": "once", "priority": 0}, true)
+	elif collection_name == &"missions": entry.merge({"mission_id": id, "briefing": "", "primary_objectives": [], "optional_objectives": [], "hidden_objectives": [], "success_conditions": {}, "failure_conditions": [], "reward_definition": {}, "story_result_rules": [], "entry_network": &"", "story_metadata": {}}, true)
+	elif collection_name == &"contacts": entry.merge({"contact_id": id, "unlock_conditions": {}, "reputation": 0, "available_interactions": [], "missions_offered": [], "comms_content": [], "story_tags": []}, true)
+	elif collection_name == &"contact_comms": entry.merge({"call_id": id, "speaker": "", "duration": 0.0, "lines": [], "completion_actions": [], "interruptible": true, "priority": 0}, true)
+	elif collection_name == &"room_bindings": entry.merge({"object_id": id, "location_id": &"", "scene_node_path": "", "hover_text": "", "primary_action": &"", "visible_if": {}, "hidden_if": {}, "state_variant_if": [], "story_event_hooks": [], "display_anchors": []}, true)
 	return entry
 
 

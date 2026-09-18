@@ -16,6 +16,7 @@ var last_category := ""
 var cooldowns: Dictionary = {}
 var history: Array[Dictionary] = []
 var streams: Dictionary = {}
+var current_time := "NIGHT"
 
 func configure(source: Dictionary, exterior_bus: StringName) -> void:
 	definition = source
@@ -31,6 +32,17 @@ func configure(source: Dictionary, exterior_bus: StringName) -> void:
 	player.bus = bus_name
 	add_child(player)
 	for event: Dictionary in source.get("events", []): streams[event.id] = load(String(event.path))
+
+func apply_profile(time_of_day: String, scale: float) -> void:
+	current_time = time_of_day
+	interval_scale = scale
+
+func eligible_event_ids() -> Array[String]:
+	var result: Array[String] = []
+	for event: Dictionary in definition.get("events", []):
+		var times: Array = event.get("times", [])
+		if times.is_empty() or current_time in times: result.append(String(event.id))
+	return result
 
 func enter() -> void:
 	leave()
@@ -64,7 +76,9 @@ func advance(delta: float, blocked := false) -> void:
 	if wait_remaining > 0: return
 	var eligible: Array[Dictionary] = []
 	for event: Dictionary in definition.get("events", []):
-		if event.category != last_category and elapsed >= float(cooldowns.get(event.category, 0)): eligible.append(event)
+		var times: Array = event.get("times", [])
+		if (times.is_empty() or current_time in times) and event.category != last_category and elapsed >= float(cooldowns.get(event.category, 0)):
+			eligible.append(event)
 	if eligible.is_empty():
 		wait_remaining = 4
 		return

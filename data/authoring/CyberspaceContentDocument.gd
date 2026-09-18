@@ -1,7 +1,7 @@
 class_name CyberspaceContentDocument
 extends Resource
 
-const SCHEMA_VERSION := 4
+const SCHEMA_VERSION := 5
 const COLLECTIONS: Array[StringName] = [
 	&"spheres", &"security_sleeves", &"network_nodes", &"network_links", &"services", &"graffiti", &"flavor_text",
 	&"story_hooks", &"story_bundles", &"story_variables", &"meatspace_locations",
@@ -15,6 +15,7 @@ const COLLECTIONS: Array[StringName] = [
 	&"realtime_processes",
 	&"hacker_reactions",
 	&"tutorial_guidance_rules",
+	&"authored_story_events", &"missions", &"contacts", &"contact_comms", &"room_bindings",
 ]
 
 @export var schema_version: int = SCHEMA_VERSION
@@ -62,6 +63,11 @@ const COLLECTIONS: Array[StringName] = [
 @export var realtime_processes: Array[Dictionary] = []
 @export var hacker_reactions: Array[Dictionary] = []
 @export var tutorial_guidance_rules: Array[Dictionary] = []
+@export var authored_story_events: Array[Dictionary] = []
+@export var missions: Array[Dictionary] = []
+@export var contacts: Array[Dictionary] = []
+@export var contact_comms: Array[Dictionary] = []
+@export var room_bindings: Array[Dictionary] = []
 
 
 func collection(name: StringName) -> Array[Dictionary]:
