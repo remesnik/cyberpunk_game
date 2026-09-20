@@ -18,6 +18,7 @@ var required_capabilities_any: Array[StringName] = []
 var accepted_credentials: Array[StringName] = []
 var recommended_capabilities: Array[StringName] = []
 var granted_capability_ids: Array[StringName] = []
+var outbound_path_controls: Array[NodePathControl] = []
 
 func _init(p_id: StringName, p_display_name: String, p_node_type: NodeType, p_security_level := 0, p_discovered := false, p_owner_faction: StringName = &"", p_sphere_id: StringName = &"") -> void:
 	id = p_id
@@ -31,6 +32,9 @@ func _init(p_id: StringName, p_display_name: String, p_node_type: NodeType, p_se
 func add_connected_link(link_id: StringName) -> void:
 	if not connected_links.has(link_id):
 		connected_links.append(link_id)
+
+func add_path_control(control: NodePathControl) -> void:
+	if control != null: outbound_path_controls.append(control)
 
 func add_service(service_id: StringName, service_name: String, service_security: int, vulnerabilities: Array[StringName] = [], tags: Array[StringName] = [], capability_types: Array = []) -> void:
 	services.append({"id": service_id, "display_name": service_name, "security_level": maxi(service_security, 0), "vulnerabilities": vulnerabilities.duplicate(), "tags": tags.duplicate(), "capability_types": capability_types.duplicate()})

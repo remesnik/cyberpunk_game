@@ -239,7 +239,7 @@ func _shortest_path(start: StringName, goal: StringName) -> Array[StringName]:
 		if current == goal: break
 		for next in graph.get_visible_connected_nodes(current):
 			var link := graph.find_link(current, next)
-			if previous.has(next) or link == null or link.disabled or link.locked: continue
+			if previous.has(next) or link == null or not bool(graph.can_traverse(current, next).get("allowed", false)): continue
 			previous[next] = current; queue.append(next)
 	if not previous.has(goal): return []
 	var path: Array[StringName] = []; var cursor := goal

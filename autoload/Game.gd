@@ -217,7 +217,7 @@ func _configure_content_availability() -> void:
 	content_availability.register_content(&"FACILITY_OPERATION_PROTOTYPE", &"STORY_ONLY")
 	content_availability.register_content(&"STORY_PROLOGUE", &"STORY_ONLY", {}, {&"kind": &"MEATSPACE_PROLOGUE", &"runtime_definition_path": "res://data/authoring/story_prologue.tres"})
 	content_availability.register_content(&"FREE_ROAM_HOME", &"FREE_ROAM_ONLY", {}, {&"kind": &"FREE_ROAM_WORLD"})
-	var first_contact := load("res://data/authoring/first_contact.tres") as CyberspaceContentDocument
+	var first_contact := load("res://data/authoring/first_contact_current.tres") as CyberspaceContentDocument
 	content_availability.register_document(first_contact)
 	var glasshouse := load("res://data/authoring/glasshouse_01.tres") as CyberspaceContentDocument
 	content_availability.register_document(glasshouse)
@@ -333,11 +333,44 @@ func serialize_persistent_state() -> Dictionary:
 	return persistent_game_state.to_save_data()
 
 func publish_story_trigger(trigger: StringName, context: Dictionary = {}) -> Array[Dictionary]:
+	if trigger in [&"ice_destroyed", &"ice_bypassed", &"ice_disrupted"] and StringName(context.get("ice_id", context.get("subject_id", &""))) == &"TRAINING_WATCHER":
+		_record_soft_gate_choice(&"WATCHER_RESOLVED")
+	EventBus.publish_tutorial_gameplay_event(_tutorial_event_type(trigger), StringName(context.get("target_id", context.get("node_id", context.get("service_id", context.get("stream_id", context.get("file_id", context.get("ice_id", &""))))))), context)
+	var path_events: Array[Dictionary] = []
+	if network_graph != null:
+		var controller_node_id := StringName(context.get("node_id", context.get("source_node_id", &"")))
+		if controller_node_id == &"" and player_network_position != null: controller_node_id = player_network_position.current_node_id
+		path_events = network_graph.apply_node_interaction(controller_node_id, trigger, context)
+		path_events.append_array(network_graph.apply_security_resolution(trigger, context))
+		for event in path_events:
+			EventBus.publish_tactical_status_alert(&"ROUTE_OPENED", event.destination_node_id, event.message, &"INFO", 4.0, event)
+			EventBus.publish_tutorial_gameplay_event(&"OUTBOUND_ROUTE_UNLOCKED", StringName(event.destination_node_id), event)
 	if story_mission_system != null: story_mission_system.observe(trigger, context)
-	if story_event_system == null: return []
+	if story_event_system == null: return path_events
 	var results := story_event_system.publish(trigger, context)
 	if story_mission_system != null: story_mission_system.refresh_availability()
+	results.append_array(path_events)
 	return results
+
+func _tutorial_event_type(trigger: StringName) -> StringName:
+	match trigger:
+		&"node_reached": return &"NODE_ENTERED"
+		&"target_scanned": return &"TARGET_SCANNED"
+		&"stream_intercepted": return &"REALTIME_FEED_MONITORED"
+		&"file_downloaded": return &"FILE_ACQUIRED"
+		&"ice_destroyed": return &"ICE_DEFEATED"
+		&"ice_bypassed", &"ice_disrupted": return &"ICE_BYPASSED"
+		&"service_disabled": return &"SERVICE_DISABLED"
+		_: return StringName(String(trigger).to_upper())
+
+func _record_soft_gate_choice(choice: StringName) -> void:
+	if persistent_game_state == null: return
+	var choices: Dictionary = persistent_game_state.world_state.get("tutorial_choices", {}).duplicate(true)
+	choices[&"SECURITY_WATCHER"] = choice
+	persistent_game_state.world_state["tutorial_choices"] = choices
+	var message := "WATCHER BYPASSED // CLEAN ROUTE" if choice == &"WATCHER_RESOLVED" else "MONITORED CROSSING ACCEPTED // SECURITY RESPONSE INCREASED"
+	EventBus.publish_tactical_status_alert(&"TUTORIAL_CHOICE_RECORDED", &"TRAINING_WATCHER", message, &"INFO", 5.0, {"choice": choice})
+	EventBus.publish_tutorial_gameplay_event(&"SOFT_GATE_CHOICE_RECORDED", &"TRAINING_WATCHER", {"choice": choice})
 
 func make_story_mission_available(mission_id: StringName) -> bool:
 	return story_mission_system != null and story_mission_system.make_available(mission_id)
@@ -504,6 +537,8 @@ func _restore_saved_meatspace_runtime() -> void:
 		if link == null: continue
 		var state: Dictionary = resume.network_links[value]
 		link.locked = bool(state.get("locked", link.locked)); link.disabled = bool(state.get("disabled", link.disabled)); link.hidden = bool(state.get("hidden", link.hidden)); link.discovered = bool(state.get("discovered", link.discovered)); link.traversal_cost = int(state.get("traversal_cost", link.traversal_cost))
+		for direction_key in (state.get("directions", {}) as Dictionary):
+			if link.traversal_directions.has(direction_key): (link.traversal_directions[direction_key] as TraversalDirectionDefinition).apply_authored(state.directions[direction_key])
 	trace_level = int(snapshot.get("trace", resume.get("trace", 0)))
 	action_clock.current_tick = int(resume.get("cyber_tick", action_clock.current_tick))
 	resource_state.volatile_resources = _string_name_keyed(resume.get("volatile_resources", {}))
@@ -601,6 +636,8 @@ func start_session() -> void:
 		network_graph = FacilityOperationFactory.create_graph()
 		player_network_position = FacilityOperationFactory.create_player()
 		player_knowledge = FacilityOperationFactory.create_knowledge(network_graph)
+	if active_content_document != null:
+		AuthoredNetworkRuntimeBuilderScript.populate_realtime(active_content_document, realtime_process_manager, comms_manager, player_knowledge, player_network_position)
 	sphere_tracker = CurrentSphereTrackerScript.new(network_graph)
 	sphere_tracker.register_player(&"PLAYER", player_network_position)
 	sphere_tracker.sphere_changed.connect(EventBus.sphere_changed.emit)
@@ -740,6 +777,8 @@ func _create_program_loadout(create_connection := true) -> void:
 	trail_system.track_actor(player_network_position, &"PLAYER", intrusion_run_id, func() -> int: return action_clock.current_tick if action_clock != null else 0)
 	game_domain = GameDomain.CYBERSPACE
 	program_inventory = ProgramInventoryScript.new()
+	var deck_hardware: Dictionary = persistent_game_state.player_state.get("hardware", {}) if persistent_game_state != null else {}
+	program_inventory.storage_capacity = maxi(2, int(deck_hardware.get(&"DECK_STORAGE", 1)) * 2)
 	program_inventory.instance_added.connect(_on_program_instance_added)
 	program_loadout = ProgramLoadoutScript.new(active_slot_capacity())
 	var standard = DoorstopDefinitionScript.new(&"DOORSTOP_STANDARD", "Doorstop", "1.0")
@@ -798,6 +837,37 @@ func active_slot_capacity() -> int:
 	if variant == &"MORE_SLOTS": return 3
 	if variant == &"MORE_STORAGE": return 2
 	return clampi(int(persistent_game_state.player_state.get("active_slot_count", 2)), 2, 3)
+
+func data_storage_capacity() -> int:
+	var hardware: Dictionary = persistent_game_state.player_state.get("hardware", {}) if persistent_game_state != null else {}
+	return maxi(2, int(hardware.get(&"DECK_STORAGE", 1)) * 2)
+
+func data_storage_used() -> int:
+	var used := 0
+	if persistent_game_state == null: return used
+	for item: Variant in persistent_game_state.player_state.get("inventory", []):
+		if item is Dictionary and StringName(item.get("kind", &"")) == &"DATA_OBJECT": used += int(item.get("size_units", 0))
+	return used
+
+func download_data_object(object_id: StringName) -> Dictionary:
+	if active_content_document == null: return {"success": false, "reason": "DATA OBJECT UNAVAILABLE"}
+	var object := active_content_document.find_entry(object_id)
+	if object.is_empty() or object.get("_collection", &"") != &"data_objects": return {"success": false, "reason": "DATA OBJECT UNAVAILABLE"}
+	var inventory: Array = persistent_game_state.player_state.get("inventory", []).duplicate(true)
+	if inventory.any(func(item: Variant): return item is Dictionary and StringName(item.get("id", &"")) == object_id): return {"success": false, "reason": "FILE ALREADY STORED"}
+	var size := maxi(1, int(object.get("size_units", 1)))
+	if data_storage_used() + size > data_storage_capacity(): return {"success": false, "reason": "INSUFFICIENT DECK STORAGE"}
+	inventory.append({"id": object_id, "kind": &"DATA_OBJECT", "display_name": object.get("display_name", object_id), "size_units": size})
+	persistent_game_state.player_state["inventory"] = inventory
+	for consequence: Dictionary in object.get("on_download", []):
+		match StringName(consequence.get("type", &"")):
+			&"INCREASE_TRACE": pending_action_trace += maxi(1, int(consequence.get("amount", 1)))
+			&"INCREASE_SLEEVE_ALERT":
+				var sleeve := network_graph.get_security_sleeve(StringName(consequence.get("sleeve_id", &"")))
+				if sleeve != null: sleeve.metadata["response_level"] = int(sleeve.metadata.get("response_level", 0)) + maxi(1, int(consequence.get("amount", 1)))
+	publish_story_trigger(&"file_downloaded", {"file_id": StringName(object.get("story_id", object_id)), "resource_id": object_id, "size_units": size})
+	EventBus.publish_tactical_status_alert(&"DATA_ACQUIRED", object_id, "FILE ACQUIRED // SECURITY RESPONSE INCREASED", &"WARNING", 5.0, {"storage_used": data_storage_used(), "storage_capacity": data_storage_capacity()})
+	return {"success": true, "reason": "FILE ACQUIRED", "storage_used": data_storage_used(), "storage_capacity": data_storage_capacity()}
 
 func _create_persistent_starter_programs() -> void:
 	var definitions := {}
@@ -1383,7 +1453,18 @@ func request_traversal(destination_node_id: StringName) -> ActionResult:
 
 func traversal_preview(destination_node_id: StringName) -> Dictionary:
 	if network_graph == null or player_network_position == null: return {"error": NetworkGraph.TraversalError.INVALID_SOURCE, "reason": "NO ACTIVE NETWORK"}
-	return network_graph.validate_traversal(player_network_position, destination_node_id, player_knowledge.link_records.keys() if player_knowledge != null else [], Callable(self, "_resolve_traversal_requirement"))
+	return network_graph.can_traverse(player_network_position.current_node_id, destination_node_id, player_network_position, player_knowledge.link_records.keys() if player_knowledge != null else [], Callable(self, "_resolve_traversal_requirement"))
+
+func unlock_outbound_path(destination_node_id: StringName, in_node_mode := true) -> Dictionary:
+	if network_graph == null or player_network_position == null: return {"success": false, "reason": "NETWORK UNAVAILABLE"}
+	var source := player_network_position.current_node_id
+	var link := network_graph.find_link(source, destination_node_id)
+	if link == null: return {"success": false, "reason": "NO OUTBOUND PATH"}
+	var result := network_graph.unlock_outbound_path(link.id, source, destination_node_id, in_node_mode, Callable(self, "_resolve_traversal_requirement"))
+	if OS.is_debug_build():
+		var direction := link.get_direction(source, destination_node_id)
+		print("[TraversalUnlock] source=%s destination=%s controller=%s state=%s result=%s reason=%s" % [source, destination_node_id, direction.controller_node_id if direction != null else &"", direction.state_name() if direction != null else &"", "ALLOWED" if bool(result.get("success", false)) else "DENIED", result.get("reason", "")])
+	return result
 
 func _resolve_traversal_requirement(requirement: Dictionary, _from_node_id: StringName, _to_node_id: StringName, _link: NetworkLinkDefinition) -> Dictionary:
 	var type := StringName(requirement.get("type", &"story_flag")).to_lower(); var satisfied := false; var value: Variant = false
@@ -1675,7 +1756,9 @@ func _capture_intrusion_resume_state(anchor: DoorstopAnchor) -> Dictionary:
 	var link_state: Dictionary = {}
 	for link_id in network_graph.links:
 		var link: NetworkLinkDefinition = network_graph.links[link_id]
-		link_state[link_id] = {"locked": link.locked, "disabled": link.disabled, "hidden": link.hidden, "discovered": link.discovered, "traversal_cost": link.traversal_cost}
+		var directions: Dictionary = {}
+		for direction_key in link.traversal_directions: directions[direction_key] = (link.traversal_directions[direction_key] as TraversalDirectionDefinition).snapshot()
+		link_state[link_id] = {"locked": link.locked, "disabled": link.disabled, "hidden": link.hidden, "discovered": link.discovered, "traversal_cost": link.traversal_cost, "directions": directions}
 	var alarm_state: Dictionary = {}
 	if physical_alarm_manager != null:
 		for alarm_id in physical_alarm_manager.instances:
@@ -1767,6 +1850,9 @@ func _route_mission_gameplay_event(event: Dictionary) -> void:
 		&"SERVICE_DISABLED", &"SERVICE_COMPROMISED": publish_story_trigger(&"service_disabled", event)
 		&"ALARM_TRIGGERED": publish_story_trigger(&"alarm_triggered", event)
 		&"TRACE_COMPLETED": publish_story_trigger(&"trace_completed", event)
+		&"ICE_DESTROYED": publish_story_trigger(&"ice_destroyed", event)
+		&"ICE_DISRUPTED": publish_story_trigger(&"ice_disrupted", event)
+		&"IDENTITY_SPOOFED": publish_story_trigger(&"ice_bypassed", event)
 		&"NODE_ENTERED", &"PLAYER_MOVED":
 			var reached_id := StringName(event.get("node_id", event.get("target", &"")))
 			publish_story_trigger(&"node_reached", {"node_id": reached_id})
@@ -1916,6 +2002,7 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 			var result := network_graph.apply_traversal(player_network_position, StringName(request.target), player_knowledge.link_records.keys(), Callable(self, "_resolve_traversal_requirement"))
 			var move_events: Array[Dictionary] = [{"type": &"PLAYER_MOVED", "target": request.target}]
 			if result.error == NetworkGraph.TraversalError.OK:
+				move_events.append_array(_apply_traversal_consequences(result, origin, StringName(request.target)))
 				player_knowledge.observe_traversal(network_graph, origin, StringName(request.target))
 				move_events.append_array(progression_controller.on_node_entered(StringName(request.target)))
 				var recovered := failure_controller.recover_at(player_network_position.current_node_id)
@@ -1951,10 +2038,45 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 			return {"success": transfer.success, "reason": transfer.reason, "events": transfer.events}
 	return {"success": false, "reason": "Unsupported action.", "events": []}
 
+func _apply_traversal_consequences(validation: Dictionary, source: StringName, destination: StringName) -> Array[Dictionary]:
+	var events: Array[Dictionary] = []
+	if not bool(validation.get("soft_gate_unauthorized", false)): return events
+	for authored: Dictionary in validation.get("consequences", []):
+		var consequence := authored.duplicate(true)
+		var type := StringName(String(consequence.get("type", &"")).to_upper())
+		consequence.merge({"type": type, "source_node_id": source, "destination_node_id": destination, "unauthorized_traversal": true, "player_visible": consequence.get("player_visible", true)}, false)
+		consequence["type"] = type
+		match type:
+			&"TRACE_PRESSURE", &"INCREASE_TRACE":
+				var amount := maxi(0, int(consequence.get("amount", consequence.get("value", 1))))
+				pending_action_trace += amount; consequence["trace_increase"] = amount
+			&"NOTIFY_ICE", &"ACTIVATE_RESPONSE_ICE", &"MARK_PLAYER_DETECTED":
+				var ice_id := StringName(consequence.get("ice_id", validation.get("controlling_security", {}).get("id", &"")))
+				var ice := ice_controller.get_ice(ice_id) if ice_controller != null else null
+				if ice != null:
+					ice.state = IceState.Value.HUNT if type != &"MARK_PLAYER_DETECTED" else IceState.Value.ENGAGE
+					ice.target_node_id = destination; ice.known_player_position = destination; ice.alert_level = mini(100, ice.alert_level + int(consequence.get("alert_increase", 25)))
+				consequence["ice_id"] = ice_id
+			&"CLOSE_PATH", &"LOCK_PATH_BEHIND":
+				consequence["applied_paths"] = validation.get("topology_consequences_applied", []).duplicate(true)
+			&"INCREASE_NODE_SECURITY": player_knowledge.set_node_critical_alert(StringName(consequence.get("node_id", destination)), true, &"SOFT_GATE")
+			&"INCREASE_SPHERE_SECURITY": player_knowledge.set_sphere_security_state(StringName(consequence.get("sphere_id", &"")), StringName(consequence.get("state", &"ALERT")), &"SOFT_GATE")
+			&"TRIGGER_ALARM": consequence["type"] = &"ALARM_TRIGGERED"
+			&"INCREASE_SLEEVE_ALERT":
+				consequence["type"] = &"SECURITY_SLEEVE_ALERT_INCREASED"
+				var sleeve := network_graph.get_security_sleeve(StringName(consequence.get("sleeve_id", &"")))
+				if sleeve != null:
+					sleeve.metadata["response_level"] = int(sleeve.metadata.get("response_level", 0)) + maxi(1, int(consequence.get("amount", 1)))
+					sleeve.changed.emit(sleeve)
+		events.append(consequence)
+	if StringName(validation.get("controlling_security", {}).get("id", &"")) == &"TRAINING_WATCHER": _record_soft_gate_choice(&"MONITORED_TRAVERSAL")
+	if not events.is_empty(): network_graph.display_update_requested.emit()
+	return events
+
 func _log_traversal_evaluation(from_node_id: StringName, to_node_id: StringName, validation: Dictionary) -> void:
 	if not OS.is_debug_build(): return
 	var link: NetworkLinkDefinition = validation.get("link")
-	print("[Traversal] from=%s to=%s adjacent=%s edge_direction_valid=%s requirement=%s requirement_value=%s result=%s" % [from_node_id, to_node_id, str(link != null), str(link != null and link.connects_from(from_node_id)), JSON.stringify(validation.get("requirement", {})), str(validation.get("requirement_value", true)), "ALLOWED" if validation.error == NetworkGraph.TraversalError.OK else "BLOCKED"])
+	print("[Traversal] source=%s destination=%s controller=%s state=%s result=%s reason=%s requirement=%s requirement_value=%s" % [from_node_id, to_node_id, validation.get("controller_node_id", &""), validation.get("traversal_state", &""), "ALLOWED" if validation.error == NetworkGraph.TraversalError.OK else "DENIED", validation.get("reason", ""), JSON.stringify(validation.get("requirement", {})), str(validation.get("requirement_value", true))])
 
 func _update_ice(tick: int, _request: ActionRequest) -> Array[Dictionary]:
 	var events := ice_controller.update(_request.cost, _request)

@@ -65,8 +65,9 @@ func move_scripted(actor_id: StringName, destination_id: StringName) -> Dictiona
 	var actor := get_actor(actor_id)
 	if actor == null or not actor.is_network_connected(): return _failure("Remote hacker is not connected.")
 	if graph == null or graph.get_node(destination_id) == null: return _failure("Remote hacker destination is invalid.")
-	var link := graph.find_link(actor.current_node_id, destination_id)
-	if link == null or not link.connects_from(actor.current_node_id) or link.disabled: return _failure("Remote hacker scripted move requires an enabled directed graph link.")
+	var movement := graph.can_traverse(actor.current_node_id, destination_id)
+	var link: NetworkLinkDefinition = movement.get("link")
+	if not bool(movement.get("allowed", false)): return _failure("Remote hacker scripted move denied: %s" % movement.get("reason_code", &"UNAVAILABLE"))
 	var origin := actor.current_node_id
 	actor.previous_node_id = origin; actor.current_node_id = destination_id; actor.movement_history.append(destination_id)
 	_emit_event(&"HACKER_MOVED", actor_id, {"from_node_id": origin, "node_id": destination_id, "link_id": link.id}); actor_moved.emit(actor_id, origin, destination_id, link.id); refresh_player_observations()

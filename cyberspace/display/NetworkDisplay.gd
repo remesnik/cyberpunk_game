@@ -74,6 +74,7 @@ const AMBER := Color("ffc857")
 @export var accessibility_config: Resource = DEFAULT_ACCESSIBILITY_CONFIG
 @export var debug_sensor_topology := false
 @export var debug_spatial_layout := false
+@export var debug_path_controllers := true
 
 var graph: NetworkGraph
 var position_model: PlayerNetworkPosition
@@ -136,6 +137,7 @@ var _mode_transition_tween: Tween
 var _network_view_anchor := Vector3.ZERO
 var _focus_camera_anchor := Vector3.ZERO
 var _local_target_final_positions: Dictionary = {}
+var _local_scan_levels: Dictionary = {}
 
 func _ready() -> void:
 	security_level_legend.set_visualization_config(visualization_config)
@@ -151,6 +153,7 @@ func _ready() -> void:
 	EventBus.san_relocated.connect(_on_san_relocated)
 	EventBus.monitor_presentation_changed.connect(_on_monitor_presentation_changed)
 	EventBus.social_message_delivered.connect(_on_social_message_delivered)
+	EventBus.tactical_status_alert.connect(_on_tactical_status_alert)
 	HudState.widget_state_changed.connect(_on_hud_state_changed)
 	HudState.widget_open_requested.connect(_on_hud_widget_open_requested)
 	HudState.action_feedback.connect(_on_hud_action_feedback)
@@ -350,7 +353,7 @@ func _rebuild_neighborhood() -> void:
 			(node_visuals[contact_node_id] as NodeVisual).set_traversal_blocked(traversal_blocked)
 			scan_targets[contact.node.id] = {"kind": ScanSystem.NODE, "node_id": contact.node.id}
 			scan_targets[contact.contact_id] = {"kind": ScanSystem.LINK, "contact_id": contact.contact_id}
-			target_views[contact.node.id] = {"kind": &"NODE", "title": contact.node.get("display_name", "UNKNOWN NODE"), "node": contact.node, "link": contact.link, "enterable": true, "traversal_blocked": traversal_blocked, "blocked_reason": traversal.get("reason", "ACCESS REQUIREMENT NOT MET"), "scan_target": scan_targets[contact.node.id]}
+			target_views[contact.node.id] = {"kind": &"NODE", "title": contact.node.get("display_name", "UNKNOWN NODE"), "node": contact.node, "link": contact.link, "enterable": bool(traversal.get("allowed", false)), "traversal_blocked": traversal_blocked, "blocked_reason": traversal.get("reason", "ACCESS REQUIREMENT NOT MET"), "traversal": traversal, "scan_target": scan_targets[contact.node.id]}
 			target_views[contact.contact_id] = {"kind": &"LINK", "title": "NETWORK LINK", "link": contact.link, "scan_target": scan_targets[contact.contact_id], "confrontation_target": {"kind": &"LINK", "contact_id": contact.contact_id}}
 			target_order.append(contact.node.id)
 		else:
@@ -397,7 +400,7 @@ func _rebuild_neighborhood() -> void:
 
 	location_label.text = "CURRENT HOST  //  %s" % String(current_view.get("display_name", "UNKNOWN")).to_upper()
 	var sensor_rating := sensor_topology.sensors_rating if sensor_topology != null else 0
-	resource_label.text = "TRAVERSAL UNITS  %02d    |    SENSORS %d    |    KNOWN CONTACTS  %02d" % [position_model.traversal_points, sensor_rating, contacts.size() + distant_nodes.size()]
+	resource_label.text = "TRAVERSAL %02d  |  SENSORS %d  |  DATA %d/%d  |  ACTIVE SLOTS %d  |  CONTACTS %02d" % [position_model.traversal_points, sensor_rating, Game.data_storage_used(), Game.data_storage_capacity(), Game.program_loadout.capacity if Game.program_loadout != null else 0, contacts.size() + distant_nodes.size()]
 	if debug_sensor_topology and sensor_topology != null:
 		status_label.text = "\n".join(sensor_topology.debug_lines())
 	elif debug_spatial_layout:
@@ -598,7 +601,15 @@ func _update_link_projection(visual: LinkVisual, map_rect: Rect2) -> void:
 		elif runtime_link.one_way: runtime_state = &"ONE_WAY"
 		elif position_model != null and position_model.current_node_id in [source_id, destination_id]:
 			var other_id := destination_id if position_model.current_node_id == source_id else source_id
-			if int(Game.traversal_preview(other_id).get("error", NetworkGraph.TraversalError.OK)) != NetworkGraph.TraversalError.OK: runtime_state = &"BLOCKED"
+			var preview := Game.traversal_preview(other_id)
+			var directional_state := StringName(preview.get("traversal_state", &""))
+			if directional_state == &"HIDDEN": runtime_state = &"HIDDEN"
+			elif directional_state == &"LOCKED_DOWN": runtime_state = &"LOCKED_DOWN"
+			elif preview.get("security_gate_type", &"NONE") == &"HARD" and not bool(preview.get("security_resolved", false)): runtime_state = &"HARD_GATE"
+			elif directional_state in [&"DISCOVERED", &"LOCKED"]: runtime_state = &"LOCKED"
+			elif bool(preview.get("soft_gate_unauthorized", false)): runtime_state = &"SOFT_GATE"
+			elif directional_state == &"UNLOCKED": runtime_state = &"UNLOCKED"
+			elif int(preview.get("error", NetworkGraph.TraversalError.OK)) != NetworkGraph.TraversalError.OK: runtime_state = &"LOCKED"
 		visual.set_runtime_state(runtime_state)
 
 func selected_target_screen_position() -> Vector2:
@@ -686,10 +697,33 @@ func _rebuild_services(current_node_id: StringName) -> void:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var target := {"kind": ScanSystem.SERVICE, "contact_id": service.contact_id}
 		var contact_id: StringName = service.contact_id
-		target_views[contact_id] = {"kind": &"SERVICE", "title": service.get("display_name", "UNKNOWN SERVICE"), "service": service, "scanned": bool(service.get("scanned", false)), "connectable": bool(service.get("connectable", false)), "disableable": bool(service.get("disableable", false)), "interceptable": bool(service.get("interceptable", false)), "scan_target": target, "mission_target": {"kind": &"SERVICE", "contact_id": contact_id}}
+		var comms_session_id := _comms_session_for_service(StringName(service.get("id", contact_id)))
+		var service_scanned := bool(service.get("scanned", false))
+		target_views[contact_id] = {"kind": &"SERVICE", "title": service.get("display_name", "UNKNOWN SERVICE"), "service": service, "scanned": service_scanned, "connectable": bool(service.get("connectable", false)), "disableable": bool(service.get("disableable", false)), "interceptable": service_scanned and comms_session_id != &"" or bool(service.get("interceptable", false)), "monitorable": service_scanned and comms_session_id != &"", "killable": service_scanned and comms_session_id != &"", "comms_session_id": comms_session_id, "scan_target": target, "mission_target": {"kind": &"SERVICE", "contact_id": contact_id}}
 		target_order.append(contact_id)
 		button.pressed.connect(func() -> void: _select_target(contact_id))
 		service_list.add_child(button)
+	if Game.active_content_document != null:
+		for authored_file: Dictionary in Game.active_content_document.data_objects:
+			if StringName(authored_file.get("node_id", &"")) != current_node_id: continue
+			var file_id := StringName(authored_file.get("id", &""))
+			var scanned := bool(_local_scan_levels.get(file_id, false))
+			var stored := Game.persistent_game_state.player_state.get("inventory", []).any(func(item: Variant): return item is Dictionary and StringName(item.get("id", &"")) == file_id)
+			var file_view := authored_file.duplicate(true); file_view["scanned"] = scanned
+			target_views[file_id] = {"kind": &"FILE", "title": authored_file.get("display_name", "UNKNOWN DATA OBJECT") if scanned else "UNKNOWN DATA OBJECT", "file": file_view, "scanned": scanned, "analyzable": scanned, "downloadable": scanned and bool(authored_file.get("downloadable", true)) and not stored, "scan_target": {"kind": &"AUTHORED_DATA_OBJECT", "file_id": file_id}}
+			target_order.append(file_id)
+			var file_button := Button.new(); file_button.text = "FILE // %s" % String(target_views[file_id].title).to_upper(); file_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			file_button.pressed.connect(func() -> void: _select_target(file_id)); service_list.add_child(file_button)
+
+func _comms_session_for_service(service_id: StringName) -> StringName:
+	if Game.active_content_document == null: return &""
+	for data: Dictionary in Game.active_content_document.comms_sessions:
+		if StringName(data.get("service_id", &"")) == service_id: return StringName(data.get("id", &""))
+	return &""
+
+func _on_monitored_comms_line(_session_id: StringName, line: Dictionary) -> void:
+	var speaker := String(line.get("speaker_id", &"VOICE")).replace("_", " ")
+	EventBus.publish_tactical_status_alert(&"LIVE_VOICE", StringName(line.get("speaker_id", &"")), "%s // %s" % [speaker, String(line.get("text", ""))], &"INFO", 5.0, {"realtime": true})
 
 
 func _local_target_ids_for_node(node_id: StringName) -> Array[StringName]:
@@ -848,6 +882,7 @@ func _enter_node_focus_mode() -> bool:
 		return false
 	var local_ids := _local_target_ids_for_node(focused_node_id)
 	netspace_view_mode = NetspaceViewMode.NODE_FOCUS
+	EventBus.publish_tutorial_gameplay_event(&"NODE_MODE_ENTERED", focused_node_id, {"node_id": focused_node_id})
 	var remembered_id := StringName(_last_local_target_by_node.get(focused_node_id, &""))
 	var remembered := &""
 	if focused_local_target_id in local_ids: remembered = focused_local_target_id
@@ -868,6 +903,7 @@ func _exit_node_focus_mode() -> void:
 	if _mode_transition_active or netspace_view_mode != NetspaceViewMode.NODE_FOCUS: return
 	if not focused_local_target_id.is_empty(): _last_local_target_by_node[focused_node_id] = focused_local_target_id
 	netspace_view_mode = NetspaceViewMode.NETWORK
+	EventBus.publish_tutorial_gameplay_event(&"NETWORK_MODE_ENTERED", focused_node_id, {"node_id": focused_node_id})
 	focused_local_target_id = &""
 	selected_target_id = focused_node_id
 	_valid_contextual_commands.clear()
@@ -1289,10 +1325,41 @@ func _execute_selected_contextual_command() -> void:
 			selected_view["disableable"] = false; selected_view["disabled"] = true; target_views[selected_target_id] = selected_view
 			Game.publish_story_trigger(&"service_disabled", {"service_id": selected_target_id})
 			status_label.text = "SERVICE DISABLED"
+		&"MONITOR":
+			var session_id := StringName(selected_view.get("comms_session_id", &""))
+			var session: CommsSession = Game.comms_manager.sessions.get(session_id) if Game.comms_manager != null else null
+			if session == null: status_label.text = "MONITOR NOT AVAILABLE"
+			else:
+				Game.realtime_process_manager.activate_process(session.realtime_process_id)
+				Game.comms_manager.monitor(session_id); session.listen()
+				if not session.transcript_line_available.is_connected(_on_monitored_comms_line): session.transcript_line_available.connect(_on_monitored_comms_line)
+				Game.publish_story_trigger(&"stream_intercepted", {"stream_id": selected_target_id, "session_id": session_id, "mode": &"MONITOR"})
+				status_label.text = "MONITORING LIVE VOICE // CYBERSPACE REMAINS ACTIVE"
 		&"INTERCEPT":
+			var session_id := StringName(selected_view.get("comms_session_id", &""))
+			if session_id != &"" and Game.comms_manager != null:
+				var session: CommsSession = Game.comms_manager.sessions.get(session_id)
+				if session != null: Game.realtime_process_manager.activate_process(session.realtime_process_id)
+				Game.comms_manager.listen(session_id)
 			selected_view["interceptable"] = false; selected_view["intercepted"] = true; target_views[selected_target_id] = selected_view
 			Game.publish_story_trigger(&"stream_intercepted", {"stream_id": selected_target_id})
 			status_label.text = "STREAM INTERCEPTED // LIVE SIMULATION CONTINUES"
+		&"KILL":
+			var session_id := StringName(selected_view.get("comms_session_id", &""))
+			var session: CommsSession = Game.comms_manager.sessions.get(session_id) if Game.comms_manager != null else null
+			if session != null:
+				session.stop_monitoring()
+				Game.realtime_process_manager.set_process_state(session.realtime_process_id, RealtimeProcess.State.INTERRUPTED)
+			status_label.text = "VOICE SESSION TERMINATED"
+		&"ANALYZE":
+			var file: Dictionary = selected_view.get("file", {})
+			Game.publish_story_trigger(&"data_object_inspected", {"target_id": selected_target_id, "file_id": selected_target_id})
+			status_label.text = "FILE // %s UNITS // STORAGE %d/%d" % [int(file.get("size_units", 1)), Game.data_storage_used(), Game.data_storage_capacity()]
+		&"DOWNLOAD":
+			var result := Game.download_data_object(selected_target_id)
+			status_label.text = "%s // STORAGE %d/%d" % [String(result.get("reason", "DOWNLOAD FAILED")), Game.data_storage_used(), Game.data_storage_capacity()]
+			if bool(result.get("success", false)):
+				selected_view["downloadable"] = false; target_views[selected_target_id] = selected_view
 		&"ATTACK": _submit_selected_confrontation(ActionRequest.ActionType.ATTACK_PROCESS)
 		&"OBSERVE", &"MESSAGE", &"ASSIST":
 			var view := target_views.get(selected_target_id, {}) as Dictionary
@@ -1343,6 +1410,13 @@ func _on_device_mode_changed(_mode: int) -> void:
 func _on_display_update_requested() -> void:
 	if not _transition_active and not _mode_transition_active:
 		_rebuild_neighborhood()
+
+func _on_tactical_status_alert(event: Dictionary) -> void:
+	if StringName(event.get("type", &"")) != &"ROUTE_OPENED": return
+	status_label.text = String(event.get("message", "ROUTE OPENED")).to_upper()
+	event_lines.append("> %s" % status_label.text)
+	while event_lines.size() > 8: event_lines.remove_at(0)
+	event_feed.text = "EVENT FEED\n%s" % "\n".join(event_lines)
 
 func _on_minimap_node_focus_requested(node_id: StringName) -> void:
 	if knowledge == null or not knowledge.player_knows_node_exists(node_id): return
@@ -1466,6 +1540,20 @@ func _select_target(target_id: StringName) -> void:
 		var link: Dictionary = view.link
 		details.append("ROUTE COST // %s" % _known_value(link, "traversal_cost"))
 		details.append("LOCK // %s" % _known_value(link, "locked"))
+		if position_model != null:
+			var other := StringName(link.get("destination", &"")) if StringName(link.get("source", &"")) == position_model.current_node_id else StringName(link.get("source", &""))
+			var preview := Game.traversal_preview(other)
+			details.append("DIRECTION // %s" % String(preview.get("traversal_state", "UNKNOWN")))
+			details.append("CONTROL // %s" % String(preview.get("controller_node_id", "UNKNOWN")))
+			var remote_controller_id := StringName(preview.get("controller_node_id", &""))
+			if remote_controller_id != &"" and remote_controller_id != position_model.current_node_id:
+				details.append("ROUTE CONTROLLED BY %s" % ("CONTROL-01" if remote_controller_id == &"CONTROL" else String(remote_controller_id)))
+			if preview.get("security_gate_type", &"NONE") == &"HARD" and not bool(preview.get("security_resolved", false)): details.append("SECURITY // HARD GATE — INACCESSIBLE")
+			if bool(preview.get("soft_gate_unauthorized", false)): details.append("TRAVERSABLE BUT MONITORED // CROSSING HAS SECURITY CONSEQUENCES")
+			if debug_path_controllers:
+				var controller_id := StringName(preview.get("controller_node_id", &""))
+				for node_id in node_visuals: (node_visuals[node_id] as NodeVisual).set_destination_emphasis(node_id == controller_id)
+				if controller_id != &"": details.append("CONTROL TRACE // PATH -> %s" % controller_id)
 	elif kind == &"SERVICE":
 		var service: Dictionary = view.service
 		details.append("SECURITY // %s" % _known_value(service, "security_level"))
@@ -1542,7 +1630,7 @@ func get_valid_commands(target_id: StringName = &"", _player_state: Variant = nu
 		&"NODE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
 			var link := view.get("link", {}) as Dictionary
-			if bool(view.get("enterable", false)) or (not link.is_empty() and target_id != position_model.current_node_id): commands.append(&"ENTER")
+			if bool(view.get("enterable", false)): commands.append(&"ENTER")
 		&"ICE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
 			if bool(view.get("attackable", false)): commands.append(&"ATTACK")
@@ -1552,6 +1640,8 @@ func get_valid_commands(target_id: StringName = &"", _player_state: Variant = nu
 			if bool(view.get("connectable", false)): commands.append(&"CONNECT")
 			if bool(view.get("disableable", false)): commands.append(&"DISABLE")
 			if bool(view.get("interceptable", false)): commands.append(&"INTERCEPT")
+			if bool(view.get("monitorable", false)): commands.append(&"MONITOR")
+			if bool(view.get("killable", false)): commands.append(&"KILL")
 		&"FILE":
 			if scanned and bool(view.get("analyzable", true)): commands.append(&"ANALYZE")
 			if bool(view.get("downloadable", false)): commands.append(&"DOWNLOAD")
@@ -1867,6 +1957,13 @@ func _scan_selected_target() -> void:
 	if selected_target_id == &"" or not target_views.has(selected_target_id):
 		return
 	var target: Dictionary = target_views[selected_target_id].get("scan_target", {})
+	if StringName(target.get("kind", &"")) == &"AUTHORED_DATA_OBJECT":
+		_local_scan_levels[selected_target_id] = true
+		var view := target_views[selected_target_id] as Dictionary; view["scanned"] = true; view["analyzable"] = true; view["downloadable"] = true; (view.file as Dictionary)["scanned"] = true; target_views[selected_target_id] = view
+		Game.publish_story_trigger(&"target_scanned", {"target_id": selected_target_id, "file_id": selected_target_id})
+		status_label.text = "DATA OBJECT IDENTIFIED // %s" % selected_target_id
+		_rebuild_services(position_model.current_node_id); _select_target(selected_target_id)
+		return
 	if not target.is_empty():
 		_submit_scan(target)
 
@@ -2178,6 +2275,7 @@ func _event_description(event: Dictionary) -> String:
 		&"UNKNOWN_SIGNAL_DETECTED": return "UNKNOWN ROUTE SIGNAL DETECTED"
 		&"SERVICE_COMPROMISED": return "SERVICE COMPROMISED // %s" % event.get("service_id", &"")
 		&"PHYSICAL_ACCESS_UNLOCKED": return "PHYSICAL ROUTE OPEN // %s" % event.get("access_point_id", &"UNKNOWN")
+		&"OUTBOUND_PATH_STATE_CHANGED": return String(event.get("message", "ROUTE STATE CHANGED"))
 		&"CAPABILITY_ACQUIRED": return "CAPABILITY ACQUIRED // %s" % event.get("capability_id", &"")
 		&"CREDENTIAL_STOLEN": return "IDENTITY CREDENTIAL CAPTURED"
 		&"SHORTCUT_ENABLED": return "PERSISTENT SHORTCUT ENABLED"

@@ -21,6 +21,7 @@ var recommended_capabilities: Array[StringName] = []
 var traversal_gate_type := TraversalGateType.NONE
 var traversal_requirement: Dictionary = {}
 var blocked_reason := "ACCESS REQUIREMENT NOT MET"
+var traversal_directions: Dictionary = {}
 
 func _init(p_id: StringName, p_source: StringName, p_destination: StringName, p_one_way := false, p_hidden := false, p_locked := false, p_disabled := false, p_discovered := true, p_traversal_cost := 1, p_authority_requirement := 0, p_capability_requirement: StringName = &"") -> void:
 	id = p_id
@@ -36,15 +37,43 @@ func _init(p_id: StringName, p_source: StringName, p_destination: StringName, p_
 	capability_requirement = p_capability_requirement
 	if capability_requirement != &"":
 		required_capabilities_all.append(capability_requirement)
+	# Legacy links migrate to independent directions while retaining their old
+	# availability. New authored content can override these records explicitly.
+	var initial_state := TraversalDirectionDefinition.State.HIDDEN if hidden and not discovered else (TraversalDirectionDefinition.State.LOCKED if locked else TraversalDirectionDefinition.State.UNLOCKED)
+	set_direction(TraversalDirectionDefinition.new(source, destination, initial_state, source))
+	if not one_way:
+		set_direction(TraversalDirectionDefinition.new(destination, source, initial_state, destination))
+
+func direction_key(from_node_id: StringName, to_node_id: StringName) -> StringName:
+	return StringName("%s->%s" % [from_node_id, to_node_id])
+
+func set_direction(direction: TraversalDirectionDefinition) -> void:
+	traversal_directions[direction_key(direction.source_node_id, direction.destination_node_id)] = direction
+
+func get_direction(from_node_id: StringName, to_node_id: StringName) -> TraversalDirectionDefinition:
+	return traversal_directions.get(direction_key(from_node_id, to_node_id)) as TraversalDirectionDefinition
+
+func configure_direction(from_node_id: StringName, to_node_id: StringName, data: Dictionary) -> TraversalDirectionDefinition:
+	var direction := get_direction(from_node_id, to_node_id)
+	if direction == null:
+		direction = TraversalDirectionDefinition.new(from_node_id, to_node_id)
+		set_direction(direction)
+	direction.apply_authored(data)
+	return direction
 
 func connects_from(node_id: StringName) -> bool:
-	return source == node_id or (not one_way and destination == node_id)
+	if one_way and node_id == destination: return false
+	return get_direction(node_id, destination_from_legacy(node_id)) != null
+
+func destination_from_legacy(node_id: StringName) -> StringName:
+	if source == node_id: return destination
+	if destination == node_id: return source
+	return &""
 
 func destination_from(node_id: StringName) -> StringName:
-	if source == node_id:
-		return destination
-	if not one_way and destination == node_id:
-		return source
+	if one_way and node_id == destination: return &""
+	var other := destination_from_legacy(node_id)
+	if other != &"" and get_direction(node_id, other) != null: return other
 	return &""
 
 func is_visible() -> bool:

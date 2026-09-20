@@ -409,7 +409,9 @@ func reveal_link(link: NetworkLinkDefinition, level: KnowledgeLevel.Value) -> vo
 	if level >= KnowledgeLevel.Value.IDENTIFIED:
 		record.merge({"id": link.id, "source": link.source, "destination": link.destination, "one_way": link.one_way}, true)
 	if level >= KnowledgeLevel.Value.SCANNED:
-		record.merge({"locked": link.locked, "disabled": link.disabled, "traversal_cost": link.traversal_cost, "authority_requirement": link.authority_requirement, "required_capabilities_all": link.required_capabilities_all.duplicate(), "required_capabilities_any": link.required_capabilities_any.duplicate(), "accepted_credentials": link.accepted_credentials.duplicate(), "recommended_capabilities": link.recommended_capabilities.duplicate()}, true)
+		var directions: Dictionary = {}
+		for key in link.traversal_directions: directions[key] = (link.traversal_directions[key] as TraversalDirectionDefinition).snapshot()
+		record.merge({"locked": link.locked, "disabled": link.disabled, "traversal_cost": link.traversal_cost, "authority_requirement": link.authority_requirement, "required_capabilities_all": link.required_capabilities_all.duplicate(), "required_capabilities_any": link.required_capabilities_any.duplicate(), "accepted_credentials": link.accepted_credentials.duplicate(), "recommended_capabilities": link.recommended_capabilities.duplicate(), "directions": directions}, true)
 	link_records[link.id] = record
 	knowledge_changed.emit()
 

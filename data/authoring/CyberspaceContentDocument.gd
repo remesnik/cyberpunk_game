@@ -15,6 +15,7 @@ const COLLECTIONS: Array[StringName] = [
 	&"realtime_processes",
 	&"hacker_reactions",
 	&"tutorial_guidance_rules",
+	&"data_objects",
 	&"authored_story_events", &"missions", &"contacts", &"contact_comms", &"room_bindings",
 ]
 
@@ -26,12 +27,19 @@ const COLLECTIONS: Array[StringName] = [
 @export_enum("AVAILABLE_IN_ALL_MODES", "STORY_ONLY", "FREE_ROAM_ONLY", "MODE_SPECIFIC_VARIANT") var availability: String = "AVAILABLE_IN_ALL_MODES"
 @export var mode_variants: Dictionary = {}
 @export var hud_guidance: Dictionary = {}
+@export var tutorial_sequence_patches: Array[Dictionary] = []
+@export var tutorial_stage_insertions: Array[Dictionary] = []
+@export var tutorial_beat_overrides: Dictionary = {}
+@export var hard_gate_tutorial_insertions: Array[Dictionary] = []
+@export var data_tutorial_insertions: Array[Dictionary] = []
 
 @export var network_nodes: Array[Dictionary] = []
 @export var network_links: Array[Dictionary] = []
+@export var path_security_overrides: Array[Dictionary] = []
 @export var spheres: Array[Dictionary] = []
 @export var security_sleeves: Array[Dictionary] = []
 @export var services: Array[Dictionary] = []
+@export var data_objects: Array[Dictionary] = []
 @export var graffiti: Array[Dictionary] = []
 @export var flavor_text: Array[Dictionary] = []
 @export var story_hooks: Array[Dictionary] = []

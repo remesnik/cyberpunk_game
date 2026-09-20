@@ -19,13 +19,14 @@ static func build_graph(document: CyberspaceContentDocument, is_available: Calla
 			if not service.is_empty() and _entry_available(service, is_available):
 				node.add_service(service_id, String(service.get("display_name", service_id)), int(service.get("security_level", 0)), _string_names(service.get("vulnerabilities", [])), _string_names(service.get("tags", [])))
 				if not node.services.is_empty(): node.services[node.services.size() - 1].merge(service, true)
+		for control_data: Dictionary in data.get("outbound_path_controls", data.get("path_controls", [])): node.add_path_control(NodePathControl.from_authored(control_data))
 		graph.add_node(node)
 	for data: Dictionary in document.network_links:
 		if not _entry_available(data, is_available): continue
 		if not graph.nodes.has(StringName(data.get("source", &""))) or not graph.nodes.has(StringName(data.get("destination", &""))): continue
 		var link := NetworkLinkDefinition.new(
 			StringName(data.get("id", &"")), StringName(data.get("source", &"")), StringName(data.get("destination", &"")),
-			bool(data.get("one_way", false)), bool(data.get("hidden", false)), bool(data.get("locked", false)), bool(data.get("disabled", false)),
+			bool(data.get("one_way", false)), bool(data.get("hidden", false)), bool(data.get("locked", false)) and (data.get("directions", []) as Array).is_empty(), bool(data.get("disabled", false)),
 			false, int(data.get("traversal_cost", 1)), int(data.get("authority_requirement", 0)), StringName(data.get("capability_requirement", &""))
 		)
 		var gate_name := StringName(data.get("traversal_gate", data.get("gate", &"NONE"))).to_upper()
@@ -34,8 +35,17 @@ static func build_graph(document: CyberspaceContentDocument, is_available: Calla
 		link.traversal_requirement = (data.get("traversal_requirement", data.get("requirement", {})) as Dictionary).duplicate(true)
 		link.blocked_reason = String(data.get("blocked_reason", "ACCESS REQUIREMENT NOT MET"))
 		if link.traversal_gate_type == NetworkLinkDefinition.TraversalGateType.ONE_WAY: link.one_way = true
+		for direction_data: Dictionary in data.get("directions", []): link.configure_direction(direction_data.get("source", link.source), direction_data.get("destination", link.destination), direction_data)
 		graph.add_link(link)
+	_apply_path_security_overrides(document, graph)
 	return graph
+
+static func _apply_path_security_overrides(document: CyberspaceContentDocument, graph: NetworkGraph) -> void:
+	for data: Dictionary in document.path_security_overrides:
+		var link := graph.get_link(StringName(data.get("link_id", &"")))
+		if link == null: continue
+		var direction := link.get_direction(StringName(data.get("source", &"")), StringName(data.get("destination", &"")))
+		if direction != null: direction.apply_authored(data)
 
 static func build_player(document: CyberspaceContentDocument, graph: NetworkGraph = null) -> PlayerNetworkPosition:
 	var entry := entry_node_id(document)
@@ -86,6 +96,35 @@ static func populate_hackers(document: CyberspaceContentDocument, manager: Hacke
 		actor.visible_signature = actor.state == HackerNPC.State.CONNECTED
 		manager.add_actor(actor)
 	manager.configure_tutorial_guidance(document.tutorial_guidance_rules)
+
+static func populate_realtime(document: CyberspaceContentDocument, process_manager: RealtimeProcessManager, comms: CommsInterceptionManager, knowledge: PlayerKnowledge, position: PlayerNetworkPosition) -> void:
+	for data: Dictionary in document.realtime_processes:
+		var type_name := StringName(data.get("process_type", &"CUSTOM"))
+		var type_index := RealtimeProcess.ProcessType.keys().find(String(type_name))
+		var process := RealtimeProcess.new(data.id, type_index as RealtimeProcess.ProcessType if type_index >= 0 else RealtimeProcess.ProcessType.CUSTOM, data.get("display_name", data.id), data.get("source_id", &""), float(data.get("duration", -1.0)))
+		process.metadata = (data.get("metadata", {}) as Dictionary).duplicate(true)
+		process.tags.assign(data.get("tags", []))
+		process_manager.add_process(process, bool(data.get("initially_active", true)))
+	for data: Dictionary in document.realtime_endpoints:
+		var type_name := StringName(data.get("endpoint_type", &"CUSTOM"))
+		var type_index := RealtimeEndpointDefinition.EndpointType.keys().find(String(type_name))
+		var process_ids: Array[StringName] = []; process_ids.assign(data.get("associated_realtime_process_ids", []))
+		var endpoint := RealtimeEndpointDefinition.new(data.id, type_index as RealtimeEndpointDefinition.EndpointType if type_index >= 0 else RealtimeEndpointDefinition.EndpointType.CUSTOM, data.get("network_node_id", data.get("node_id", &"")), data.get("service_id", &""), process_ids)
+		process_manager.add_endpoint(endpoint)
+	comms.configure(process_manager, knowledge, position)
+	for data: Dictionary in document.comms_channels:
+		var type_name := StringName(data.get("channel_type", &"CUSTOM"))
+		var type_index := CommsChannelDefinition.ChannelType.keys().find(String(type_name))
+		var channel := CommsChannelDefinition.new(data.id, data.get("display_name", data.id), type_index as CommsChannelDefinition.ChannelType if type_index >= 0 else CommsChannelDefinition.ChannelType.CUSTOM, data.get("source_endpoint_id", &""))
+		channel.participant_ids.assign(data.get("participant_ids", []))
+		if bool(data.get("allow_monitor", true)): channel.set_access_policy(CommsAccessResult.Operation.MONITOR)
+		if bool(data.get("allow_intercept", true)): channel.set_access_policy(CommsAccessResult.Operation.INTERCEPT)
+		comms.add_channel(channel)
+	for data: Dictionary in document.comms_sessions:
+		var session := CommsSession.new(data.id, data.get("channel_id", &""), data.get("realtime_process_id", &""))
+		session.duration = float(data.get("duration", -1.0)); session.story_tags.assign(data.get("tags", []))
+		for line: Dictionary in data.get("timeline", []): session.add_transcript_line(float(line.get("time", 0.0)), line.get("speaker_id", &""), line.get("text", ""), line.get("story_event_id", &""))
+		comms.add_session(session)
 
 static func _entry_available(data: Dictionary, is_available: Callable) -> bool:
 	return not is_available.is_valid() or bool(is_available.call(StringName(data.get("id", &""))))

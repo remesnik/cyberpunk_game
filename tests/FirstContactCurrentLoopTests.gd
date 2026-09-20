@@ -1,0 +1,105 @@
+extends SceneTree
+
+const ValidatorScript := preload("res://addons/cyberspace_authoring/validators/AuthoringValidator.gd")
+var failures := 0
+var assertions := 0
+
+func _init() -> void:
+	var level := load("res://data/authoring/first_contact_current.tres") as CyberspaceContentDocument
+	_expect(level != null and level.document_id == &"FIRST_CONTACT", "current First Contact tutorial loads")
+	_expect(AuthoredNetworkRuntimeBuilder.entry_node_id(level) == &"SAN" and int(level.hud_guidance.required_sensors_level) == 1, "First Contact enters at the player SAN with Sensors 1")
+	_expect(level.network_nodes.map(func(node: Dictionary): return node.id) == [&"SAN", &"ACCESS", &"COMMS", &"SECURITY", &"CONTROL", &"DATA", &"EXIT"], "tutorial uses the requested compact topology")
+	var graph := AuthoredNetworkRuntimeBuilder.build_graph(level)
+	_expect(graph.can_traverse(&"SAN", &"ACCESS").allowed, "initial SAN route is usable")
+	var position := PlayerNetworkPosition.new(&"SAN", 20)
+	var knowledge := AuthoredNetworkRuntimeBuilder.build_knowledge(level, graph)
+	var sensors := SensorTopologyController.new()
+	sensors.configure(graph, position, knowledge, 1)
+	var sensor_view := sensors.current_view()
+	_expect(sensor_view.depths.get(&"ACCESS") == 1 and sensor_view.depths.get(&"COMMS") == 2, "Sensors 1 reveals ACCESS plus one additional topology layer")
+	var comms_view := knowledge.get_node_view(&"COMMS")
+	_expect(knowledge.get_node_level(&"COMMS") == KnowledgeLevel.Value.DETECTED and not comms_view.get("identity_known", true), "the additional layer remains unknown topology")
+	_expect(not graph.can_traverse(&"SAN", &"COMMS", position, knowledge.link_records.keys()).allowed, "sensor discovery does not grant traversal")
+	var access_locked := graph.can_traverse(&"ACCESS", &"COMMS")
+	_expect(not access_locked.allowed and access_locked.controller == &"ACCESS", "ACCESS controls its locked outbound COMMS route")
+	_expect(graph.get_visible_connected_nodes(&"ACCESS").has(&"COMMS"), "the locked ACCESS to COMMS route remains visible")
+	var access_events := graph.apply_node_interaction(&"ACCESS", &"service_disabled", {"service_id": &"ACCESS_AUTH"})
+	_expect(graph.can_traverse(&"ACCESS", &"COMMS").allowed, "the authored ACCESS interaction unlocks COMMS")
+	_expect(access_events.size() == 1 and String(access_events[0].message).begins_with("ROUTE OPENED:"), "unlocking ACCESS gives immediate route-opened feedback")
+	var remote := graph.can_traverse(&"SECURITY", &"DATA")
+	_expect(not remote.allowed and remote.controller == &"CONTROL", "CONTROL remotely owns SECURITY to DATA")
+	_expect(graph.can_traverse(&"CONTROL", &"SECURITY").allowed, "CONTROL is reachable and supports physical backtracking without crossing the remote gate")
+	graph.apply_node_interaction(&"CONTROL", &"service_disabled", {"service_id": &"ROUTE_CONTROL"})
+	var warden_block := graph.can_traverse(&"SECURITY", &"DATA")
+	_expect(not warden_block.allowed and warden_block.reason_code == &"HARD_SECURITY_BLOCKING" and "WARDEN BLOCKING" in String(warden_block.reason), "remote unlock exposes the normal Warden hard gate without permitting traversal")
+	graph.apply_security_resolution(&"ice_bypassed", {"ice_id": &"DATA_WARDEN"})
+	_expect(graph.can_traverse(&"SECURITY", &"DATA").allowed, "resolving the Warden immediately opens the protected route")
+	var watcher := graph.can_traverse(&"SECURITY", &"CONTROL")
+	_expect(watcher.allowed and watcher.soft_gate_unauthorized and watcher.security_gate_type == &"SOFT", "Watcher route remains traversable but monitored")
+	_expect((watcher.consequences as Array).any(func(item: Dictionary): return item.type == &"INCREASE_TRACE") and (watcher.consequences as Array).any(func(item: Dictionary): return item.type == &"INCREASE_SLEEVE_ALERT"), "monitored traversal carries trace and sleeve-response consequences")
+	var security_position := PlayerNetworkPosition.new(&"SECURITY", 20)
+	var monitored_move := graph.apply_traversal(security_position, &"CONTROL")
+	_expect(monitored_move.error == NetworkGraph.TraversalError.OK and security_position.current_node_id == &"CONTROL", "soft-gated route permits deliberate traversal")
+	var resolved_graph := AuthoredNetworkRuntimeBuilder.build_graph(level)
+	resolved_graph.apply_security_resolution(&"ice_bypassed", {"ice_id": &"TRAINING_WATCHER"})
+	_expect(not resolved_graph.can_traverse(&"SECURITY", &"CONTROL").soft_gate_unauthorized, "bypassing the Watcher removes monitored-route consequences")
+	var sequence: Dictionary = level.find_entry(&"FIRST_CONTACT_CURRENT_LOOP")
+	var events := JSON.stringify(sequence)
+	var additions: Array = level.hud_guidance.additional_beats
+	_expect(additions.any(func(item: Dictionary): return item.beat.id == &"FC_IDENTIFY_ACCESS_CONTROL" and item.insert_after == &"FC_NODE_MODE_ACCESS"), "ACCESS authors a service scan after entering Node Mode")
+	_expect(additions.any(func(item: Dictionary): return item.beat.id == &"FC_RETURN_TO_NETWORK" and item.insert_after == &"FC_UNLOCK_COMMS" and item.beat.require_fresh_event), "ACCESS requires a fresh return to Network Mode after unlocking")
+	_expect(level.hud_guidance.beat_overrides.FC_REACH_COMMS.require_fresh_event, "onward traversal must occur after the ACCESS lesson")
+	var process_manager := RealtimeProcessManager.new()
+	var comms_manager := CommsInterceptionManager.new()
+	AuthoredNetworkRuntimeBuilder.populate_realtime(level, process_manager, comms_manager, knowledge, position)
+	var voice_session: CommsSession = comms_manager.sessions.get(&"OFFICE_VOICE_SESSION")
+	knowledge.realtime_endpoint_records[&"OFFICE_FEED_ENDPOINT"] = {"id": &"OFFICE_FEED_ENDPOINT", "accessible": true}
+	knowledge.realtime_process_records[&"OFFICE_VOICE_PROCESS"] = {"id": &"OFFICE_VOICE_PROCESS", "endpoint_id": &"OFFICE_FEED_ENDPOINT"}
+	_expect(voice_session != null and comms_manager.monitor(voice_session.id).available, "COMMS exposes a monitorable active voice session")
+	process_manager.activate_process(voice_session.realtime_process_id); voice_session.listen()
+	process_manager.advance_to_realtime(8.1)
+	_expect(voice_session.heard_lines.any(func(line: Dictionary): return "CONTROL-01" in String(line.text)), "monitored conversation foreshadows the remote CONTROL route")
+	var heard_before := voice_session.heard_lines.size()
+	var cyber_clock := ActionClock.new()
+	cyber_clock.resolve_action(ActionRequest.new(&"PLAYER", ActionRequest.ActionType.WAIT, null, 10), func(_request): return {"success": true, "events": []}, func(_request): return {"success": true, "events": []})
+	_expect(cyber_clock.current_tick == 10 and voice_session.heard_lines.size() == heard_before and voice_session.listening, "cyberspace actions do not pause or consume the realtime call")
+	var comms_rules := level.tutorial_guidance_rules
+	_expect(comms_rules.any(func(rule: Dictionary): return rule.get("insert_after", &"") == &"FC_REACH_COMMS" and rule.beat.completion.event_type == &"NODE_MODE_ENTERED"), "COMMS requires Node Mode after arrival")
+	_expect(comms_rules.any(func(rule: Dictionary): return rule.get("insert_after", &"") == &"FC_MONITOR_FEED" and rule.beat.completion.event_type == &"NETWORK_MODE_ENTERED"), "the player leaves Node Mode while monitoring continues")
+	var watcher_patch: Dictionary = level.tutorial_sequence_patches.filter(func(item: Dictionary): return item.beat_id == &"FC_RESOLVE_ICE")[0]
+	_expect((watcher_patch.patch.completion.events as Array).any(func(event: Dictionary): return event.event_type == &"PATH_TRAVERSED"), "Watcher lesson accepts deliberate monitored traversal")
+	_expect("It won't stop you" in JSON.stringify(level.tutorial_sequence_patches), "Watcher inspection explains the soft-gate distinction")
+	var remote_steps := level.tutorial_stage_insertions.map(func(item: Dictionary): return item.beat.id)
+	_expect(remote_steps.has(&"FC_CONTROL_NODE_MODE") and remote_steps.has(&"FC_SCAN_ROUTE_CONTROL"), "remote-controller lesson enters CONTROL Node Mode and identifies its routing system")
+	_expect(remote_steps.find(&"FC_CONTROL_RETURN_NETWORK") < remote_steps.find(&"FC_BACKTRACK_SECURITY") and remote_steps.find(&"FC_BACKTRACK_SECURITY") < remote_steps.find(&"FC_TRAVERSE_REMOTE_DATA"), "remote-controller lesson requires Network Mode backtracking before DATA traversal")
+	_expect("ROUTE CONTROLLED BY CONTROL-01" in JSON.stringify(level.tutorial_stage_insertions), "remote gate reveals its controlling node")
+	var hard_gate_text := JSON.stringify(level.hard_gate_tutorial_insertions)
+	_expect("Watcher cared that you passed. Warden won't let you pass." in hard_gate_text, "tutorial explicitly contrasts soft and hard gates")
+	_expect(level.hard_gate_tutorial_insertions.size() == 2 and "PATH_TRAVERSED" not in JSON.stringify(level.hard_gate_tutorial_insertions[1].beat.completion), "Warden must be resolved through normal ICE mechanics before traversal")
+	var data_object: Dictionary = level.find_entry(&"TRAINING_FILE_OBJECT")
+	_expect(data_object.get("size_units", 0) == 2 and data_object.get("node_id", &"") == &"DATA", "DATA contains the requested downloadable file")
+	_expect(level.data_tutorial_insertions.size() == 3 and "DATA_OBJECT_INSPECTED" in JSON.stringify(level.data_tutorial_insertions), "DATA teaches discovery and inspection before copying")
+	var starter := PersistentGameState.new(); StoryModeNewGameInitializer.initialize(starter)
+	_expect(int(starter.player_state.active_slot_count) == 2 and int(starter.player_state.hardware.DECK_STORAGE) == 1, "base starter deck has the intended two active slots and base storage")
+	var consequences: Array = data_object.on_download
+	_expect(consequences.any(func(item: Dictionary): return item.type == &"INCREASE_TRACE") and consequences.any(func(item: Dictionary): return item.type == &"INCREASE_SLEEVE_ALERT"), "file acquisition authors mild trace and security-sleeve escalation")
+	comms_manager.free(); process_manager.free()
+	var opening_text := " ".join(level.hud_guidance.opening_network_lesson)
+	_expect("Seeing a node does not mean you can reach it." in opening_text, "opening explicitly separates discovery from access")
+	_expect(sequence.beats[1].completion.event_type == &"PATH_TRAVERSED" and sequence.beats[1].completion.target_id == &"ACCESS", "opening advances only after SAN to ACCESS traversal")
+	_expect(sequence.beats[2].completion.event_type == &"NODE_MODE_ENTERED", "Node Mode is introduced only after the first traversal")
+	for event_name in ["NODE_SCANNED", "PATH_TRAVERSED", "NODE_MODE_ENTERED", "OUTBOUND_ROUTE_UNLOCKED", "REALTIME_FEED_MONITORED", "ICE_INSPECTED", "ICE_DEFEATED", "FILE_ACQUIRED", "DOORSTOP_DEPLOYED", "INTRUSION_SUSPENDED"]:
+		_expect(event_name in events, "guidance advances from %s gameplay state" % event_name)
+	_expect("press " not in events.to_lower(), "tutorial guidance does not name input keys")
+	var issues: Array[Dictionary] = ValidatorScript.new().validate(level)
+	for issue in issues:
+		if issue.level == "ERROR": printerr("AUTHORING ERROR: %s" % issue)
+	_expect(not issues.any(func(issue: Dictionary): return issue.level == "ERROR"), "current tutorial passes authoring validation")
+	print("%s: %d current First Contact assertions" % ["PASS" if failures == 0 else "FAIL", assertions])
+	quit(failures)
+
+func _expect(condition: bool, description: String) -> void:
+	assertions += 1
+	if not condition:
+		failures += 1
+		printerr("FAILED: %s" % description)
