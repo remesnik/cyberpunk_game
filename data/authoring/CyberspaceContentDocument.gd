@@ -32,6 +32,8 @@ const COLLECTIONS: Array[StringName] = [
 @export var tutorial_beat_overrides: Dictionary = {}
 @export var hard_gate_tutorial_insertions: Array[Dictionary] = []
 @export var data_tutorial_insertions: Array[Dictionary] = []
+@export var escalation_tutorial_insertions: Array[Dictionary] = []
+@export var final_tutorial_insertions: Array[Dictionary] = []
 
 @export var network_nodes: Array[Dictionary] = []
 @export var network_links: Array[Dictionary] = []

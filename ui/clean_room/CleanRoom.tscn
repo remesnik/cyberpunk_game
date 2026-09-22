@@ -1,31 +1,28 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://ui/clean_room/CleanRoom.gd" id="1"]
-[ext_resource type="Script" path="res://ui/input/ControlHintBar.gd" id="2_hints"]
-
 [sub_resource type="StyleBoxFlat" id="panel"]
-bg_color = Color(1, 1, 1, 0.92)
+bg_color = Color(0.965, 0.98, 0.985, 0.98)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.06, 0.16, 0.2, 0.65)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
-
+border_color = Color(0.08, 0.34, 0.4, 0.5)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 [sub_resource type="StyleBoxFlat" id="go"]
-bg_color = Color(0.93, 0.99, 1, 1)
-border_width_left = 4
-border_width_top = 4
-border_width_right = 4
-border_width_bottom = 4
-border_color = Color(0.03, 0.5, 0.65, 1)
-corner_radius_top_left = 72
-corner_radius_top_right = 72
-corner_radius_bottom_right = 72
-corner_radius_bottom_left = 72
+bg_color = Color(0.03, 0.55, 0.7, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.72, 0.98, 1, 1)
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
 
 [node name="CleanRoom" type="Control"]
 layout_mode = 3
@@ -35,8 +32,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
-
-[node name="White" type="ColorRect" parent="."]
+[node name="Background" type="ColorRect" parent="."]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -44,192 +40,239 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 color = Color(0.985, 0.99, 0.99, 1)
-
-[node name="Header" type="Label" parent="."]
+mouse_filter = 2
+[node name="TopBar" type="HBoxContainer" parent="."]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
-offset_top = 32.0
-offset_bottom = 70.0
-theme_override_colors/font_color = Color(0.04, 0.14, 0.18, 1)
-theme_override_font_sizes/font_size = 22
-text = "CLEAN-ROOM  //  PREP CHAMBER"
-horizontal_alignment = 1
-
-[node name="CreditsLabel" type="Label" parent="."]
-unique_name_in_owner = true
-layout_mode = 0
-offset_left = 34.0
-offset_top = 30.0
-offset_right = 180.0
+offset_left = 24.0
+offset_top = 18.0
+offset_right = -24.0
 offset_bottom = 62.0
-theme_override_colors/font_color = Color(0.04, 0.14, 0.18, 1)
-theme_override_font_sizes/font_size = 18
-
-[node name="GoButton" type="Button" parent="."]
+grow_horizontal = 2
+[node name="Header" type="Label" parent="TopBar"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "CLEAN ROOM  //  PREPARE"
+[node name="CreditsLabel" type="Label" parent="TopBar"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(190, 190)
+layout_mode = 2
+[node name="ControlsButton" type="Button" parent="TopBar"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+text = "?  CONTROLS"
+
+[node name="ContentMargin" type="MarginContainer" parent="."]
 layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -95.0
-offset_top = -165.0
-offset_right = 95.0
-offset_bottom = 25.0
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 24.0
+offset_top = 78.0
+offset_right = -24.0
+offset_bottom = -132.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 1)
-theme_override_font_sizes/font_size = 32
-theme_override_styles/normal = SubResource("go")
-theme_override_styles/hover = SubResource("go")
-text = "GO\nNETSPACE"
-tooltip_text = "Enter the prepared Netspace run."
-
-[node name="ControlsButton" type="Button" parent="."]
+[node name="Columns" type="HBoxContainer" parent="ContentMargin"]
+layout_mode = 2
+theme_override_constants/separation = 20
+[node name="DeckPanel" type="PanelContainer" parent="ContentMargin/Columns"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+size_flags_horizontal = 2
+theme_override_styles/panel = SubResource("panel")
+[node name="Rows" type="VBoxContainer" parent="ContentMargin/Columns/DeckPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+[node name="Title" type="Label" parent="ContentMargin/Columns/DeckPanel/Rows"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "DECK"
+[node name="DeckUsageLabel" type="Label" parent="ContentMargin/Columns/DeckPanel/Rows"]
 unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -158.0
-offset_top = 24.0
-offset_right = -24.0
-offset_bottom = 66.0
-grow_horizontal = 0
-theme_override_colors/font_color = Color(0.04, 0.28, 0.34, 0.82)
+layout_mode = 2
 theme_override_font_sizes/font_size = 15
-text = "?  CONTROLS"
-tooltip_text = "Open the controls reference."
+[node name="DeckSoftwareLabel" type="Label" parent="ContentMargin/Columns/DeckPanel/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_vertical = 3
+autowrap_mode = 2
+[node name="LoadoutButton" type="Button" parent="ContentMargin/Columns/DeckPanel/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+text = "REVIEW LOADOUT"
+[node name="MissionPanel" type="PanelContainer" parent="ContentMargin/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+clip_contents = true
+theme_override_styles/panel = SubResource("panel")
+[node name="MissionLabel" type="Label" parent="ContentMargin/Columns/MissionPanel"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "NO TARGET SELECTED"
+autowrap_mode = 2
 
-[node name="PrepPanel" type="PanelContainer" parent="."]
+[node name="ActionBar" type="PanelContainer" parent="."]
 layout_mode = 1
-anchors_preset = 7
-anchor_left = 0.5
-anchor_top = 1.0
-anchor_right = 0.5
+anchors_preset = 12
+anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -390.0
-offset_top = -280.0
-offset_right = 390.0
-offset_bottom = -35.0
+offset_top = -112.0
 grow_horizontal = 2
 grow_vertical = 0
 theme_override_styles/panel = SubResource("panel")
-
-[node name="Rows" type="VBoxContainer" parent="PrepPanel"]
+z_index = 20
+[node name="Row" type="HBoxContainer" parent="ActionBar"]
 layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="MissionLabel" type="Label" parent="PrepPanel/Rows"]
+theme_override_constants/separation = 16
+[node name="HomeButton" type="Button" parent="ActionBar/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(150, 72)
+layout_mode = 2
+text = "RETURN HOME"
+[node name="ReadinessLabel" type="Label" parent="ActionBar/Row"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 1)
-theme_override_font_sizes/font_size = 13
-text = "MISSION BRIEFING"
-horizontal_alignment = 1
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 16
+text = "DECK STATUS: READY"
+vertical_alignment = 1
 autowrap_mode = 2
-
-[node name="ConnectionLabel" type="Label" parent="PrepPanel/Rows"]
+[node name="GoButton" type="Button" parent="ActionBar/Row"]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(230, 72)
 layout_mode = 2
-theme_override_colors/font_color = Color(0.04, 0.14, 0.18, 1)
-horizontal_alignment = 1
-
-[node name="BuyLinkButton" type="Button" parent="PrepPanel/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-
-[node name="ProgramRow" type="HBoxContainer" parent="PrepPanel/Rows"]
-layout_mode = 2
-[node name="AvailablePrograms" type="OptionButton" parent="PrepPanel/Rows/ProgramRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-[node name="LoadButton" type="Button" parent="PrepPanel/Rows/ProgramRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "LOAD >"
-[node name="LoadedPrograms" type="OptionButton" parent="PrepPanel/Rows/ProgramRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-[node name="UnloadButton" type="Button" parent="PrepPanel/Rows/ProgramRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "UNLOAD"
-
-[node name="SlotsLabel" type="Label" parent="PrepPanel/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_colors/font_color = Color(0.04, 0.14, 0.18, 1)
-[node name="ContactButton" type="Button" parent="PrepPanel/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "CONTACT ALLIES"
-[node name="ContactRow" type="HBoxContainer" parent="PrepPanel/Rows"]
-layout_mode = 2
-[node name="ContactSelect" type="OptionButton" parent="PrepPanel/Rows/ContactRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-[node name="ContactInteraction" type="OptionButton" parent="PrepPanel/Rows/ContactRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-[node name="ContactActionButton" type="Button" parent="PrepPanel/Rows/ContactRow"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "OPEN"
-[node name="AllyStatus" type="Label" parent="PrepPanel/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-horizontal_alignment = 1
-text = "LATCH // OFFLINE    NO NEW MESSAGES"
-[node name="InboxButton" type="Button" parent="PrepPanel/Rows"]
-unique_name_in_owner = true
-layout_mode = 2
-text = "READ MESSAGE"
-[node name="MessageLabel" type="Label" parent="PrepPanel/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 38)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.04, 0.28, 0.34, 1)
-horizontal_alignment = 1
-autowrap_mode = 2
-
-[node name="HomeButton" type="Button" parent="."]
-unique_name_in_owner = true
-layout_mode = 1
-anchors_preset = 3
-anchor_top = 1.0
-anchor_bottom = 1.0
-offset_left = 24.0
-offset_top = -76.0
-offset_right = 178.0
-offset_bottom = -24.0
-grow_vertical = 0
-text = "⌂  RETURN HOME"
-tooltip_text = "Leave the Clean-Room and return to Meatspace."
-
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 28
+theme_override_styles/normal = SubResource("go")
+theme_override_styles/hover = SubResource("go")
+theme_override_styles/focus = SubResource("go")
+text = "GO"
 [node name="TutorialHint" type="Label" parent="."]
 unique_name_in_owner = true
 visible = false
+layout_mode = 0
+offset_left = 24.0
+offset_top = 62.0
+offset_right = 700.0
+offset_bottom = 82.0
+text = "GO — enter Netspace  •  REVIEW LOADOUT — optional preparation"
+
+[node name="LoadoutPanel" type="Control" parent="."]
+unique_name_in_owner = true
+visible = false
 layout_mode = 1
-anchors_preset = 10
+anchors_preset = 15
 anchor_right = 1.0
-offset_left = 210.0
-offset_top = 78.0
-offset_right = -210.0
-offset_bottom = 112.0
+anchor_bottom = 1.0
+offset_bottom = -112.0
 grow_horizontal = 2
-theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 0.88)
-theme_override_font_sizes/font_size = 14
-text = "GO — enter Netspace  •  CONTROLS — review controls  •  RETURN HOME — back to Meatspace"
-horizontal_alignment = 1
-mouse_filter = 2
+grow_vertical = 2
+mouse_filter = 1
+z_index = 10
+[node name="Dim" type="ColorRect" parent="LoadoutPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.06, 0.08, 0.78)
+[node name="Sheet" type="PanelContainer" parent="LoadoutPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 48.0
+offset_top = 36.0
+offset_right = -48.0
+offset_bottom = -36.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("panel")
+[node name="Rows" type="VBoxContainer" parent="LoadoutPanel/Sheet"]
+layout_mode = 2
+[node name="TitleRow" type="HBoxContainer" parent="LoadoutPanel/Sheet/Rows"]
+layout_mode = 2
+[node name="Title" type="Label" parent="LoadoutPanel/Sheet/Rows/TitleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 22
+text = "LOADOUT"
+[node name="CloseLoadoutButton" type="Button" parent="LoadoutPanel/Sheet/Rows/TitleRow"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CLOSE"
+[node name="MemoryBar" type="ProgressBar" parent="LoadoutPanel/Sheet/Rows"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 30)
+layout_mode = 2
+show_percentage = false
+[node name="LoadoutUsageLabel" type="Label" parent="LoadoutPanel/Sheet/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+[node name="SoftwareScroll" type="ScrollContainer" parent="LoadoutPanel/Sheet/Rows"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+[node name="SoftwareLists" type="VBoxContainer" parent="LoadoutPanel/Sheet/Rows/SoftwareScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="InstalledUtilitiesLabel" type="Label" parent="LoadoutPanel/Sheet/Rows/SoftwareScroll/SoftwareLists"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+[node name="StoredUtilitiesLabel" type="Label" parent="LoadoutPanel/Sheet/Rows/SoftwareScroll/SoftwareLists"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+[node name="RunningProgramsLabel" type="Label" parent="LoadoutPanel/Sheet/Rows/SoftwareScroll/SoftwareLists"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+[node name="StoredProgramsLabel" type="Label" parent="LoadoutPanel/Sheet/Rows/SoftwareScroll/SoftwareLists"]
+unique_name_in_owner = true
+layout_mode = 2
+autowrap_mode = 2
+[node name="Controls" type="GridContainer" parent="LoadoutPanel/Sheet/Rows"]
+layout_mode = 2
+columns = 4
+[node name="StoredOption" type="OptionButton" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="InstallButton" type="Button" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "INSTALL / START"
+[node name="InstalledOption" type="OptionButton" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="RemoveButton" type="Button" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "UNINSTALL / STOP"
+[node name="RunningOption" type="OptionButton" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="SwapButton" type="Button" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "SWAP WITH"
+[node name="StoredActiveOption" type="OptionButton" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+[node name="LoadoutStatus" type="Label" parent="LoadoutPanel/Sheet/Rows/Controls"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "READY"
 
 [node name="ControlsSheet" type="Control" parent="."]
 unique_name_in_owner = true
@@ -238,100 +281,30 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_bottom = -112.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 1
-
-[node name="Dim" type="ColorRect" parent="ControlsSheet"]
+z_index = 10
+[node name="Rows" type="VBoxContainer" parent="ControlsSheet"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 60.0
+offset_top = 48.0
+offset_right = -60.0
+offset_bottom = -48.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.92, 0.95, 0.95, 0.82)
-
-[node name="Sheet" type="PanelContainer" parent="ControlsSheet"]
-layout_mode = 1
-anchors_preset = 8
-anchor_left = 0.5
-anchor_top = 0.5
-anchor_right = 0.5
-anchor_bottom = 0.5
-offset_left = -510.0
-offset_top = -340.0
-offset_right = 510.0
-offset_bottom = 340.0
-grow_horizontal = 2
-grow_vertical = 2
-theme_override_styles/panel = SubResource("panel")
-
-[node name="Margin" type="MarginContainer" parent="ControlsSheet/Sheet"]
-layout_mode = 2
-theme_override_constants/margin_left = 28
-theme_override_constants/margin_top = 22
-theme_override_constants/margin_right = 28
-theme_override_constants/margin_bottom = 22
-
-[node name="Rows" type="VBoxContainer" parent="ControlsSheet/Sheet/Margin"]
-layout_mode = 2
-theme_override_constants/separation = 14
-
-[node name="Title" type="Label" parent="ControlsSheet/Sheet/Margin/Rows"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.03, 0.18, 0.22, 1)
-theme_override_font_sizes/font_size = 24
-text = "CONTROLS  //  QUICK REFERENCE"
-
-[node name="Rule" type="HSeparator" parent="ControlsSheet/Sheet/Margin/Rows"]
-layout_mode = 2
-
-[node name="Columns" type="HBoxContainer" parent="ControlsSheet/Sheet/Margin/Rows"]
+[node name="PrimaryBindings" type="Label" parent="ControlsSheet/Rows"]
+unique_name_in_owner = true
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 28
-
-[node name="PrimaryBindings" type="Label" parent="ControlsSheet/Sheet/Margin/Rows/Columns"]
+[node name="AlternateBindings" type="Label" parent="ControlsSheet/Rows"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(390, 0)
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 14
-
-[node name="AlternateBindings" type="Label" parent="ControlsSheet/Sheet/Margin/Rows/Columns"]
+size_flags_vertical = 3
+[node name="CloseControlsButton" type="Button" parent="ControlsSheet/Rows"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(390, 0)
 layout_mode = 2
-size_flags_horizontal = 3
-theme_override_font_sizes/font_size = 12
-
-[node name="Grammar" type="Label" parent="ControlsSheet/Sheet/Margin/Rows"]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.02, 0.31, 0.4, 0.9)
-theme_override_font_sizes/font_size = 13
-text = "NETSPACE GRAMMAR  //  RIGHT STICK: WHAT am I targeting?   D-PAD LEFT/RIGHT: WHAT command?   A/CROSS: DO IT   •   LB/RB: WHICH slot?   RT: RUN   •   LT: MANAGE"
-horizontal_alignment = 1
-
-[node name="CloseControlsButton" type="Button" parent="ControlsSheet/Sheet/Margin/Rows"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 40)
-layout_mode = 2
-text = "B / CIRCLE  •  ESCAPE   //   CLOSE"
-
-[node name="ControlHints" type="Label" parent="."]
-layout_mode = 1
-anchors_preset = 12
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 200.0
-offset_top = -64.0
-offset_right = -24.0
-offset_bottom = -24.0
-grow_horizontal = 2
-grow_vertical = 0
-theme_override_colors/font_color = Color(0.04, 0.28, 0.34, 0.8)
-horizontal_alignment = 2
-text = "ARROWS: SELECT  •  ENTER: CONFIRM  •  ESC: BACK"
-script = ExtResource("2_hints")
-keyboard_text = "ARROWS: SELECT  •  ENTER: CONFIRM  •  ESC: BACK"
-gamepad_text = "RIGHT STICK / D-PAD: SELECT  •  A: CONFIRM  •  B: BACK  •  Y: LOADOUT"
+text = "CLOSE"

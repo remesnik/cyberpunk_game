@@ -46,7 +46,7 @@ func _ready() -> void:
 	_expect(Game.active_content_document != null and Game.active_content_document.document_id == &"FIRST_CONTACT", "computer starts existing FIRST_CONTACT resource")
 	_expect(Game.game_domain == Game.GameDomain.CLEAN_ROOM and clean_room.visible and not network.visible and not screen.visible, "bedroom connection enters the Clean-Room first")
 	_expect(bool(Game.persistent_game_state.campaign_state.story_flags.CLEAN_ROOM_LATCH_CONTACTED), "Latch initiates the authored first Clean-Room contact")
-	_expect(FirstMeatspaceTutorial.get_step(Game.persistent_game_state) == FirstMeatspaceTutorial.Step.ENTER_CLEAN_ROOM and clean_room.tutorial_hint.visible and "CONTROLS" in clean_room.tutorial_hint.text and "RETURN HOME" in clean_room.tutorial_hint.text, "first Clean-Room visit presents the concise staging-area cue")
+	_expect(FirstMeatspaceTutorial.get_step(Game.persistent_game_state) == FirstMeatspaceTutorial.Step.ENTER_CLEAN_ROOM and clean_room.tutorial_hint.visible and "GO" in clean_room.tutorial_hint.text and "LOADOUT" in clean_room.tutorial_hint.text, "first Clean-Room visit presents the concise preparation-to-GO cue")
 	clean_room.go_button.pressed.emit()
 	await get_tree().process_frame
 	_expect(Game.game_domain == Game.GameDomain.CYBERSPACE and network.visible and not clean_room.visible, "Clean-Room GO enters the Netspace run")

@@ -14,6 +14,7 @@ var knowledge: PlayerKnowledge
 var ice_controller: IceController
 var realtime_endpoints: Dictionary
 var realtime_processes: Dictionary
+var disclosure_profile: ScanDisclosureProfile
 
 func _init(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_knowledge: PlayerKnowledge, p_ice_controller: IceController, p_realtime_endpoints: Dictionary = {}, p_realtime_processes: Dictionary = {}) -> void:
 	graph = p_graph
@@ -22,6 +23,7 @@ func _init(p_graph: NetworkGraph, p_position: PlayerNetworkPosition, p_knowledge
 	ice_controller = p_ice_controller
 	realtime_endpoints = p_realtime_endpoints
 	realtime_processes = p_realtime_processes
+	disclosure_profile = load("res://data/scan_disclosure_profile.tres") as ScanDisclosureProfile
 
 func get_action_cost(target: Dictionary) -> int:
 	var distance := _target_distance(target)
@@ -61,12 +63,15 @@ func perform_scan(target: Dictionary, scanner_power: int) -> ScanResult:
 	var existing := _existing_level(kind, objective_id)
 	var capability_bonus := 2 if position.has_capability(CapabilityCatalog.DEEP_SCAN) else 0
 	var effective_power := maxi(scanner_power, 0) + position.scan_capability + capability_bonus + int(existing / 2) - maxi(distance, 0)
-	var depth := clampi(effective_power - security + 1, 1, 4)
+	var depth := clampi(effective_power - security + 1, 1, disclosure_profile.maximum_quality)
 	var cost := get_action_cost(target)
 	var trace := maxi(0, security + depth - scanner_power - position.scan_capability)
 	var discoveries := _discover(kind, objective_id, depth)
 	var events: Array[Dictionary] = [{"type": &"SCAN_PULSE", "target_kind": kind, "depth": depth, "player_visible": true}]
-	return ScanResult.new(true, kind, objective_id, depth, cost, trace, "Scan complete.", discoveries, events)
+	var result := ScanResult.new(true, kind, objective_id, depth, cost, trace, "Scan complete.", discoveries, events)
+	result.scan_quality = disclosure_profile.quality_label(depth)
+	result.quality_metadata = {"quality": depth, "maximum_quality": disclosure_profile.maximum_quality, "profile": &"DEFAULT_SCAN_DISCLOSURE"}
+	return result
 
 func _discover(kind: StringName, objective_id: StringName, depth: int) -> Array[Dictionary]:
 	var discoveries: Array[Dictionary] = []
@@ -75,25 +80,47 @@ func _discover(kind: StringName, objective_id: StringName, depth: int) -> Array[
 		# Identity and scan-detail discoveries are separate so level/content facts
 		# can also arrive independently from story, comms, or another hacker.
 		var level := KnowledgeLevel.Value.IDENTIFIED
-		discoveries.append({"entity_kind": &"NODE", "entity_id": node.id, "level": level, "identity": node.display_name, "node_type": node.node_type})
-		if depth >= 2:
-			discoveries.append({"entity_kind": &"NODE_DETAILS", "entity_id": node.id, "owner": node.owner_faction, "security_level": node.security_level})
-		if depth >= 3:
+		discoveries.append({"entity_kind": &"NODE", "entity_id": node.id, "level": level, "identity": node.display_name, "node_type": node.node_type, "network_type": node.network_type})
+		var local_ice: Array[IceInstance] = []
+		for ice_id in ice_controller.instances:
+			var ice := ice_controller.get_ice(ice_id)
+			if ice.current_node_id == node.id: local_ice.append(ice)
+		if depth >= disclosure_profile.ice_presence_quality: discoveries.append({"entity_kind": &"ICE_PRESENCE", "entity_id": node.id, "present": not local_ice.is_empty(), "count": local_ice.size()})
+		if depth >= mini(disclosure_profile.security_family_quality, disclosure_profile.difficulty_rating_quality):
+			var security_discovery := {"entity_kind": &"NODE_SECURITY", "entity_id": node.id}
+			if depth >= disclosure_profile.security_family_quality: security_discovery["security_family"] = node.security_family_name()
+			if depth >= disclosure_profile.difficulty_rating_quality: security_discovery["difficulty_rating"] = node.difficulty_rating
+			discoveries.append(security_discovery)
+		if depth >= disclosure_profile.controlled_paths_quality:
 			discoveries.append({"entity_kind": &"CONNECTIONS", "entity_id": node.id, "count": node.connected_links.size()})
+			var controlled_paths: Array[Dictionary] = []
+			for control: NodePathControl in node.outbound_path_controls:
+				controlled_paths.append({"control_id": control.id, "link_ids": control.link_ids.duplicate(), "destination_node_ids": control.destination_node_ids.duplicate(), "interaction": control.interaction})
 			for link_id in node.connected_links:
 				var link := graph.get_link(link_id)
+				var path := {"link_id": link.id, "remote_controller_relationships": []}
+				for direction: TraversalDirectionDefinition in link.traversal_directions.values():
+					if direction.controller_node_id == node.id: path["controlled"] = true
+					elif not direction.controller_node_id.is_empty() and depth >= disclosure_profile.remote_controller_quality: path.remote_controller_relationships.append({"controller_node_id": direction.controller_node_id, "remote_controller_node_id": direction.remote_controller_node_id, "source": direction.source_node_id, "destination": direction.destination_node_id})
+				controlled_paths.append(path)
 				if link.hidden and not link.discovered:
 					discoveries.append({"entity_kind": &"LINK", "entity_id": link.id, "level": KnowledgeLevel.Value.DETECTED})
 				else:
-					discoveries.append({"entity_kind": &"LINK", "entity_id": link.id, "level": KnowledgeLevel.Value.SCANNED})
-		if depth >= 2:
+					discoveries.append({"entity_kind": &"LINK", "entity_id": link.id, "level": KnowledgeLevel.Value.SCANNED if depth >= disclosure_profile.remote_controller_quality else KnowledgeLevel.Value.IDENTIFIED})
+			discoveries.append({"entity_kind": &"CONTROLLED_PATHS", "entity_id": node.id, "paths": controlled_paths})
+		if depth >= disclosure_profile.service_list_quality:
 			for service in node.services:
 				discoveries.append({"entity_kind": &"SERVICE", "entity_id": service.id, "level": KnowledgeLevel.Value.IDENTIFIED})
-			for ice_id in ice_controller.instances:
-				var ice := ice_controller.get_ice(ice_id)
-				if ice.current_node_id == node.id:
-					discoveries.append({"entity_kind": &"ICE", "entity_id": ice.instance_id, "level": KnowledgeLevel.Value.DETECTED})
-		_append_endpoint_discoveries(discoveries, node.id, &"", level)
+		if depth >= disclosure_profile.ice_identity_quality:
+			for ice: IceInstance in local_ice:
+				var ice_discovery := {"entity_kind": &"ICE", "entity_id": ice.instance_id, "level": KnowledgeLevel.Value.SCANNED, "node_id": node.id, "state": ice.state, "ice_type": ice.definition.display_name}
+				if depth >= disclosure_profile.ice_rating_quality: ice_discovery["ice_rating"] = ice.definition.defense
+				discoveries.append(ice_discovery)
+		if depth >= disclosure_profile.affinity_hint_quality:
+			discoveries.append({"entity_kind": &"AFFINITY_HINTS", "entity_id": node.id, "security_family": node.security_family_name(), "service_types": node.services.map(func(service): return service.get("service_type", &""))})
+		if depth >= disclosure_profile.vulnerability_quality:
+			discoveries.append({"entity_kind": &"NODE_VULNERABILITIES", "entity_id": node.id, "items": node.services.reduce(func(items: Array, service: Dictionary): items.append_array(service.get("vulnerabilities", [])); return items, [])})
+		if depth >= disclosure_profile.realtime_endpoint_quality: _append_endpoint_discoveries(discoveries, node.id, &"", level)
 	elif kind == LINK:
 		var link := graph.get_link(objective_id)
 		var link_level := KnowledgeLevel.Value.IDENTIFIED if depth == 1 else KnowledgeLevel.Value.SCANNED

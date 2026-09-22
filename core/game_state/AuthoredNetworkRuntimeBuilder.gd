@@ -14,11 +14,15 @@ static func build_graph(document: CyberspaceContentDocument, is_available: Calla
 			StringName(data.get("owner", data.get("faction", &""))),
 			StringName(data.get("sphere_id", &""))
 		)
+		node.network_type = StringName(data.get("network_type", data.get("node_type", &"SYSTEM"))).to_upper()
+		var family_name := StringName(data.get("security_family", &"VIRAL")).to_upper()
+		var family_index := NetworkNodeDefinition.SecurityFamily.keys().find(String(family_name))
+		node.security_family = (family_index as NetworkNodeDefinition.SecurityFamily) if family_index >= 0 else NetworkNodeDefinition.SecurityFamily.VIRAL
+		node.difficulty_rating = maxi(0, int(data.get("difficulty_rating", data.get("security_level", 0))))
 		for service_id: StringName in _string_names(data.get("services", [])):
 			var service := document.find_entry(service_id)
 			if not service.is_empty() and _entry_available(service, is_available):
-				node.add_service(service_id, String(service.get("display_name", service_id)), int(service.get("security_level", 0)), _string_names(service.get("vulnerabilities", [])), _string_names(service.get("tags", [])))
-				if not node.services.is_empty(): node.services[node.services.size() - 1].merge(service, true)
+				node.add_service_record(service)
 		for control_data: Dictionary in data.get("outbound_path_controls", data.get("path_controls", [])): node.add_path_control(NodePathControl.from_authored(control_data))
 		graph.add_node(node)
 	for data: Dictionary in document.network_links:

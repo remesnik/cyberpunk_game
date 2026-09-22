@@ -35,10 +35,10 @@ func _test_clean_room_indicator() -> void:
 	var room := (load("res://ui/clean_room/CleanRoom.tscn") as PackedScene).instantiate() as CleanRoom
 	add_child(room)
 	await get_tree().process_frame
-	_expect(room.get_node("PrepPanel/Rows/InboxButton").disabled, "Clean-Room inbox stays visually quiet when empty")
+	_expect(room.get_node_or_null("PrepPanel") == null, "Clean-Room keeps contacts and inbox widgets out of the primary preparation flow")
 	Game.social_inbox.add_authored(&"TEST_OPTIONAL", &"LATCH", "Still here.")
 	await get_tree().process_frame
-	_expect(not room.get_node("PrepPanel/Rows/InboxButton").disabled and "1 UNREAD" in room.get_node("PrepPanel/Rows/AllyStatus").text, "Clean-Room displays a sparse incoming-message indicator")
+	_expect(Game.social_inbox.unread_count() == 1, "incoming messages remain available through the social system without expanding the Clean-Room")
 	var bedroom := (load("res://ui/story_prologue/PlayerBedroom.tscn") as PackedScene).instantiate() as PlayerBedroom
 	add_child(bedroom); bedroom.bind_state(Game.persistent_game_state)
 	_expect((bedroom.dressing[&"MESSAGE_WAITING"].node as Node3D).visible, "unread social state leaves a message-waiting indicator in Meatspace")

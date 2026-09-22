@@ -40,9 +40,15 @@ func _init() -> void:
 	var security_position := PlayerNetworkPosition.new(&"SECURITY", 20)
 	var monitored_move := graph.apply_traversal(security_position, &"CONTROL")
 	_expect(monitored_move.error == NetworkGraph.TraversalError.OK and security_position.current_node_id == &"CONTROL", "soft-gated route permits deliberate traversal")
+	_expect(graph.apply_traversal(security_position, &"SECURITY").error == NetworkGraph.TraversalError.OK and security_position.current_node_id == &"SECURITY", "revisiting a previous node remains valid and does not depend on tutorial order")
 	var resolved_graph := AuthoredNetworkRuntimeBuilder.build_graph(level)
 	resolved_graph.apply_security_resolution(&"ice_bypassed", {"ice_id": &"TRAINING_WATCHER"})
 	_expect(not resolved_graph.can_traverse(&"SECURITY", &"CONTROL").soft_gate_unauthorized, "bypassing the Watcher removes monitored-route consequences")
+	var early_control_graph := AuthoredNetworkRuntimeBuilder.build_graph(level)
+	early_control_graph.apply_node_interaction(&"CONTROL", &"service_disabled", {"service_id": &"ROUTE_CONTROL"})
+	_expect(not early_control_graph.can_traverse(&"SECURITY", &"DATA").allowed, "CONTROL can be explored and compromised before gate inspection while the normal Warden still blocks traversal")
+	early_control_graph.apply_security_resolution(&"ice_bypassed", {"ice_id": &"DATA_WARDEN"})
+	_expect(early_control_graph.can_traverse(&"SECURITY", &"DATA").allowed, "the early remote unlock remains valid when the Warden is resolved later")
 	var sequence: Dictionary = level.find_entry(&"FIRST_CONTACT_CURRENT_LOOP")
 	var events := JSON.stringify(sequence)
 	var additions: Array = level.hud_guidance.additional_beats
@@ -83,12 +89,32 @@ func _init() -> void:
 	_expect(int(starter.player_state.active_slot_count) == 2 and int(starter.player_state.hardware.DECK_STORAGE) == 1, "base starter deck has the intended two active slots and base storage")
 	var consequences: Array = data_object.on_download
 	_expect(consequences.any(func(item: Dictionary): return item.type == &"INCREASE_TRACE") and consequences.any(func(item: Dictionary): return item.type == &"INCREASE_SLEEVE_ALERT"), "file acquisition authors mild trace and security-sleeve escalation")
+	var lockdown: Dictionary = consequences.filter(func(item: Dictionary): return item.type == &"SET_PATH_STATE")[0]
+	var escalation_graph := AuthoredNetworkRuntimeBuilder.build_graph(level)
+	escalation_graph.set_direction_state(lockdown.link_id, lockdown.source, lockdown.destination, TraversalDirectionDefinition.State.LOCKED_DOWN)
+	escalation_graph.apply_node_interaction(&"DATA", &"file_downloaded", {"file_id": &"TRAINING_FILE"})
+	_expect(not escalation_graph.can_traverse(&"DATA", &"SECURITY").allowed and escalation_graph.can_traverse(&"DATA", &"EXIT").allowed, "objective lockdown revokes the obvious return while preserving a viable exit")
+	_expect("Unlocked does not necessarily mean permanently unlocked." in JSON.stringify(level.escalation_tutorial_insertions), "tutorial explains dynamic traversal state explicitly")
+	var doorstop_beat: Dictionary = level.tutorial_beat_overrides.FC_DOORSTOP
+	var jack_out_beat: Dictionary = level.tutorial_beat_overrides.FC_JACK_OUT
+	var jack_back_in_beat: Dictionary = level.tutorial_beat_overrides.FC_JACK_BACK_IN
+	_expect(doorstop_beat.objective.action_type == &"USE_PROGRAM" and doorstop_beat.objective.target_node_id == &"DATA" and doorstop_beat.require_fresh_event, "DATA requires a fresh real Doorstop deployment at the current node")
+	_expect(doorstop_beat.completion.event_type == &"DOORSTOP_DEPLOYED" and doorstop_beat.completion.target_id == &"DATA", "Doorstop stage advances only from the matching deployment event")
+	var doorstop_text := JSON.stringify(doorstop_beat).to_lower()
+	_expect("one-shot" in doorstop_text and "temporary return point" in doorstop_text and "not a permanent save point" in doorstop_text, "Doorstop lesson explains its disposable temporary-return semantics")
+	_expect(jack_out_beat.objective.action_type == &"JACK_OUT_DOORSTOP" and jack_out_beat.completion.event_type == &"INTRUSION_SUSPENDED_AT_DOORSTOP" and jack_out_beat.require_fresh_event, "jack-out stage advances only after actual Doorstop suspension completes")
+	_expect(jack_back_in_beat.objective.return_node_id == &"DATA" and jack_back_in_beat.completion.event_type == &"DOORSTOP_REENTRY_COMPLETED" and jack_back_in_beat.completion.target_id == &"DATA", "intermission advances only after exact-node Doorstop re-entry")
+	_expect("one final task" in JSON.stringify(jack_back_in_beat).to_lower(), "tutorial contact frames the remaining network task")
+	var cleanup_service: Dictionary = level.find_entry(&"ACCESS_LOG")
+	_expect(cleanup_service.node_id == &"DATA" and cleanup_service.disableable, "final cleanup uses the existing scannable and disableable service mechanics")
+	_expect(level.final_tutorial_insertions.size() == 2 and level.final_tutorial_insertions[0].beat.completion.event_type == &"TARGET_SCANNED" and level.final_tutorial_insertions[1].beat.completion.event_type == &"SERVICE_DISABLED", "re-entry leads through a short inspect-and-scrub objective")
+	_expect(level.network_links.any(func(link: Dictionary): return link.id == &"DATA_EXIT" and link.one_way), "cleanup leaves a clear normal exit route from DATA")
 	comms_manager.free(); process_manager.free()
 	var opening_text := " ".join(level.hud_guidance.opening_network_lesson)
 	_expect("Seeing a node does not mean you can reach it." in opening_text, "opening explicitly separates discovery from access")
 	_expect(sequence.beats[1].completion.event_type == &"PATH_TRAVERSED" and sequence.beats[1].completion.target_id == &"ACCESS", "opening advances only after SAN to ACCESS traversal")
 	_expect(sequence.beats[2].completion.event_type == &"NODE_MODE_ENTERED", "Node Mode is introduced only after the first traversal")
-	for event_name in ["NODE_SCANNED", "PATH_TRAVERSED", "NODE_MODE_ENTERED", "OUTBOUND_ROUTE_UNLOCKED", "REALTIME_FEED_MONITORED", "ICE_INSPECTED", "ICE_DEFEATED", "FILE_ACQUIRED", "DOORSTOP_DEPLOYED", "INTRUSION_SUSPENDED"]:
+	for event_name in ["NODE_SCANNED", "PATH_TRAVERSED", "NODE_MODE_ENTERED", "OUTBOUND_ROUTE_UNLOCKED", "REALTIME_FEED_MONITORED", "ICE_INSPECTED", "ICE_DEFEATED", "FILE_ACQUIRED", "DOORSTOP_DEPLOYED"]:
 		_expect(event_name in events, "guidance advances from %s gameplay state" % event_name)
 	_expect("press " not in events.to_lower(), "tutorial guidance does not name input keys")
 	var issues: Array[Dictionary] = ValidatorScript.new().validate(level)

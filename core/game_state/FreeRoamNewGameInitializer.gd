@@ -10,12 +10,15 @@ static func initialize(state: PersistentGameState, run_introduction := false) ->
 	# advances authored campaign gates from the absence of dialogue.
 	state.campaign_state = {}
 	state.player_state = {
+		"bypass_stat": 2,
 		"deck_id": &"FIELD_DECK_MK1",
 		"active_slot_count": 2,
 		"hardware": {&"DECK_CPU": 1, &"DECK_RAM": 2, &"DECK_STORAGE": 2, &"DECK_SENSORS": 1},
 		"owned_programs": [
 			{"instance_id": &"FREEROAM_SERVICE_PROBE_001", "definition_id": &"SERVICE_PROBE"},
 			{"instance_id": &"FREEROAM_ROUTE_SNIFFER_001", "definition_id": &"ROUTE_SNIFFER_0_8"},
+			{"instance_id": &"FREEROAM_SLEEZE_001", "definition_id": &"SLEEZE"},
+			{"instance_id": &"FREEROAM_DISGUISE_001", "definition_id": &"DISGUISE"},
 			{"instance_id": &"FREEROAM_DOORSTOP_001", "definition_id": &"DOORSTOP_STANDARD"},
 			{"instance_id": &"FREEROAM_DOORSTOP_002", "definition_id": &"DOORSTOP_STANDARD"},
 		],

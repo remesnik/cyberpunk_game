@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"TAMTAMA"
+display_name = "Tamtama"
+description = "Indexes file stores and searches for paydata and files of interest."
+version = "1.0"
+utility_rating = 2
+supported_operations = Array[StringName]([&"ENUMERATE", &"SEARCH", &"READ"])
+supported_services = Array[StringName]([&"INDEX_SEARCH", &"FILESYSTEM", &"DATABASE"])
+affinity_type = &"DATA_DISCOVERY"
+storage_cost = 1
+memory_cost = 1
+consumes_active_slot = false

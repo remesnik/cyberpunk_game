@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="BypassProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://programs/BypassProfile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+defense_roll_min = 0
+defense_roll_max = 2
+default_player_stat = 2
+security_alert_increase = 25
+sleeve_response_increase = 1

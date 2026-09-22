@@ -42,6 +42,7 @@ static func initialize(state: PersistentGameState) -> void:
 	state.save_metadata = {"save_id": &"STORY_AUTO", "network_name": "OFFLINE", "location_name": "BEDROOM", "playtime_seconds": 0.0}
 	state.player_state = {
 		"fatigue": 35.0,
+		"bypass_stat": 2,
 		"player_class": "",
 		"selected_deck_variant": "",
 		"active_slot_count": 2,
@@ -55,6 +56,8 @@ static func initialize(state: PersistentGameState) -> void:
 		"owned_programs": [
 			{"instance_id": &"STARTER_SERVICE_PROBE_001", "definition_id": &"SERVICE_PROBE"},
 			{"instance_id": &"STARTER_ROUTE_SNIFFER_001", "definition_id": &"ROUTE_SNIFFER_0_8"},
+			{"instance_id": &"STARTER_SLEEZE_001", "definition_id": &"SLEEZE"},
+			{"instance_id": &"STARTER_DISGUISE_001", "definition_id": &"DISGUISE"},
 		],
 		"installed_program_instance_ids": [&"STARTER_SERVICE_PROBE_001"],
 		"inventory": [],

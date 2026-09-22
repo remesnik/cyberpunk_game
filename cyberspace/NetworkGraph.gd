@@ -7,6 +7,7 @@ signal traversal_completed(from_node_id: StringName, to_node_id: StringName, lin
 signal display_update_requested
 signal security_sleeve_changed(sleeve_id: StringName)
 signal outbound_path_state_changed(event: Dictionary)
+signal security_event_reported(event: Dictionary)
 
 enum TraversalError { OK, INVALID_SOURCE, INVALID_DESTINATION, NOT_CONNECTED, HIDDEN_LINK, LOCKED_LINK, DISABLED_LINK, AUTHORITY_REQUIRED, CAPABILITY_REQUIRED, INSUFFICIENT_POINTS, ALREADY_TRANSITIONING, SOURCE_EXIT_BLOCKED, DESTINATION_ENTRY_BLOCKED, SCRIPTED_GATE_BLOCKED, DIRECTION_LOCKED_DOWN }
 const LEGACY_UNASSIGNED_SPHERE_ID := &"LEGACY_UNASSIGNED_SPHERE"
@@ -40,6 +41,7 @@ func add_node(node: NetworkNodeDefinition) -> bool:
 		_ensure_legacy_sphere()
 		node.sphere_id = LEGACY_UNASSIGNED_SPHERE_ID
 	nodes[node.id] = node
+	node.security_event_reported.connect(func(event: Dictionary): security_event_reported.emit(event))
 	if node.sphere_id != &"": (spheres[node.sphere_id] as SphereDefinition).register_node(node.id)
 	display_update_requested.emit()
 	return true

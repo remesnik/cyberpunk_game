@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="SecurityEscalationProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://cyberspace/security/SecurityEscalationProfile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+thresholds = {&"LOW": 0, &"GUARDED": 2, &"ALERT": 5, &"HOSTILE": 9, &"SEVERE": 14, &"CRITICAL": 20, &"SHUTDOWN": 28}
+effects_by_level = {
+&"LOW": [],
+&"GUARDED": [{"type": &"PATH_DIFFICULTY", "value": 1}],
+&"ALERT": [{"type": &"PATH_DIFFICULTY", "value": 1}, {"type": &"SPAWN_STATIONARY_ICE", "count": 1, "tier": 1}],
+&"HOSTILE": [{"type": &"PATH_DIFFICULTY", "value": 2}, {"type": &"ACCESS_DIFFICULTY", "value": 1}, {"type": &"SYSTEM_TRACE", "pressure": 1}, {"type": &"PUNITIVE_TAG", "tag": &"HOSTILE_INTRUDER"}],
+&"SEVERE": [{"type": &"PATH_DIFFICULTY", "value": 3}, {"type": &"ACCESS_DIFFICULTY", "value": 2}, {"type": &"SPAWN_STATIONARY_ICE", "count": 1, "tier": 2}, {"type": &"SYSTEM_TRACE", "pressure": 1}],
+&"CRITICAL": [{"type": &"PATH_DIFFICULTY", "value": 4}, {"type": &"ACCESS_DIFFICULTY", "value": 3}, {"type": &"SPAWN_STATIONARY_ICE", "count": 2, "tier": 3}, {"type": &"SYSTEM_TRACE", "pressure": 2}, {"type": &"PUNITIVE_TAG", "tag": &"CRITICAL_THREAT"}],
+&"SHUTDOWN": [{"type": &"PATH_DIFFICULTY", "value": 6}, {"type": &"ACCESS_DIFFICULTY", "value": 5}, {"type": &"SYSTEM_TRACE", "pressure": 3}, {"type": &"PUNITIVE_TAG", "tag": &"SYSTEM_LOCKOUT"}, {"type": &"SHUTDOWN_SYSTEM"}]
+}

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="DeckResourceProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://programs/DeckResourceProfile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+storage_per_hardware_level = 4
+memory_per_hardware_level = 4
+minimum_storage = 4
+minimum_memory = 4
+install_utility_seconds = 4.0
+uninstall_utility_seconds = 2.0
+start_active_program_seconds = 3.0
+stop_active_program_seconds = 1.5
+swap_active_program_seconds = 4.0
+time_reduction_per_cpu_level = 0.1

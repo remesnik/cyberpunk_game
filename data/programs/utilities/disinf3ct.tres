@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"DISINF3CT"
+display_name = "disinf3ct"
+description = "Antivirus and antimalware protection against hostile viral code."
+version = "1.0"
+utility_rating = 2
+supported_operations = Array[StringName]([&"SCAN", &"MONITOR", &"DELETE", &"SUPPRESS", &"DISABLE"])
+supported_services = Array[StringName]([&"MALWARE"])
+affinity_type = &"MALWARE_DEFENSE"
+storage_cost = 1
+memory_cost = 2
+consumes_active_slot = false

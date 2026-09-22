@@ -400,7 +400,7 @@ func _rebuild_neighborhood() -> void:
 
 	location_label.text = "CURRENT HOST  //  %s" % String(current_view.get("display_name", "UNKNOWN")).to_upper()
 	var sensor_rating := sensor_topology.sensors_rating if sensor_topology != null else 0
-	resource_label.text = "TRAVERSAL %02d  |  SENSORS %d  |  DATA %d/%d  |  ACTIVE SLOTS %d  |  CONTACTS %02d" % [position_model.traversal_points, sensor_rating, Game.data_storage_used(), Game.data_storage_capacity(), Game.program_loadout.capacity if Game.program_loadout != null else 0, contacts.size() + distant_nodes.size()]
+	resource_label.text = "TRAVERSAL %02d  |  SENSORS %d  |  STORAGE %d/%d  |  MEMORY %d/%d  |  ACTIVE SLOTS %d/%d  |  CONTACTS %02d" % [position_model.traversal_points, sensor_rating, Game.deck_storage_used(), Game.data_storage_capacity(), Game.deck_memory_used(), Game.deck_memory_capacity(), Game.program_loadout.active_slots_used() if Game.program_loadout != null else 0, Game.program_loadout.capacity if Game.program_loadout != null else 0, contacts.size() + distant_nodes.size()]
 	if debug_sensor_topology and sensor_topology != null:
 		status_label.text = "\n".join(sensor_topology.debug_lines())
 	elif debug_spatial_layout:
@@ -708,7 +708,7 @@ func _rebuild_services(current_node_id: StringName) -> void:
 			if StringName(authored_file.get("node_id", &"")) != current_node_id: continue
 			var file_id := StringName(authored_file.get("id", &""))
 			var scanned := bool(_local_scan_levels.get(file_id, false))
-			var stored := Game.persistent_game_state.player_state.get("inventory", []).any(func(item: Variant): return item is Dictionary and StringName(item.get("id", &"")) == file_id)
+			var stored: bool = Game.persistent_game_state.player_state.get("inventory", []).any(func(item: Variant): return item is Dictionary and StringName(item.get("id", &"")) == file_id)
 			var file_view := authored_file.duplicate(true); file_view["scanned"] = scanned
 			target_views[file_id] = {"kind": &"FILE", "title": authored_file.get("display_name", "UNKNOWN DATA OBJECT") if scanned else "UNKNOWN DATA OBJECT", "file": file_view, "scanned": scanned, "analyzable": scanned, "downloadable": scanned and bool(authored_file.get("downloadable", true)) and not stored, "scan_target": {"kind": &"AUTHORED_DATA_OBJECT", "file_id": file_id}}
 			target_order.append(file_id)
@@ -1177,6 +1177,9 @@ func _finish_transition() -> void:
 
 func _process(delta: float) -> void:
 	_update_command_dial_position()
+	if Game.meatspace_management != null:
+		var operation := Game.meatspace_management.deck_reconfiguration_view()
+		if not operation.is_empty(): status_label.text = "DECK %s // %d%% // %.1fs // WORLD LIVE" % [String(operation.operation_name).replace("_", " "), roundi(float(operation.progress) * 100.0), float(operation.remaining)]
 	if not visible or spatial_world == null or _transition_active or _camera_view_motion_active or _mode_transition_active: return
 	if netspace_view_mode == NetspaceViewMode.NETWORK:
 		var direction := GameplayBindings.camera_pan_vector()
@@ -1330,9 +1333,11 @@ func _execute_selected_contextual_command() -> void:
 			var session: CommsSession = Game.comms_manager.sessions.get(session_id) if Game.comms_manager != null else null
 			if session == null: status_label.text = "MONITOR NOT AVAILABLE"
 			else:
+				var was_listening := session.listening
 				Game.realtime_process_manager.activate_process(session.realtime_process_id)
 				Game.comms_manager.monitor(session_id); session.listen()
 				if not session.transcript_line_available.is_connected(_on_monitored_comms_line): session.transcript_line_available.connect(_on_monitored_comms_line)
+				if not was_listening: EventBus.publish_tutorial_gameplay_event(&"REALTIME_FEED_STARTED", selected_target_id, {"session_id": session_id, "service_id": selected_target_id})
 				Game.publish_story_trigger(&"stream_intercepted", {"stream_id": selected_target_id, "session_id": session_id, "mode": &"MONITOR"})
 				status_label.text = "MONITORING LIVE VOICE // CYBERSPACE REMAINS ACTIVE"
 		&"INTERCEPT":
@@ -1534,8 +1539,14 @@ func _select_target(target_id: StringName) -> void:
 	if kind == &"NODE":
 		var node: Dictionary = view.node
 		details.append("TYPE // %s" % _node_type_label(node))
-		details.append("SECURITY // %s" % _known_value(node, "security_level"))
+		details.append("SECURITY // %s" % _known_value(node, "security_family"))
+		details.append("DIFFICULTY // %s" % (_known_value(node, "difficulty_rating") if node.get("difficulty_rating_known", false) else "?"))
+		if node.get("ice_presence_known", false): details.append("ICE // %s" % ("PRESENT" if node.get("ice_present", false) else "NONE DETECTED"))
 		details.append("AUTHORITY // %s" % String(node.get("owner_faction", "UNKNOWN")))
+		if node.get("controlled_paths_known", false): details.append("CONTROLLED PATHS // %d" % (node.get("controlled_paths", []) as Array).size())
+		if node.has("security_family") and node.has("network_type"):
+			var contributions := ExploitLoadoutPresenter.installed_contributions(Game.network_graph.get_node(target_id), Game.program_inventory, Game.program_loadout)
+			if not contributions.is_empty(): details.append("INSTALLED EXPLOIT CONTRIBUTION\n%s" % "\n".join(contributions))
 	elif kind == &"LINK":
 		var link: Dictionary = view.link
 		details.append("ROUTE COST // %s" % _known_value(link, "traversal_cost"))
@@ -1556,8 +1567,20 @@ func _select_target(target_id: StringName) -> void:
 				if controller_id != &"": details.append("CONTROL TRACE // PATH -> %s" % controller_id)
 	elif kind == &"SERVICE":
 		var service: Dictionary = view.service
+		details.append("SERVICE TYPE // %s" % String(service.get("service_type", "UNKNOWN")).replace("_", " "))
 		details.append("SECURITY // %s" % _known_value(service, "security_level"))
 		details.append("STATE // DETECTABLE")
+		var supported_operations: Array = service.get("supported_operations", [])
+		if not supported_operations.is_empty():
+			var operation_labels := PackedStringArray()
+			for value: Variant in supported_operations: operation_labels.append(String(value).replace("_", " "))
+			details.append("OPERATIONS // %s" % ", ".join(operation_labels))
+		var mission_target: Dictionary = view.get("mission_target", {})
+		if not mission_target.is_empty():
+			var bypass := Game.bypass_preview(mission_target)
+			var defense_range: Array = bypass.get("defense_value_range", [bypass.defense_value, bypass.defense_value])
+			details.append("BYPASS // %s // ATTACK %d vs DEFENSE %d-%d" % [String(bypass.approach).replace("_", " "), int(bypass.attack_value), int(defense_range[0]), int(defense_range[1])])
+			details.append("NOISE // %s" % ("GUARANTEED" if bypass.approach == "BARE_COMMAND" else "ON FAILURE"))
 	elif kind == &"ICE":
 		var ice: Dictionary = view.ice
 		details.append("POSITION // %s" % String(ice.get("node_id", "UNKNOWN")))
@@ -2079,7 +2102,7 @@ func _update_program_bar() -> void:
 		var instance := Game.program_inventory.get_instance(instance_id) if not instance_id.is_empty() and Game.program_inventory != null else null
 		var binding_id := StringName("PROGRAM_SLOT_%d" % (index + 1))
 		var action := StringName(GameplayBindings.profile.program_bindings.get(binding_id, &""))
-		button.text = "[%d] %s" % [index + 1, instance.definition.display_name.to_upper() if instance != null else "EMPTY"]
+		button.text = "[%d] %s%s" % [index + 1, instance.definition.display_name.to_upper() if instance != null else "EMPTY", " // MEM %d" % instance.definition.memory_cost if instance != null else ""]
 		button.tooltip_text = "%s // input: %s // binding: PROGRAM_SLOT_%d" % [instance.definition.description if instance != null else "No program installed in this loadout position.", GameplayBindings.get_binding_label(action), index + 1]
 		button.modulate = AMBER if index == _selected_active_slot else Color.WHITE
 		button.focus_mode = Control.FOCUS_NONE
@@ -2130,29 +2153,48 @@ func _refresh_slot_management() -> void:
 	var instance := Game.program_inventory.get_instance(slot_id) if not slot_id.is_empty() and Game.program_inventory != null else null
 	_slot_management_title.text = "ACTIVE SLOT %02d // %s" % [_selected_active_slot + 1, instance.definition.display_name.to_upper() if instance != null else "EMPTY"]
 	if instance != null:
-		var move := Button.new(); move.text = "MOVE TO STORAGE"; move.pressed.connect(_move_selected_to_storage); move.disabled = Game.program_inventory == null or not Game.program_inventory.can_store(Game.program_loadout); _slot_management_options.add_child(move)
+		var move := Button.new(); move.text = "STOP // KEEP IN STORAGE"; move.pressed.connect(_move_selected_to_storage); move.disabled = Game.program_inventory == null; _slot_management_options.add_child(move)
 		var dump := Button.new(); dump.text = "DUMP PROGRAM"; dump.pressed.connect(_request_dump_selected_slot); _slot_management_options.add_child(dump)
 	if instance == null:
 		var storage_label := Label.new(); storage_label.text = "LOAD FROM STORAGE"; _slot_management_options.add_child(storage_label)
 	if instance == null and Game.program_inventory != null:
 		for stored: ProgramInstance in Game.program_inventory.all_instances():
 			if Game.program_loadout.is_installed(stored.instance_id): continue
-			var load := Button.new(); load.text = stored.definition.display_name.to_upper(); load.pressed.connect(_load_into_selected_slot.bind(stored.instance_id)); _slot_management_options.add_child(load)
+			var load := Button.new(); load.text = ("INSTALL UTILITY // " if stored.definition.is_passive_utility() else "START // ") + stored.definition.display_name.to_upper(); load.pressed.connect(_load_into_selected_slot.bind(stored.instance_id)); _slot_management_options.add_child(load)
+	if instance != null and Game.program_inventory != null:
+		for stored: ProgramInstance in Game.program_inventory.all_instances():
+			if stored.definition.is_passive_utility() or Game.program_loadout.is_installed(stored.instance_id): continue
+			var swap := Button.new(); swap.text = "SWAP TO // %s" % stored.definition.display_name.to_upper(); swap.pressed.connect(_swap_selected_program.bind(stored.instance_id)); _slot_management_options.add_child(swap)
+	if Game.program_inventory != null:
+		for utility_id: StringName in Game.program_loadout.installed_utility_ids:
+			var utility := Game.program_inventory.get_instance(utility_id)
+			if utility == null: continue
+			var uninstall := Button.new(); uninstall.text = "UNINSTALL UTILITY // %s" % utility.definition.display_name.to_upper(); uninstall.pressed.connect(_uninstall_utility.bind(utility_id)); _slot_management_options.add_child(uninstall)
 
 
 func _load_into_selected_slot(instance_id: StringName) -> void:
-	if Game.program_loadout.install_at(_selected_active_slot, instance_id, Game.program_inventory):
-		status_label.text = "PROGRAM LOADED"
-		_update_program_bar(); _refresh_slot_management()
+	var instance := Game.program_inventory.get_instance(instance_id)
+	var result := Game.meatspace_management.install_program(instance_id) if instance != null and instance.definition.is_passive_utility() else Game.meatspace_management.start_active_program_in_slot(instance_id, _selected_active_slot)
+	status_label.text = String(result.reason).to_upper()
+	_refresh_slot_management()
+
+func _swap_selected_program(stored_instance_id: StringName) -> void:
+	var running_id := Game.program_loadout.instance_at(_selected_active_slot)
+	var result := Game.meatspace_management.swap_active_program(running_id, stored_instance_id)
+	status_label.text = String(result.reason).to_upper()
+
+func _uninstall_utility(instance_id: StringName) -> void:
+	var result := Game.meatspace_management.remove_program(instance_id)
+	status_label.text = String(result.reason).to_upper()
 
 
 func _move_selected_to_storage() -> void:
-	if Game.program_inventory == null or not Game.program_inventory.can_store(Game.program_loadout):
-		status_label.text = "STORAGE FULL"; return
-	if not Game.program_loadout.instance_at(_selected_active_slot).is_empty():
-		Game.program_loadout.uninstall_at(_selected_active_slot)
-		status_label.text = "PROGRAM STORED"
-		_update_program_bar(); _refresh_slot_management()
+	if Game.program_inventory == null: return
+	var instance_id := Game.program_loadout.instance_at(_selected_active_slot)
+	if not instance_id.is_empty():
+		var result := Game.meatspace_management.remove_program(instance_id)
+		status_label.text = String(result.reason).to_upper()
+		_refresh_slot_management()
 
 
 func _request_dump_selected_slot() -> void:
@@ -2232,12 +2274,24 @@ func _submit_wait() -> void:
 func _update_current_panel(view: Dictionary) -> void:
 	current_name.text = String(view.get("display_name", "UNKNOWN")).to_upper()
 	current_type.text = "TYPE // %s" % _node_type_label(view)
-	current_security.text = "SECURITY // %s" % _known_value(view, "security_level")
+	var ice_summary := "UNKNOWN"
+	if view.get("ice_presence_known", false):
+		ice_summary = "PRESENT" if view.get("ice_present", false) else "NONE DETECTED"
+		var known_ice := knowledge.ice_records.values().filter(func(record): return record.get("node_id", &"") == position_model.current_node_id and record.has("ice_type"))
+		if not known_ice.is_empty(): ice_summary = "%s-%s" % [String(known_ice[0].get("ice_type", "ICE")), String(known_ice[0].get("ice_rating", "?"))]
+	current_security.text = "SECURITY // %s\nDIFFICULTY // %s\nICE // %s" % [_known_value(view, "security_family"), str(view.difficulty_rating) if view.get("difficulty_rating_known", false) else "?", ice_summary]
 	current_authority.text = "AUTHORITY // %s  |  PLAYER %d" % [String(view.get("owner_faction", "UNKNOWN")), position_model.authority_level]
 	var service_names: PackedStringArray = []
 	for service in knowledge.get_services_at(position_model.current_node_id):
-		service_names.append(String(service.get("display_name", "UNKNOWN SERVICE")))
-	services_label.text = "SERVICES\n  %s" % ("\n  ".join(service_names) if not service_names.is_empty() else "NO DATA")
+		service_names.append(String(service.get("service_type", service.get("display_name", "UNKNOWN SERVICE"))).replace("_", " ").capitalize())
+	var extras := PackedStringArray()
+	if view.get("controlled_paths_known", false): extras.append("CONTROLLED PATHS // %d" % (view.get("controlled_paths", []) as Array).size())
+	if view.has("affinity_hints"): extras.append("AFFINITY // %s" % JSON.stringify(view.affinity_hints))
+	if view.has("known_vulnerabilities"): extras.append("VULNERABILITIES // %s" % ", ".join(PackedStringArray(view.known_vulnerabilities)))
+	if view.has("security_family") and view.has("network_type"):
+		var contributions := ExploitLoadoutPresenter.installed_contributions(Game.network_graph.get_node(position_model.current_node_id), Game.program_inventory, Game.program_loadout)
+		if not contributions.is_empty(): extras.append("INSTALLED EXPLOIT CONTRIBUTION\n%s" % "\n".join(contributions))
+	services_label.text = "SERVICES\n  %s%s" % ["\n  ".join(service_names) if not service_names.is_empty() else "NO DATA", "\n" + "\n".join(extras) if not extras.is_empty() else ""]
 
 func _update_top_bar() -> void:
 	if Game.action_clock == null:
@@ -2294,6 +2348,7 @@ func _event_description(event: Dictionary) -> String:
 		_: return String(event.get("type", &"NETWORK EVENT")).replace("_", " ")
 
 func _node_type_label(view: Dictionary) -> String:
+	if view.has("network_type"): return String(view.network_type).replace("_", " ").capitalize()
 	if not view.has("node_type"):
 		return "UNKNOWN"
 	return NetworkNodeDefinition.NodeType.keys()[int(view.node_type)].replace("_", " ")

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="ProgramDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://programs/ProgramDefinition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"DISGUISE"
+display_name = "Disguise"
+description = "Identity and trust masquerading program for narrowly supported authorization operations."
+version = "1.0"
+program_type = &"IDENTITY_BYPASS_PROGRAM"
+utility_rating = 3
+bypass_supported_operations = Array[StringName]([&"AUTHENTICATION", &"TRUSTED_IDENTITY", &"ACCESS_CHECK", &"MASQUERADE"])
+storage_cost = 1
+memory_cost = 2
+consumes_active_slot = true

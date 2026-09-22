@@ -14,11 +14,7 @@ static func build(document: CyberspaceContentDocument, entry_node_id: StringName
 		var node := NetworkNodeDefinition.new(data.id, data.get("display_name", data.id), _node_type(data.get("node_type", &"SYSTEM")), int(data.get("security_level", 0)), data.get("starting_discovery_state", &"UNKNOWN") != &"UNKNOWN", data.get("owner", data.get("faction", &"")), data.get("sphere_id", &""))
 		for service_id: StringName in data.get("services", []):
 			var definition: Dictionary = services.get(service_id, {})
-			var vulnerabilities: Array[StringName] = []
-			vulnerabilities.assign(definition.get("vulnerabilities", []))
-			var tags: Array[StringName] = []
-			tags.assign(definition.get("tags", []))
-			node.add_service(service_id, definition.get("display_name", service_id), int(definition.get("security_level", data.get("security_level", 0))), vulnerabilities, tags, definition.get("capability_types", []))
+			if not definition.is_empty(): node.add_service_record(definition)
 		for control_data: Dictionary in data.get("outbound_path_controls", data.get("path_controls", [])):
 			node.add_path_control(NodePathControl.from_authored(control_data))
 		graph.add_node(node)

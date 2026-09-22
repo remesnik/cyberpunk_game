@@ -44,6 +44,13 @@ theme_override_colors/font_color = Color(0.35, 0.94, 1, 1)
 theme_override_font_sizes/font_size = 18
 text = "ACTIVE BACKDOOR"
 
+[node name="IntermissionLabel" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.82, 0.88, 0.92, 1)
+autowrap_mode = 2
+text = "MEATSPACE SYSTEMS AVAILABLE"
+
 [node name="JackBackInButton" type="Button" parent="Margin/Rows"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -108,6 +115,14 @@ size_flags_horizontal = 3
 unique_name_in_owner = true
 layout_mode = 2
 text = "REMOVE"
+
+[node name="ExploitComparison" type="Label" parent="Margin/Rows"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.72, 0.86, 0.92, 1)
+theme_override_font_sizes/font_size = 12
+text = "EXPLOIT SUITE COMPARISON"
+autowrap_mode = 2
 
 [node name="ManagementActions" type="HBoxContainer" parent="Margin/Rows"]
 layout_mode = 2

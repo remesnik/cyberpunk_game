@@ -143,7 +143,7 @@ func reveal_sphere_topology(graph: NetworkGraph, sphere_id: StringName, source: 
 		if not bool(record.get("exists_known", false)): nodes_revealed += 1
 		record["exists_known"] = true
 		if reveal_identities:
-			record.merge({"identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "level": maxi(int(record.get("level", KnowledgeLevel.Value.UNKNOWN)), KnowledgeLevel.Value.IDENTIFIED)}, true)
+			record.merge({"identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "network_type": node.network_type, "level": maxi(int(record.get("level", KnowledgeLevel.Value.UNKNOWN)), KnowledgeLevel.Value.IDENTIFIED)}, true)
 		_add_node_source(record, source)
 		node_records[node_id] = record
 	for link: NetworkLinkDefinition in graph.links.values():
@@ -331,7 +331,7 @@ func reveal_topology_link(link: NetworkLinkDefinition, source: StringName = &"TO
 func reveal_node_level(node: NetworkNodeDefinition, source: StringName = &"INTELLIGENCE") -> void:
 	if node == null: return
 	var record := _node_record(node.id)
-	record.merge({"exists_known": true, "level_known": true, "security_level": node.security_level}, true)
+	record.merge({"exists_known": true, "level_known": true, "security_level": node.security_level, "security_family": node.security_family_name(), "difficulty_rating": node.difficulty_rating}, true)
 	_add_node_source(record, source)
 	node_records[node.id] = record
 	knowledge_changed.emit()
@@ -348,8 +348,8 @@ func reveal_node_contents(node: NetworkNodeDefinition, source: StringName = &"IN
 func mark_node_scanned(node: NetworkNodeDefinition, reveal_level := true, reveal_contents := true, source: StringName = &"SCAN") -> void:
 	if node == null: return
 	var record := _node_record(node.id)
-	record.merge({"exists_known": true, "identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "scanned": true, "level": maxi(int(record.get("level", 0)), KnowledgeLevel.Value.SCANNED)}, true)
-	if reveal_level: record.merge({"level_known": true, "security_level": node.security_level}, true)
+	record.merge({"exists_known": true, "identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "network_type": node.network_type, "scanned": true, "level": maxi(int(record.get("level", 0)), KnowledgeLevel.Value.SCANNED)}, true)
+	if reveal_level: record.merge({"level_known": true, "security_level": node.security_level, "security_family": node.security_family_name(), "difficulty_rating": node.difficulty_rating}, true)
 	if reveal_contents:
 		record.merge({"contents_known": true, "unknown_content_count": 0, "owner_faction": node.owner_faction, "service_ids": node.services.map(func(service): return service.get("id", &"")), "capability_types": CAPABILITY_CATALOG.derive_from_services(node.services), "capability_counts": CAPABILITY_CATALOG.derive_counts_from_services(node.services), "required_capabilities_all": node.required_capabilities_all.duplicate(), "required_capabilities_any": node.required_capabilities_any.duplicate(), "accepted_credentials": node.accepted_credentials.duplicate(), "recommended_capabilities": node.recommended_capabilities.duplicate()}, true)
 		_seed_capability_sources(node)
@@ -360,7 +360,7 @@ func mark_node_scanned(node: NetworkNodeDefinition, reveal_level := true, reveal
 func mark_node_visited(node: NetworkNodeDefinition, source: StringName = &"TRAVERSAL") -> void:
 	if node == null: return
 	var record := _node_record(node.id)
-	record.merge({"exists_known": true, "identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "visited": true, "level": maxi(int(record.get("level", 0)), KnowledgeLevel.Value.IDENTIFIED)}, true)
+	record.merge({"exists_known": true, "identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "network_type": node.network_type, "visited": true, "level": maxi(int(record.get("level", 0)), KnowledgeLevel.Value.IDENTIFIED)}, true)
 	_add_node_source(record, source)
 	node_records[node.id] = record
 	knowledge_changed.emit()
@@ -386,9 +386,9 @@ func reveal_node(node: NetworkNodeDefinition, level: KnowledgeLevel.Value) -> vo
 	record["exists_known"] = true
 	record["level"] = maxi(level, int(record.get("level", KnowledgeLevel.Value.UNKNOWN)))
 	if level >= KnowledgeLevel.Value.IDENTIFIED:
-		record.merge({"identity_known": true, "display_name": node.display_name, "node_type": node.node_type}, true)
+		record.merge({"identity_known": true, "display_name": node.display_name, "node_type": node.node_type, "network_type": node.network_type}, true)
 	if level >= KnowledgeLevel.Value.SCANNED:
-		record.merge({"scanned": true, "level_known": true, "contents_known": true, "unknown_content_count": 0, "security_level": node.security_level, "owner_faction": node.owner_faction, "service_ids": node.services.map(func(service): return service.get("id", &"")), "capability_types": CAPABILITY_CATALOG.derive_from_services(node.services), "capability_counts": CAPABILITY_CATALOG.derive_counts_from_services(node.services), "required_capabilities_all": node.required_capabilities_all.duplicate(), "required_capabilities_any": node.required_capabilities_any.duplicate(), "accepted_credentials": node.accepted_credentials.duplicate(), "recommended_capabilities": node.recommended_capabilities.duplicate()}, true)
+		record.merge({"scanned": true, "level_known": true, "contents_known": true, "unknown_content_count": 0, "security_level": node.security_level, "security_family": node.security_family_name(), "difficulty_rating": node.difficulty_rating, "owner_faction": node.owner_faction, "service_ids": node.services.map(func(service): return service.get("id", &"")), "capability_types": CAPABILITY_CATALOG.derive_from_services(node.services), "capability_counts": CAPABILITY_CATALOG.derive_counts_from_services(node.services), "required_capabilities_all": node.required_capabilities_all.duplicate(), "required_capabilities_any": node.required_capabilities_any.duplicate(), "accepted_credentials": node.accepted_credentials.duplicate(), "recommended_capabilities": node.recommended_capabilities.duplicate()}, true)
 		_seed_capability_sources(node)
 	if level >= KnowledgeLevel.Value.COMPROMISED: record["compromised"] = true
 	_add_node_source(record, &"LEGACY_REVEAL")
@@ -507,9 +507,9 @@ func reveal_service(service: Dictionary, node_id: StringName, level: KnowledgeLe
 	var record := {"level": level, "contact_id": _contact_id(service_id), "node_id": node_id}
 	if level >= KnowledgeLevel.Value.IDENTIFIED:
 		var identified_service: Array[Dictionary] = [service]
-		record.merge({"id": service_id, "display_name": service.get("display_name", "SERVICE"), "capability_types": CAPABILITY_CATALOG.derive_from_services(identified_service)}, true)
+		record.merge({"id": service_id, "display_name": service.get("display_name", "SERVICE"), "service_type": service.get("service_type", NodeServiceCatalog.SERVICE_PROCESS_CONTROL), "capability_types": CAPABILITY_CATALOG.derive_from_services(identified_service)}, true)
 	if level >= KnowledgeLevel.Value.SCANNED:
-		record.merge({"security_level": service.get("security_level", 0), "vulnerabilities": service.get("vulnerabilities", []).duplicate()}, true)
+		record.merge({"security_level": service.get("security_level", 0), "vulnerabilities": service.get("vulnerabilities", []).duplicate(), "bypass_operations": service.get("bypass_operations", []).duplicate(), "supported_operations": service.get("supported_operations", []).duplicate()}, true)
 	service_records[service_id] = record
 	var discovered_services: Array[Dictionary] = [service]
 	for capability: int in CAPABILITY_CATALOG.derive_from_services(discovered_services):
@@ -528,6 +528,13 @@ func get_services_at(node_id: StringName) -> Array[Dictionary]:
 func commit_scan(result: ScanResult, graph: NetworkGraph, ice_controller: IceController) -> void:
 	if not result.success:
 		return
+	if result.target_kind in [&"CURRENT_NODE", &"NODE"]:
+		var scan_record := _node_record(result.target_id)
+		scan_record["scan_quality"] = maxi(int(scan_record.get("scan_quality", 0)), result.scan_depth)
+		scan_record["scan_quality_label"] = result.scan_quality
+		scan_record["scanned"] = true
+		scan_record["level"] = maxi(int(scan_record.get("level", 0)), KnowledgeLevel.Value.SCANNED)
+		node_records[result.target_id] = scan_record
 	for discovery in result.discoveries:
 		var kind: StringName = discovery.get("entity_kind", &"")
 		var entity_id: StringName = discovery.get("entity_id", &"")
@@ -538,6 +545,17 @@ func commit_scan(result: ScanResult, graph: NetworkGraph, ice_controller: IceCon
 					mark_node_scanned(graph.get_node(entity_id), discovery.has("security_level"), true)
 				else:
 					reveal_node(graph.get_node(entity_id), level)
+			&"NODE_SECURITY", &"ICE_PRESENCE", &"CONTROLLED_PATHS", &"AFFINITY_HINTS", &"NODE_VULNERABILITIES":
+				var record := _node_record(entity_id)
+				match kind:
+					&"NODE_SECURITY":
+						if discovery.has("security_family"): record["security_family"] = discovery.security_family; record["security_family_known"] = true
+						if discovery.has("difficulty_rating"): record["difficulty_rating"] = discovery.difficulty_rating; record["difficulty_rating_known"] = true
+					&"ICE_PRESENCE": record["ice_presence_known"] = true; record["ice_present"] = bool(discovery.present); record["ice_count"] = int(discovery.count)
+					&"CONTROLLED_PATHS": record["controlled_paths"] = discovery.paths.duplicate(true); record["controlled_paths_known"] = true
+					&"AFFINITY_HINTS": record["affinity_hints"] = {"security_family": discovery.security_family, "service_types": discovery.service_types.duplicate()}
+					&"NODE_VULNERABILITIES": record["known_vulnerabilities"] = discovery.items.duplicate()
+				node_records[entity_id] = record
 			&"NODE_CONTENT_COUNT", &"UNKNOWN_CONTENT":
 				reveal_uncertain_node_contents(entity_id, int(discovery.get("count", 1)), &"SCAN")
 			&"LINK":
@@ -553,6 +571,10 @@ func commit_scan(result: ScanResult, graph: NetworkGraph, ice_controller: IceCon
 					var ice := ice_controller.get_ice(entity_id)
 					if ice != null:
 						report_ice(entity_id, discovery.get("node_id", ice.current_node_id), discovery.get("state", ice.state), level)
+						var ice_record := (ice_records.get(entity_id, {}) as Dictionary).duplicate(true)
+						if discovery.has("ice_type"): ice_record["display_name"] = discovery.ice_type; ice_record["ice_type"] = discovery.ice_type
+						if discovery.has("ice_rating"): ice_record["ice_rating"] = discovery.ice_rating
+						ice_records[entity_id] = ice_record
 			&"SERVICE":
 				var service_data := _find_service(graph, entity_id)
 				if not service_data.is_empty():

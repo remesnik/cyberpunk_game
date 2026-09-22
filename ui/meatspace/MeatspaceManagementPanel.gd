@@ -7,11 +7,14 @@ extends PanelContainer
 @onready var loadout_option: OptionButton = %LoadoutOption
 @onready var task_label: Label = %TaskLabel
 @onready var event_label: Label = %EventLabel
+@onready var intermission_label: Label = %IntermissionLabel
+@onready var exploit_comparison: Label = %ExploitComparison
 
 var _inventory_ids: Array[StringName] = []
 var _loadout_ids: Array[StringName] = []
 var _task_serial := 0
 var _job_ids: Array[StringName] = []
+var _reconfiguration_was_active := false
 
 
 func _ready() -> void:
@@ -35,6 +38,11 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	if visible and Game.meatspace_management != null:
 		Game.meatspace_management.update_tasks()
+		var operation := Game.meatspace_management.deck_reconfiguration_view()
+		if not operation.is_empty(): _reconfiguration_was_active = true
+		elif _reconfiguration_was_active:
+			_reconfiguration_was_active = false
+			_refresh_program_options()
 		_refresh_status()
 
 
@@ -62,12 +70,15 @@ func _refresh() -> void:
 		$Margin/Rows/Title.text = "FREE ROAM // HOME DECK MANAGEMENT"
 		backdoor_label.text = "LOCAL DECK BAY\nNo campaign route selected.\n\nDYNAMIC JOB BOARD: ONLINE\nKnown networks: %d\nAvailable jobs: %d\n\nConfigure your deck, write software, order equipment, or connect when ready." % [Game.persistent_game_state.world_state.get("known_network_ids", []).size(), Game.persistent_game_state.world_state.get("available_dynamic_job_ids", []).size()]
 		%JackBackInButton.text = "[CONNECT TO PUBLIC MESH]"
+		intermission_label.visible = false
 		%FreeRoamJobs.visible = true
 		_refresh_free_roam_jobs()
 	else:
 		var view := Game.suspended_doorstop_view()
 		$Margin/Rows/Title.text = "MEATSPACE // SUSPENDED INTRUSION MANAGEMENT"
 		backdoor_label.text = "CONNECTION SUSPENDED\nBackdoor remains open.\n\nACTIVE BACKDOOR\nTarget: %s\nReturn Node: %s\nIntrusion: %s\n\nOne re-entry. Returning destroys this temporary route." % [view.get("target_name", "UNKNOWN"), view.get("return_node_id", &"UNKNOWN"), view.get("intrusion_run_id", &"UNKNOWN")]
+		intermission_label.text = "LATCH // You're back in the bedroom. The network still has one final task.\n\nMEATSPACE IS ACTIVE\n• Toolbox: inspect repairs and hardware upgrades\n• Deck: change the installed loadout\n• Bench: program or craft software\n• Equipment: inspect or order gear\n• Bed: rest when fatigue calls for it\n\nThese are optional right now. Jack back in when ready; the Doorstop returns you to %s." % view.get("return_node_id", &"UNKNOWN")
+		intermission_label.visible = true
 		%JackBackInButton.text = "[JACK BACK IN]"
 		%FreeRoamJobs.visible = false
 	_refresh_program_options()
@@ -84,22 +95,26 @@ func _refresh_program_options() -> void:
 	for instance: ProgramInstance in Game.program_inventory.all_instances():
 		if not Game.program_loadout.is_installed(instance.instance_id):
 			_inventory_ids.append(instance.instance_id)
-			inventory_option.add_item("%s // %s" % [instance.definition.display_name, instance.instance_id])
+			inventory_option.add_item(ExploitLoadoutPresenter.utility_line(instance, false) if instance.definition.is_passive_utility() else "%s // MEM %d // STORED" % [instance.definition.display_name, instance.definition.memory_cost])
 	for instance_id: StringName in Game.program_loadout.installed_instance_ids:
 		var instance := Game.program_inventory.get_instance(instance_id)
 		if instance != null:
 			_loadout_ids.append(instance_id)
-			loadout_option.add_item("%s // %s" % [instance.definition.display_name, instance_id])
+			loadout_option.add_item(ExploitLoadoutPresenter.utility_line(instance, true) if instance.definition.is_passive_utility() else "%s // MEM %d // RUNNING" % [instance.definition.display_name, instance.definition.memory_cost])
+	exploit_comparison.text = ExploitLoadoutPresenter.comparison(Game.program_inventory, Game.program_loadout)
 
 
 func _refresh_status() -> void:
 	var manager: MeatspaceManagement = Game.meatspace_management
 	if manager == null:
 		return
-	hardware_label.text = "DECK CPU %d  //  RAM %d  //  STORAGE %d  //  SENSORS %d\nFICTIONAL CREDITS %d" % [manager.hardware_levels.DECK_CPU, manager.hardware_levels.DECK_RAM, manager.hardware_levels.DECK_STORAGE, manager.hardware_levels.get(&"DECK_SENSORS", 1), Game.equipment_order_manager.credits]
+	hardware_label.text = "STORAGE %d/%d  //  MEMORY %d/%d  //  ACTIVE SLOTS %d/%d\nDECK CPU %d  //  SENSORS %d  //  FATIGUE %d  //  FICTIONAL CREDITS %d" % [Game.deck_storage_used(), Game.data_storage_capacity(), Game.deck_memory_used(), Game.deck_memory_capacity(), Game.program_loadout.active_slots_used(), Game.program_loadout.capacity, manager.hardware_levels.DECK_CPU, manager.hardware_levels.get(&"DECK_SENSORS", 1), int(Game.persistent_game_state.player_state.get("fatigue", 0)), Game.equipment_order_manager.credits]
 	var tasks: PackedStringArray = []
 	for task: SoftwareProgrammingTask in manager.programming_tasks.values():
 		tasks.append("%s // %s // %.1f/%.1fs" % [task.id, SoftwareProgrammingTask.State.keys()[task.state], task.elapsed(Game.realtime_world_clock.elapsed_seconds), task.duration])
+	var reconfiguration := manager.deck_reconfiguration_view()
+	if not reconfiguration.is_empty():
+		tasks.append("DECK %s // %d%% // %.1fs REMAINING" % [String(reconfiguration.operation_name).replace("_", " "), roundi(float(reconfiguration.progress) * 100.0), float(reconfiguration.remaining)])
 	task_label.text = "SOFTWARE PROGRAMMING\n%s" % ("\n".join(tasks) if not tasks.is_empty() else "NO ACTIVE TASKS")
 
 func _refresh_free_roam_jobs() -> void:

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"HERMES"
+display_name = "Hermes"
+description = "Communications, calls, messaging, and stream interaction support."
+version = "1.0"
+utility_rating = 1
+supported_operations = Array[StringName]([&"READ", &"MONITOR", &"INTERCEPT", &"INJECT", &"REDIRECT", &"SUPPRESS"])
+supported_services = Array[StringName]([&"MESSAGING", &"VOICE_COMMS"])
+affinity_type = &"COMMUNICATIONS"
+storage_cost = 1
+memory_cost = 1
+consumes_active_slot = false

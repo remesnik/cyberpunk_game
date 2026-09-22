@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="ScanDisclosureProfile" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://hacking/ScanDisclosureProfile.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+maximum_quality = 4
+quality_labels = {1: &"CONTACT", 2: &"CLASSIFIED", 3: &"DETAILED", 4: &"FORENSIC"}
+network_type_quality = 1
+ice_presence_quality = 1
+security_family_quality = 2
+difficulty_rating_quality = 2
+service_list_quality = 2
+ice_identity_quality = 3
+ice_rating_quality = 3
+controlled_paths_quality = 3
+remote_controller_quality = 4
+vulnerability_quality = 4
+affinity_hint_quality = 4
+realtime_endpoint_quality = 3
