@@ -51,8 +51,10 @@ func observe_events(events: Array[Dictionary], now: float) -> void:
 func capture_runtime(graph: NetworkGraph, controller: IceController, alarm_manager: Variant = null) -> void:
 	if graph != null:
 		for link: NetworkLinkDefinition in graph.links.values():
-			if link.disabled or link.locked or link.discovered:
-				records[_key(&"LINK", link.id)] = {"kind": &"LINK", "id": link.id, "state": &"CHANGED", "disabled": link.disabled, "locked": link.locked, "hidden": link.hidden, "discovered": link.discovered}
+			var directions: Dictionary = {}
+			for direction_key in link.traversal_directions: directions[direction_key] = (link.traversal_directions[direction_key] as TraversalDirectionDefinition).snapshot()
+			if link.disabled or link.locked or link.discovered or not directions.is_empty():
+				records[_key(&"LINK", link.id)] = {"kind": &"LINK", "id": link.id, "state": &"CHANGED", "disabled": link.disabled, "locked": link.locked, "hidden": link.hidden, "discovered": link.discovered, "directions": directions}
 		for node: NetworkNodeDefinition in graph.nodes.values():
 			for service: Dictionary in node.services:
 				var service_id := StringName(service.id)
@@ -82,6 +84,8 @@ func apply_to_graph(graph: NetworkGraph) -> void:
 			link.locked = bool(link_record.get("locked", link.locked))
 			link.hidden = bool(link_record.get("hidden", link.hidden))
 			link.discovered = bool(link_record.get("discovered", link.discovered))
+			for direction_key in (link_record.get("directions", {}) as Dictionary):
+				if link.traversal_directions.has(direction_key): (link.traversal_directions[direction_key] as TraversalDirectionDefinition).apply_authored(link_record.directions[direction_key])
 	for node: NetworkNodeDefinition in graph.nodes.values():
 		for index in node.services.size():
 			var service: Dictionary = node.services[index]

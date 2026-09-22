@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"CULTERLY"
+display_name = "Culterly"
+description = "I/O control utility for physical access and external machinery."
+version = "1.0"
+utility_rating = 2
+supported_operations = Array[StringName]([&"MONITOR", &"ACTIVATE", &"DEACTIVATE", &"UNLOCK", &"LOCK", &"DISABLE"])
+supported_services = Array[StringName]([&"PHYSICAL_CONTROL", &"PHYSICAL_SENSORS"])
+affinity_type = &"PHYSICAL_IO"
+storage_cost = 1
+memory_cost = 2
+consumes_active_slot = false

@@ -39,7 +39,7 @@ func resolve_action(request: ActionRequest, validator: Callable, applier: Callab
 
 	var application: Dictionary = applier.call(request)
 	_append_events(events, application.get("events", []))
-	if not application.get("success", false):
+	if not application.get("success", false) and not application.get("action_resolved", false):
 		_resolving = false
 		return _finish(request, ActionResult.new(false, 0, application.get("reason", "Action failed."), events))
 
@@ -51,7 +51,7 @@ func resolve_action(request: ActionRequest, validator: Callable, applier: Callab
 	_run_phase(&"NETWORK_UPDATE", _network_updaters, request, events)
 	events.append({"type": &"EVENTS_RESOLVED", "tick": current_tick})
 	_resolving = false
-	return _finish(request, ActionResult.new(true, request.cost, application.get("reason", "Action resolved."), events))
+	return _finish(request, ActionResult.new(bool(application.get("success", false)), request.cost, application.get("reason", "Action resolved."), events, application.get("details", {})))
 
 func _run_phase(phase: StringName, updaters: Array[Callable], request: ActionRequest, events: Array[Dictionary]) -> void:
 	events.append({"type": phase, "tick": current_tick})

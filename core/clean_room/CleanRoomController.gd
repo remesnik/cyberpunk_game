@@ -42,7 +42,27 @@ func enter() -> Dictionary:
 func view() -> Dictionary:
 	var deck := management.inspect_deck() if management != null else {}
 	var mission_view := _mission_presentation()
-	return {"connection_value": connection_value, "trace_resolution_multiplier": trace_resolution_multiplier(), "transfer_duration_multiplier": transfer_duration_multiplier(), "next_link_cost": next_link_cost(), "credits": management.equipment_orders.credits if management != null and management.equipment_orders != null else 0, "owned_programs": deck.get("owned_programs", []), "installed_instance_ids": deck.get("installed_instance_ids", []), "active_slot_capacity": deck.get("capacity", 0), "latch_contacted": bool(_flags().get(&"CLEAN_ROOM_LATCH_CONTACTED", false)), "ally_status": "AVAILABLE" if bool(_flags().get(&"CLEAN_ROOM_LATCH_CONTACTED", false)) else "OFFLINE", "unread_count": inbox.unread_count() if inbox != null else 0, "critical_unread": inbox.has_critical_unread() if inbox != null else false, "mission_briefing": mission_view.briefing, "mission_debrief": mission_view.debrief, "allies": contacts.unlocked_contacts() if contacts != null else []}
+	return {"connection_value": connection_value, "trace_resolution_multiplier": trace_resolution_multiplier(), "transfer_duration_multiplier": transfer_duration_multiplier(), "next_link_cost": next_link_cost(), "credits": management.equipment_orders.credits if management != null and management.equipment_orders != null else 0, "owned_programs": deck.get("owned_programs", []), "installed_instance_ids": deck.get("installed_instance_ids", []), "active_slot_capacity": deck.get("capacity", 0), "active_slots_used": deck.get("active_slots_used", 0), "memory_used": deck.get("memory_used", 0), "memory_capacity": deck.get("memory_capacity", 0), "storage_used": deck.get("storage_used", 0), "storage_capacity": deck.get("storage_capacity", 0), "latch_contacted": bool(_flags().get(&"CLEAN_ROOM_LATCH_CONTACTED", false)), "ally_status": "AVAILABLE" if bool(_flags().get(&"CLEAN_ROOM_LATCH_CONTACTED", false)) else "OFFLINE", "unread_count": inbox.unread_count() if inbox != null else 0, "critical_unread": inbox.has_critical_unread() if inbox != null else false, "mission_briefing": mission_view.briefing, "mission_debrief": mission_view.debrief, "allies": contacts.unlocked_contacts() if contacts != null else [], "launch_readiness": launch_readiness(deck), "first_contact_first_run": _is_first_contact_first_run()}
+
+func launch_readiness(deck: Dictionary = {}) -> Dictionary:
+	if management == null or management.program_inventory == null or management.program_loadout == null:
+		return {"ready": false, "reason": "CANNOT LAUNCH: deck state is unavailable."}
+	if deck.is_empty(): deck = management.inspect_deck()
+	if int(deck.get("memory_used", 0)) > int(deck.get("memory_capacity", 0)):
+		return {"ready": false, "reason": "CANNOT LAUNCH: active software exceeds available memory."}
+	if int(deck.get("active_slots_used", 0)) > int(deck.get("capacity", 0)):
+		return {"ready": false, "reason": "CANNOT LAUNCH: active programs exceed available slots."}
+	if int(deck.get("storage_used", 0)) > int(deck.get("storage_capacity", 0)):
+		return {"ready": false, "reason": "CANNOT LAUNCH: stored software exceeds deck storage."}
+	var warning := "READY"
+	if int(deck.get("memory_capacity", 0)) > 0 and float(deck.get("memory_used", 0)) / float(deck.get("memory_capacity", 1)) >= 0.85:
+		warning = "READY — high memory usage (non-blocking)."
+	return {"ready": true, "reason": warning}
+
+func _is_first_contact_first_run() -> bool:
+	if game_state == null or not game_state.is_story_mode(): return false
+	var content_id := StringName(game_state.campaign_state.get("current_content_id", game_state.campaign_state.get("pending_entry_content_id", &"")))
+	return content_id == &"FIRST_CONTACT" and int(game_state.save_metadata.get("completed_runs", 0)) == 0
 
 func read_next_message() -> Dictionary:
 	if inbox == null: return _failure("Inbox unavailable.")

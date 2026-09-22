@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="ProgramDefinition" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://programs/ProgramDefinition.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = &"SLEEZE"
+display_name = "Sleeze"
+description = "General-purpose stealth exploitation and intrusion masking program."
+version = "1.0"
+program_type = &"STEALTH_PROGRAM"
+utility_rating = 2
+storage_cost = 1
+memory_cost = 2
+consumes_active_slot = true

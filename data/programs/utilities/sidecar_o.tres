@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"SIDECAR_O"
+display_name = "Sidecar-O"
+description = "Sidecar exploit utility for Orange security."
+version = "1.0"
+program_type = &"EXPLOIT_UTILITY"
+exploit_security_family = &"ORANGE"
+utility_rating = 1
+utility_model = &"SIDECAR"
+supported_operations = Array[StringName]([&"BYPASS"])
+supported_services = Array[StringName]([&"SERVICE_PROCESS_CONTROL"])
+affinity_type = &"SIDECAR"
+strong_network_types = Array[StringName]([&"COMMUNICATIONS", &"PHYSICAL_CONTROL", &"WORKSTATION", &"SERVICE_CONTROL", &"DATABASE", &"DATASTORE"])
+neutral_network_types = Array[StringName]([&"ROUTING", &"ROUTER", &"FILESYSTEM", &"SECURITY"])
+weak_network_types = Array[StringName]([&"AUTHENTICATION", &"SYSTEM", &"SYSTEM_ADMINISTRATION"])
+storage_cost = 1
+memory_cost = 2
+consumes_active_slot = false

@@ -74,6 +74,7 @@ const AMBER := Color("ffc857")
 @export var accessibility_config: Resource = DEFAULT_ACCESSIBILITY_CONFIG
 @export var debug_sensor_topology := false
 @export var debug_spatial_layout := false
+@export var debug_path_controllers := true
 
 var graph: NetworkGraph
 var position_model: PlayerNetworkPosition
@@ -136,6 +137,7 @@ var _mode_transition_tween: Tween
 var _network_view_anchor := Vector3.ZERO
 var _focus_camera_anchor := Vector3.ZERO
 var _local_target_final_positions: Dictionary = {}
+var _local_scan_levels: Dictionary = {}
 
 func _ready() -> void:
 	security_level_legend.set_visualization_config(visualization_config)
@@ -151,6 +153,7 @@ func _ready() -> void:
 	EventBus.san_relocated.connect(_on_san_relocated)
 	EventBus.monitor_presentation_changed.connect(_on_monitor_presentation_changed)
 	EventBus.social_message_delivered.connect(_on_social_message_delivered)
+	EventBus.tactical_status_alert.connect(_on_tactical_status_alert)
 	HudState.widget_state_changed.connect(_on_hud_state_changed)
 	HudState.widget_open_requested.connect(_on_hud_widget_open_requested)
 	HudState.action_feedback.connect(_on_hud_action_feedback)
@@ -350,7 +353,7 @@ func _rebuild_neighborhood() -> void:
 			(node_visuals[contact_node_id] as NodeVisual).set_traversal_blocked(traversal_blocked)
 			scan_targets[contact.node.id] = {"kind": ScanSystem.NODE, "node_id": contact.node.id}
 			scan_targets[contact.contact_id] = {"kind": ScanSystem.LINK, "contact_id": contact.contact_id}
-			target_views[contact.node.id] = {"kind": &"NODE", "title": contact.node.get("display_name", "UNKNOWN NODE"), "node": contact.node, "link": contact.link, "enterable": true, "traversal_blocked": traversal_blocked, "blocked_reason": traversal.get("reason", "ACCESS REQUIREMENT NOT MET"), "scan_target": scan_targets[contact.node.id]}
+			target_views[contact.node.id] = {"kind": &"NODE", "title": contact.node.get("display_name", "UNKNOWN NODE"), "node": contact.node, "link": contact.link, "enterable": bool(traversal.get("allowed", false)), "traversal_blocked": traversal_blocked, "blocked_reason": traversal.get("reason", "ACCESS REQUIREMENT NOT MET"), "traversal": traversal, "scan_target": scan_targets[contact.node.id]}
 			target_views[contact.contact_id] = {"kind": &"LINK", "title": "NETWORK LINK", "link": contact.link, "scan_target": scan_targets[contact.contact_id], "confrontation_target": {"kind": &"LINK", "contact_id": contact.contact_id}}
 			target_order.append(contact.node.id)
 		else:
@@ -397,7 +400,7 @@ func _rebuild_neighborhood() -> void:
 
 	location_label.text = "CURRENT HOST  //  %s" % String(current_view.get("display_name", "UNKNOWN")).to_upper()
 	var sensor_rating := sensor_topology.sensors_rating if sensor_topology != null else 0
-	resource_label.text = "TRAVERSAL UNITS  %02d    |    SENSORS %d    |    KNOWN CONTACTS  %02d" % [position_model.traversal_points, sensor_rating, contacts.size() + distant_nodes.size()]
+	resource_label.text = "TRAVERSAL %02d  |  SENSORS %d  |  STORAGE %d/%d  |  MEMORY %d/%d  |  ACTIVE SLOTS %d/%d  |  CONTACTS %02d" % [position_model.traversal_points, sensor_rating, Game.deck_storage_used(), Game.data_storage_capacity(), Game.deck_memory_used(), Game.deck_memory_capacity(), Game.program_loadout.active_slots_used() if Game.program_loadout != null else 0, Game.program_loadout.capacity if Game.program_loadout != null else 0, contacts.size() + distant_nodes.size()]
 	if debug_sensor_topology and sensor_topology != null:
 		status_label.text = "\n".join(sensor_topology.debug_lines())
 	elif debug_spatial_layout:
@@ -598,7 +601,15 @@ func _update_link_projection(visual: LinkVisual, map_rect: Rect2) -> void:
 		elif runtime_link.one_way: runtime_state = &"ONE_WAY"
 		elif position_model != null and position_model.current_node_id in [source_id, destination_id]:
 			var other_id := destination_id if position_model.current_node_id == source_id else source_id
-			if int(Game.traversal_preview(other_id).get("error", NetworkGraph.TraversalError.OK)) != NetworkGraph.TraversalError.OK: runtime_state = &"BLOCKED"
+			var preview := Game.traversal_preview(other_id)
+			var directional_state := StringName(preview.get("traversal_state", &""))
+			if directional_state == &"HIDDEN": runtime_state = &"HIDDEN"
+			elif directional_state == &"LOCKED_DOWN": runtime_state = &"LOCKED_DOWN"
+			elif preview.get("security_gate_type", &"NONE") == &"HARD" and not bool(preview.get("security_resolved", false)): runtime_state = &"HARD_GATE"
+			elif directional_state in [&"DISCOVERED", &"LOCKED"]: runtime_state = &"LOCKED"
+			elif bool(preview.get("soft_gate_unauthorized", false)): runtime_state = &"SOFT_GATE"
+			elif directional_state == &"UNLOCKED": runtime_state = &"UNLOCKED"
+			elif int(preview.get("error", NetworkGraph.TraversalError.OK)) != NetworkGraph.TraversalError.OK: runtime_state = &"LOCKED"
 		visual.set_runtime_state(runtime_state)
 
 func selected_target_screen_position() -> Vector2:
@@ -686,10 +697,33 @@ func _rebuild_services(current_node_id: StringName) -> void:
 		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		var target := {"kind": ScanSystem.SERVICE, "contact_id": service.contact_id}
 		var contact_id: StringName = service.contact_id
-		target_views[contact_id] = {"kind": &"SERVICE", "title": service.get("display_name", "UNKNOWN SERVICE"), "service": service, "scanned": bool(service.get("scanned", false)), "connectable": bool(service.get("connectable", false)), "disableable": bool(service.get("disableable", false)), "interceptable": bool(service.get("interceptable", false)), "scan_target": target, "mission_target": {"kind": &"SERVICE", "contact_id": contact_id}}
+		var comms_session_id := _comms_session_for_service(StringName(service.get("id", contact_id)))
+		var service_scanned := bool(service.get("scanned", false))
+		target_views[contact_id] = {"kind": &"SERVICE", "title": service.get("display_name", "UNKNOWN SERVICE"), "service": service, "scanned": service_scanned, "connectable": bool(service.get("connectable", false)), "disableable": bool(service.get("disableable", false)), "interceptable": service_scanned and comms_session_id != &"" or bool(service.get("interceptable", false)), "monitorable": service_scanned and comms_session_id != &"", "killable": service_scanned and comms_session_id != &"", "comms_session_id": comms_session_id, "scan_target": target, "mission_target": {"kind": &"SERVICE", "contact_id": contact_id}}
 		target_order.append(contact_id)
 		button.pressed.connect(func() -> void: _select_target(contact_id))
 		service_list.add_child(button)
+	if Game.active_content_document != null:
+		for authored_file: Dictionary in Game.active_content_document.data_objects:
+			if StringName(authored_file.get("node_id", &"")) != current_node_id: continue
+			var file_id := StringName(authored_file.get("id", &""))
+			var scanned := bool(_local_scan_levels.get(file_id, false))
+			var stored: bool = Game.persistent_game_state.player_state.get("inventory", []).any(func(item: Variant): return item is Dictionary and StringName(item.get("id", &"")) == file_id)
+			var file_view := authored_file.duplicate(true); file_view["scanned"] = scanned
+			target_views[file_id] = {"kind": &"FILE", "title": authored_file.get("display_name", "UNKNOWN DATA OBJECT") if scanned else "UNKNOWN DATA OBJECT", "file": file_view, "scanned": scanned, "analyzable": scanned, "downloadable": scanned and bool(authored_file.get("downloadable", true)) and not stored, "scan_target": {"kind": &"AUTHORED_DATA_OBJECT", "file_id": file_id}}
+			target_order.append(file_id)
+			var file_button := Button.new(); file_button.text = "FILE // %s" % String(target_views[file_id].title).to_upper(); file_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			file_button.pressed.connect(func() -> void: _select_target(file_id)); service_list.add_child(file_button)
+
+func _comms_session_for_service(service_id: StringName) -> StringName:
+	if Game.active_content_document == null: return &""
+	for data: Dictionary in Game.active_content_document.comms_sessions:
+		if StringName(data.get("service_id", &"")) == service_id: return StringName(data.get("id", &""))
+	return &""
+
+func _on_monitored_comms_line(_session_id: StringName, line: Dictionary) -> void:
+	var speaker := String(line.get("speaker_id", &"VOICE")).replace("_", " ")
+	EventBus.publish_tactical_status_alert(&"LIVE_VOICE", StringName(line.get("speaker_id", &"")), "%s // %s" % [speaker, String(line.get("text", ""))], &"INFO", 5.0, {"realtime": true})
 
 
 func _local_target_ids_for_node(node_id: StringName) -> Array[StringName]:
@@ -848,6 +882,7 @@ func _enter_node_focus_mode() -> bool:
 		return false
 	var local_ids := _local_target_ids_for_node(focused_node_id)
 	netspace_view_mode = NetspaceViewMode.NODE_FOCUS
+	EventBus.publish_tutorial_gameplay_event(&"NODE_MODE_ENTERED", focused_node_id, {"node_id": focused_node_id})
 	var remembered_id := StringName(_last_local_target_by_node.get(focused_node_id, &""))
 	var remembered := &""
 	if focused_local_target_id in local_ids: remembered = focused_local_target_id
@@ -868,6 +903,7 @@ func _exit_node_focus_mode() -> void:
 	if _mode_transition_active or netspace_view_mode != NetspaceViewMode.NODE_FOCUS: return
 	if not focused_local_target_id.is_empty(): _last_local_target_by_node[focused_node_id] = focused_local_target_id
 	netspace_view_mode = NetspaceViewMode.NETWORK
+	EventBus.publish_tutorial_gameplay_event(&"NETWORK_MODE_ENTERED", focused_node_id, {"node_id": focused_node_id})
 	focused_local_target_id = &""
 	selected_target_id = focused_node_id
 	_valid_contextual_commands.clear()
@@ -1141,6 +1177,9 @@ func _finish_transition() -> void:
 
 func _process(delta: float) -> void:
 	_update_command_dial_position()
+	if Game.meatspace_management != null:
+		var operation := Game.meatspace_management.deck_reconfiguration_view()
+		if not operation.is_empty(): status_label.text = "DECK %s // %d%% // %.1fs // WORLD LIVE" % [String(operation.operation_name).replace("_", " "), roundi(float(operation.progress) * 100.0), float(operation.remaining)]
 	if not visible or spatial_world == null or _transition_active or _camera_view_motion_active or _mode_transition_active: return
 	if netspace_view_mode == NetspaceViewMode.NETWORK:
 		var direction := GameplayBindings.camera_pan_vector()
@@ -1289,10 +1328,43 @@ func _execute_selected_contextual_command() -> void:
 			selected_view["disableable"] = false; selected_view["disabled"] = true; target_views[selected_target_id] = selected_view
 			Game.publish_story_trigger(&"service_disabled", {"service_id": selected_target_id})
 			status_label.text = "SERVICE DISABLED"
+		&"MONITOR":
+			var session_id := StringName(selected_view.get("comms_session_id", &""))
+			var session: CommsSession = Game.comms_manager.sessions.get(session_id) if Game.comms_manager != null else null
+			if session == null: status_label.text = "MONITOR NOT AVAILABLE"
+			else:
+				var was_listening := session.listening
+				Game.realtime_process_manager.activate_process(session.realtime_process_id)
+				Game.comms_manager.monitor(session_id); session.listen()
+				if not session.transcript_line_available.is_connected(_on_monitored_comms_line): session.transcript_line_available.connect(_on_monitored_comms_line)
+				if not was_listening: EventBus.publish_tutorial_gameplay_event(&"REALTIME_FEED_STARTED", selected_target_id, {"session_id": session_id, "service_id": selected_target_id})
+				Game.publish_story_trigger(&"stream_intercepted", {"stream_id": selected_target_id, "session_id": session_id, "mode": &"MONITOR"})
+				status_label.text = "MONITORING LIVE VOICE // CYBERSPACE REMAINS ACTIVE"
 		&"INTERCEPT":
+			var session_id := StringName(selected_view.get("comms_session_id", &""))
+			if session_id != &"" and Game.comms_manager != null:
+				var session: CommsSession = Game.comms_manager.sessions.get(session_id)
+				if session != null: Game.realtime_process_manager.activate_process(session.realtime_process_id)
+				Game.comms_manager.listen(session_id)
 			selected_view["interceptable"] = false; selected_view["intercepted"] = true; target_views[selected_target_id] = selected_view
 			Game.publish_story_trigger(&"stream_intercepted", {"stream_id": selected_target_id})
 			status_label.text = "STREAM INTERCEPTED // LIVE SIMULATION CONTINUES"
+		&"KILL":
+			var session_id := StringName(selected_view.get("comms_session_id", &""))
+			var session: CommsSession = Game.comms_manager.sessions.get(session_id) if Game.comms_manager != null else null
+			if session != null:
+				session.stop_monitoring()
+				Game.realtime_process_manager.set_process_state(session.realtime_process_id, RealtimeProcess.State.INTERRUPTED)
+			status_label.text = "VOICE SESSION TERMINATED"
+		&"ANALYZE":
+			var file: Dictionary = selected_view.get("file", {})
+			Game.publish_story_trigger(&"data_object_inspected", {"target_id": selected_target_id, "file_id": selected_target_id})
+			status_label.text = "FILE // %s UNITS // STORAGE %d/%d" % [int(file.get("size_units", 1)), Game.data_storage_used(), Game.data_storage_capacity()]
+		&"DOWNLOAD":
+			var result := Game.download_data_object(selected_target_id)
+			status_label.text = "%s // STORAGE %d/%d" % [String(result.get("reason", "DOWNLOAD FAILED")), Game.data_storage_used(), Game.data_storage_capacity()]
+			if bool(result.get("success", false)):
+				selected_view["downloadable"] = false; target_views[selected_target_id] = selected_view
 		&"ATTACK": _submit_selected_confrontation(ActionRequest.ActionType.ATTACK_PROCESS)
 		&"OBSERVE", &"MESSAGE", &"ASSIST":
 			var view := target_views.get(selected_target_id, {}) as Dictionary
@@ -1343,6 +1415,13 @@ func _on_device_mode_changed(_mode: int) -> void:
 func _on_display_update_requested() -> void:
 	if not _transition_active and not _mode_transition_active:
 		_rebuild_neighborhood()
+
+func _on_tactical_status_alert(event: Dictionary) -> void:
+	if StringName(event.get("type", &"")) != &"ROUTE_OPENED": return
+	status_label.text = String(event.get("message", "ROUTE OPENED")).to_upper()
+	event_lines.append("> %s" % status_label.text)
+	while event_lines.size() > 8: event_lines.remove_at(0)
+	event_feed.text = "EVENT FEED\n%s" % "\n".join(event_lines)
 
 func _on_minimap_node_focus_requested(node_id: StringName) -> void:
 	if knowledge == null or not knowledge.player_knows_node_exists(node_id): return
@@ -1460,16 +1539,48 @@ func _select_target(target_id: StringName) -> void:
 	if kind == &"NODE":
 		var node: Dictionary = view.node
 		details.append("TYPE // %s" % _node_type_label(node))
-		details.append("SECURITY // %s" % _known_value(node, "security_level"))
+		details.append("SECURITY // %s" % _known_value(node, "security_family"))
+		details.append("DIFFICULTY // %s" % (_known_value(node, "difficulty_rating") if node.get("difficulty_rating_known", false) else "?"))
+		if node.get("ice_presence_known", false): details.append("ICE // %s" % ("PRESENT" if node.get("ice_present", false) else "NONE DETECTED"))
 		details.append("AUTHORITY // %s" % String(node.get("owner_faction", "UNKNOWN")))
+		if node.get("controlled_paths_known", false): details.append("CONTROLLED PATHS // %d" % (node.get("controlled_paths", []) as Array).size())
+		if node.has("security_family") and node.has("network_type"):
+			var contributions := ExploitLoadoutPresenter.installed_contributions(Game.network_graph.get_node(target_id), Game.program_inventory, Game.program_loadout)
+			if not contributions.is_empty(): details.append("INSTALLED EXPLOIT CONTRIBUTION\n%s" % "\n".join(contributions))
 	elif kind == &"LINK":
 		var link: Dictionary = view.link
 		details.append("ROUTE COST // %s" % _known_value(link, "traversal_cost"))
 		details.append("LOCK // %s" % _known_value(link, "locked"))
+		if position_model != null:
+			var other := StringName(link.get("destination", &"")) if StringName(link.get("source", &"")) == position_model.current_node_id else StringName(link.get("source", &""))
+			var preview := Game.traversal_preview(other)
+			details.append("DIRECTION // %s" % String(preview.get("traversal_state", "UNKNOWN")))
+			details.append("CONTROL // %s" % String(preview.get("controller_node_id", "UNKNOWN")))
+			var remote_controller_id := StringName(preview.get("controller_node_id", &""))
+			if remote_controller_id != &"" and remote_controller_id != position_model.current_node_id:
+				details.append("ROUTE CONTROLLED BY %s" % ("CONTROL-01" if remote_controller_id == &"CONTROL" else String(remote_controller_id)))
+			if preview.get("security_gate_type", &"NONE") == &"HARD" and not bool(preview.get("security_resolved", false)): details.append("SECURITY // HARD GATE — INACCESSIBLE")
+			if bool(preview.get("soft_gate_unauthorized", false)): details.append("TRAVERSABLE BUT MONITORED // CROSSING HAS SECURITY CONSEQUENCES")
+			if debug_path_controllers:
+				var controller_id := StringName(preview.get("controller_node_id", &""))
+				for node_id in node_visuals: (node_visuals[node_id] as NodeVisual).set_destination_emphasis(node_id == controller_id)
+				if controller_id != &"": details.append("CONTROL TRACE // PATH -> %s" % controller_id)
 	elif kind == &"SERVICE":
 		var service: Dictionary = view.service
+		details.append("SERVICE TYPE // %s" % String(service.get("service_type", "UNKNOWN")).replace("_", " "))
 		details.append("SECURITY // %s" % _known_value(service, "security_level"))
 		details.append("STATE // DETECTABLE")
+		var supported_operations: Array = service.get("supported_operations", [])
+		if not supported_operations.is_empty():
+			var operation_labels := PackedStringArray()
+			for value: Variant in supported_operations: operation_labels.append(String(value).replace("_", " "))
+			details.append("OPERATIONS // %s" % ", ".join(operation_labels))
+		var mission_target: Dictionary = view.get("mission_target", {})
+		if not mission_target.is_empty():
+			var bypass := Game.bypass_preview(mission_target)
+			var defense_range: Array = bypass.get("defense_value_range", [bypass.defense_value, bypass.defense_value])
+			details.append("BYPASS // %s // ATTACK %d vs DEFENSE %d-%d" % [String(bypass.approach).replace("_", " "), int(bypass.attack_value), int(defense_range[0]), int(defense_range[1])])
+			details.append("NOISE // %s" % ("GUARANTEED" if bypass.approach == "BARE_COMMAND" else "ON FAILURE"))
 	elif kind == &"ICE":
 		var ice: Dictionary = view.ice
 		details.append("POSITION // %s" % String(ice.get("node_id", "UNKNOWN")))
@@ -1542,7 +1653,7 @@ func get_valid_commands(target_id: StringName = &"", _player_state: Variant = nu
 		&"NODE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
 			var link := view.get("link", {}) as Dictionary
-			if bool(view.get("enterable", false)) or (not link.is_empty() and target_id != position_model.current_node_id): commands.append(&"ENTER")
+			if bool(view.get("enterable", false)): commands.append(&"ENTER")
 		&"ICE":
 			if scanned and bool(view.get("probeable", false)): commands.append(&"PROBE")
 			if bool(view.get("attackable", false)): commands.append(&"ATTACK")
@@ -1552,6 +1663,8 @@ func get_valid_commands(target_id: StringName = &"", _player_state: Variant = nu
 			if bool(view.get("connectable", false)): commands.append(&"CONNECT")
 			if bool(view.get("disableable", false)): commands.append(&"DISABLE")
 			if bool(view.get("interceptable", false)): commands.append(&"INTERCEPT")
+			if bool(view.get("monitorable", false)): commands.append(&"MONITOR")
+			if bool(view.get("killable", false)): commands.append(&"KILL")
 		&"FILE":
 			if scanned and bool(view.get("analyzable", true)): commands.append(&"ANALYZE")
 			if bool(view.get("downloadable", false)): commands.append(&"DOWNLOAD")
@@ -1867,6 +1980,13 @@ func _scan_selected_target() -> void:
 	if selected_target_id == &"" or not target_views.has(selected_target_id):
 		return
 	var target: Dictionary = target_views[selected_target_id].get("scan_target", {})
+	if StringName(target.get("kind", &"")) == &"AUTHORED_DATA_OBJECT":
+		_local_scan_levels[selected_target_id] = true
+		var view := target_views[selected_target_id] as Dictionary; view["scanned"] = true; view["analyzable"] = true; view["downloadable"] = true; (view.file as Dictionary)["scanned"] = true; target_views[selected_target_id] = view
+		Game.publish_story_trigger(&"target_scanned", {"target_id": selected_target_id, "file_id": selected_target_id})
+		status_label.text = "DATA OBJECT IDENTIFIED // %s" % selected_target_id
+		_rebuild_services(position_model.current_node_id); _select_target(selected_target_id)
+		return
 	if not target.is_empty():
 		_submit_scan(target)
 
@@ -1982,7 +2102,7 @@ func _update_program_bar() -> void:
 		var instance := Game.program_inventory.get_instance(instance_id) if not instance_id.is_empty() and Game.program_inventory != null else null
 		var binding_id := StringName("PROGRAM_SLOT_%d" % (index + 1))
 		var action := StringName(GameplayBindings.profile.program_bindings.get(binding_id, &""))
-		button.text = "[%d] %s" % [index + 1, instance.definition.display_name.to_upper() if instance != null else "EMPTY"]
+		button.text = "[%d] %s%s" % [index + 1, instance.definition.display_name.to_upper() if instance != null else "EMPTY", " // MEM %d" % instance.definition.memory_cost if instance != null else ""]
 		button.tooltip_text = "%s // input: %s // binding: PROGRAM_SLOT_%d" % [instance.definition.description if instance != null else "No program installed in this loadout position.", GameplayBindings.get_binding_label(action), index + 1]
 		button.modulate = AMBER if index == _selected_active_slot else Color.WHITE
 		button.focus_mode = Control.FOCUS_NONE
@@ -2033,29 +2153,48 @@ func _refresh_slot_management() -> void:
 	var instance := Game.program_inventory.get_instance(slot_id) if not slot_id.is_empty() and Game.program_inventory != null else null
 	_slot_management_title.text = "ACTIVE SLOT %02d // %s" % [_selected_active_slot + 1, instance.definition.display_name.to_upper() if instance != null else "EMPTY"]
 	if instance != null:
-		var move := Button.new(); move.text = "MOVE TO STORAGE"; move.pressed.connect(_move_selected_to_storage); move.disabled = Game.program_inventory == null or not Game.program_inventory.can_store(Game.program_loadout); _slot_management_options.add_child(move)
+		var move := Button.new(); move.text = "STOP // KEEP IN STORAGE"; move.pressed.connect(_move_selected_to_storage); move.disabled = Game.program_inventory == null; _slot_management_options.add_child(move)
 		var dump := Button.new(); dump.text = "DUMP PROGRAM"; dump.pressed.connect(_request_dump_selected_slot); _slot_management_options.add_child(dump)
 	if instance == null:
 		var storage_label := Label.new(); storage_label.text = "LOAD FROM STORAGE"; _slot_management_options.add_child(storage_label)
 	if instance == null and Game.program_inventory != null:
 		for stored: ProgramInstance in Game.program_inventory.all_instances():
 			if Game.program_loadout.is_installed(stored.instance_id): continue
-			var load := Button.new(); load.text = stored.definition.display_name.to_upper(); load.pressed.connect(_load_into_selected_slot.bind(stored.instance_id)); _slot_management_options.add_child(load)
+			var load := Button.new(); load.text = ("INSTALL UTILITY // " if stored.definition.is_passive_utility() else "START // ") + stored.definition.display_name.to_upper(); load.pressed.connect(_load_into_selected_slot.bind(stored.instance_id)); _slot_management_options.add_child(load)
+	if instance != null and Game.program_inventory != null:
+		for stored: ProgramInstance in Game.program_inventory.all_instances():
+			if stored.definition.is_passive_utility() or Game.program_loadout.is_installed(stored.instance_id): continue
+			var swap := Button.new(); swap.text = "SWAP TO // %s" % stored.definition.display_name.to_upper(); swap.pressed.connect(_swap_selected_program.bind(stored.instance_id)); _slot_management_options.add_child(swap)
+	if Game.program_inventory != null:
+		for utility_id: StringName in Game.program_loadout.installed_utility_ids:
+			var utility := Game.program_inventory.get_instance(utility_id)
+			if utility == null: continue
+			var uninstall := Button.new(); uninstall.text = "UNINSTALL UTILITY // %s" % utility.definition.display_name.to_upper(); uninstall.pressed.connect(_uninstall_utility.bind(utility_id)); _slot_management_options.add_child(uninstall)
 
 
 func _load_into_selected_slot(instance_id: StringName) -> void:
-	if Game.program_loadout.install_at(_selected_active_slot, instance_id, Game.program_inventory):
-		status_label.text = "PROGRAM LOADED"
-		_update_program_bar(); _refresh_slot_management()
+	var instance := Game.program_inventory.get_instance(instance_id)
+	var result := Game.meatspace_management.install_program(instance_id) if instance != null and instance.definition.is_passive_utility() else Game.meatspace_management.start_active_program_in_slot(instance_id, _selected_active_slot)
+	status_label.text = String(result.reason).to_upper()
+	_refresh_slot_management()
+
+func _swap_selected_program(stored_instance_id: StringName) -> void:
+	var running_id := Game.program_loadout.instance_at(_selected_active_slot)
+	var result := Game.meatspace_management.swap_active_program(running_id, stored_instance_id)
+	status_label.text = String(result.reason).to_upper()
+
+func _uninstall_utility(instance_id: StringName) -> void:
+	var result := Game.meatspace_management.remove_program(instance_id)
+	status_label.text = String(result.reason).to_upper()
 
 
 func _move_selected_to_storage() -> void:
-	if Game.program_inventory == null or not Game.program_inventory.can_store(Game.program_loadout):
-		status_label.text = "STORAGE FULL"; return
-	if not Game.program_loadout.instance_at(_selected_active_slot).is_empty():
-		Game.program_loadout.uninstall_at(_selected_active_slot)
-		status_label.text = "PROGRAM STORED"
-		_update_program_bar(); _refresh_slot_management()
+	if Game.program_inventory == null: return
+	var instance_id := Game.program_loadout.instance_at(_selected_active_slot)
+	if not instance_id.is_empty():
+		var result := Game.meatspace_management.remove_program(instance_id)
+		status_label.text = String(result.reason).to_upper()
+		_refresh_slot_management()
 
 
 func _request_dump_selected_slot() -> void:
@@ -2135,12 +2274,24 @@ func _submit_wait() -> void:
 func _update_current_panel(view: Dictionary) -> void:
 	current_name.text = String(view.get("display_name", "UNKNOWN")).to_upper()
 	current_type.text = "TYPE // %s" % _node_type_label(view)
-	current_security.text = "SECURITY // %s" % _known_value(view, "security_level")
+	var ice_summary := "UNKNOWN"
+	if view.get("ice_presence_known", false):
+		ice_summary = "PRESENT" if view.get("ice_present", false) else "NONE DETECTED"
+		var known_ice := knowledge.ice_records.values().filter(func(record): return record.get("node_id", &"") == position_model.current_node_id and record.has("ice_type"))
+		if not known_ice.is_empty(): ice_summary = "%s-%s" % [String(known_ice[0].get("ice_type", "ICE")), String(known_ice[0].get("ice_rating", "?"))]
+	current_security.text = "SECURITY // %s\nDIFFICULTY // %s\nICE // %s" % [_known_value(view, "security_family"), str(view.difficulty_rating) if view.get("difficulty_rating_known", false) else "?", ice_summary]
 	current_authority.text = "AUTHORITY // %s  |  PLAYER %d" % [String(view.get("owner_faction", "UNKNOWN")), position_model.authority_level]
 	var service_names: PackedStringArray = []
 	for service in knowledge.get_services_at(position_model.current_node_id):
-		service_names.append(String(service.get("display_name", "UNKNOWN SERVICE")))
-	services_label.text = "SERVICES\n  %s" % ("\n  ".join(service_names) if not service_names.is_empty() else "NO DATA")
+		service_names.append(String(service.get("service_type", service.get("display_name", "UNKNOWN SERVICE"))).replace("_", " ").capitalize())
+	var extras := PackedStringArray()
+	if view.get("controlled_paths_known", false): extras.append("CONTROLLED PATHS // %d" % (view.get("controlled_paths", []) as Array).size())
+	if view.has("affinity_hints"): extras.append("AFFINITY // %s" % JSON.stringify(view.affinity_hints))
+	if view.has("known_vulnerabilities"): extras.append("VULNERABILITIES // %s" % ", ".join(PackedStringArray(view.known_vulnerabilities)))
+	if view.has("security_family") and view.has("network_type"):
+		var contributions := ExploitLoadoutPresenter.installed_contributions(Game.network_graph.get_node(position_model.current_node_id), Game.program_inventory, Game.program_loadout)
+		if not contributions.is_empty(): extras.append("INSTALLED EXPLOIT CONTRIBUTION\n%s" % "\n".join(contributions))
+	services_label.text = "SERVICES\n  %s%s" % ["\n  ".join(service_names) if not service_names.is_empty() else "NO DATA", "\n" + "\n".join(extras) if not extras.is_empty() else ""]
 
 func _update_top_bar() -> void:
 	if Game.action_clock == null:
@@ -2178,6 +2329,7 @@ func _event_description(event: Dictionary) -> String:
 		&"UNKNOWN_SIGNAL_DETECTED": return "UNKNOWN ROUTE SIGNAL DETECTED"
 		&"SERVICE_COMPROMISED": return "SERVICE COMPROMISED // %s" % event.get("service_id", &"")
 		&"PHYSICAL_ACCESS_UNLOCKED": return "PHYSICAL ROUTE OPEN // %s" % event.get("access_point_id", &"UNKNOWN")
+		&"OUTBOUND_PATH_STATE_CHANGED": return String(event.get("message", "ROUTE STATE CHANGED"))
 		&"CAPABILITY_ACQUIRED": return "CAPABILITY ACQUIRED // %s" % event.get("capability_id", &"")
 		&"CREDENTIAL_STOLEN": return "IDENTITY CREDENTIAL CAPTURED"
 		&"SHORTCUT_ENABLED": return "PERSISTENT SHORTCUT ENABLED"
@@ -2196,6 +2348,7 @@ func _event_description(event: Dictionary) -> String:
 		_: return String(event.get("type", &"NETWORK EVENT")).replace("_", " ")
 
 func _node_type_label(view: Dictionary) -> String:
+	if view.has("network_type"): return String(view.network_type).replace("_", " ").capitalize()
 	if not view.has("node_type"):
 		return "UNKNOWN"
 	return NetworkNodeDefinition.NodeType.keys()[int(view.node_type)].replace("_", " ")

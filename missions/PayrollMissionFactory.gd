@@ -29,7 +29,7 @@ static func create_graph() -> NetworkGraph:
 	graph.get_node(DMZ_ROUTER).add_service(&"DMZ_CONTROL", "DMZ Routing Control", 1, [&"DEFAULT_ROUTE_TABLE"])
 	graph.get_node(EMPLOYEE_WS).add_service(&"EMP_DIRECTORY", "Employee Directory Agent", 1, [&"CACHED_CREDENTIAL"])
 	graph.get_node(ENGINEERING_WS).add_service(&"ENG_TOOLCHAIN", "Engineering Toolchain", 2, [&"UNSIGNED_PLUGIN"])
-	graph.get_node(AUTH_SERVER).add_service(&"AUTH_DAEMON", "Authentication Daemon", 3, [&"TOKEN_DOWNGRADE"])
+	graph.get_node(AUTH_SERVER).add_service(&"AUTH_DAEMON", "Authentication Daemon", 3, [&"TOKEN_DOWNGRADE"], [], [], [&"AUTHENTICATION", &"TRUSTED_IDENTITY", &"ACCESS_CHECK"], NodeServiceCatalog.AUTHENTICATION)
 	graph.get_node(FILE_SERVER).add_service(&"FILE_INDEX", "File Index", 2, [&"STALE_ACL"])
 	graph.get_node(PAYROLL_SERVER).add_service(&"PAYROLL_DB", "Payroll Database", 4, [&"BATCH_EXPORT"])
 	graph.get_node(SECURITY_SERVER).add_service(&"ICE_ORCHESTRATOR", "ICE Orchestrator", 5)

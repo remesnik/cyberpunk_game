@@ -9,6 +9,8 @@ signal hardware_changed(component_id: StringName, level: int)
 var hardware_levels: Dictionary = {&"DECK_CPU": 1, &"DECK_RAM": 1, &"DECK_STORAGE": 1, &"DECK_SENSORS": 1}
 var story_interactions: Array[Dictionary] = []
 var software_programming: SoftwareProgrammingManager
+var deck_reconfiguration: DeckReconfigurationManager
+signal loadout_changed
 var programming_tasks: Dictionary:
 	get: return software_programming.tasks if software_programming != null else {}
 
@@ -20,6 +22,10 @@ func configure(inventory: ProgramInventory, loadout: ProgramLoadout, orders: Equ
 	realtime_clock = clock
 	software_programming = SoftwareProgrammingManager.new()
 	software_programming.configure(program_inventory, realtime_clock)
+	deck_reconfiguration = DeckReconfigurationManager.new()
+	var profile := load("res://data/deck_resource_profile.tres") as DeckResourceProfile
+	deck_reconfiguration.configure(program_inventory, program_loadout, realtime_clock, profile, func() -> Dictionary: return hardware_levels)
+	deck_reconfiguration.operation_completed.connect(func(_view: Dictionary) -> void: loadout_changed.emit())
 
 
 func upgrade_hardware(component_id: StringName, credit_cost: int) -> Dictionary:
@@ -44,6 +50,9 @@ func inspect_deck() -> Dictionary:
 			"display_name": instance.definition.display_name,
 			"version": instance.definition.version,
 			"installed": program_loadout.is_installed(instance.instance_id),
+			"memory_cost": instance.definition.memory_cost,
+			"storage_cost": instance.definition.storage_cost,
+			"consumes_active_slot": instance.definition.consumes_active_slot,
 		})
 	owned.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return String(a.instance_id) < String(b.instance_id))
 	return {
@@ -51,21 +60,34 @@ func inspect_deck() -> Dictionary:
 		"reason": "Deck inspected.",
 		"hardware_levels": hardware_levels.duplicate(true),
 		"capacity": program_loadout.capacity,
+		"active_slots_used": program_loadout.active_slots_used(),
+		"memory_used": program_loadout.memory_used(program_inventory),
+		"memory_capacity": program_loadout.memory_capacity,
+		"storage_used": program_inventory.storage_used(),
+		"storage_capacity": program_inventory.storage_capacity,
 		"installed_instance_ids": program_loadout.installed_instance_ids.duplicate(),
 		"owned_programs": owned,
 	}
 
 
 func install_program(instance_id: StringName) -> Dictionary:
-	if program_loadout.install(instance_id, program_inventory):
-		return {"success": true, "reason": "Program installed.", "instance_id": instance_id}
-	return _failure("Program could not be installed.")
+	var instance := program_inventory.get_instance(instance_id)
+	if instance == null: return _failure("PROGRAM NOT IN STORAGE")
+	var operation := DeckReconfigurationManager.Operation.INSTALL_UTILITY if instance.definition.is_passive_utility() else DeckReconfigurationManager.Operation.START_ACTIVE
+	return deck_reconfiguration.request(operation, instance_id)
 
 
 func remove_program(instance_id: StringName) -> Dictionary:
-	if program_loadout.uninstall(instance_id):
-		return {"success": true, "reason": "Program removed from loadout.", "instance_id": instance_id}
-	return _failure("Program is not installed.")
+	var instance := program_inventory.get_instance(instance_id)
+	if instance == null or not program_loadout.is_installed(instance_id): return _failure("Program is not installed.")
+	var operation := DeckReconfigurationManager.Operation.UNINSTALL_UTILITY if instance.definition.is_passive_utility() else DeckReconfigurationManager.Operation.STOP_ACTIVE
+	return deck_reconfiguration.request(operation, instance_id)
+
+func swap_active_program(running_instance_id: StringName, stored_instance_id: StringName) -> Dictionary:
+	return deck_reconfiguration.request(DeckReconfigurationManager.Operation.SWAP_ACTIVE, running_instance_id, stored_instance_id)
+
+func start_active_program_in_slot(instance_id: StringName, slot_index: int) -> Dictionary:
+	return deck_reconfiguration.request(DeckReconfigurationManager.Operation.START_ACTIVE, instance_id, &"", slot_index)
 
 
 func order_equipment(equipment_id: StringName, vendor_id: StringName, quantity: int, destination: StringName) -> Dictionary:
@@ -87,6 +109,9 @@ func collect_programming(task_id: StringName) -> Dictionary:
 
 func update_tasks() -> void:
 	software_programming.update()
+
+func deck_reconfiguration_view() -> Dictionary:
+	return deck_reconfiguration.view() if deck_reconfiguration != null else {}
 
 
 func grant_program_reward(definition: ProgramDefinition, source_id: StringName = &"") -> Dictionary:

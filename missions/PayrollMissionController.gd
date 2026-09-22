@@ -41,7 +41,9 @@ func validate_exploit(target: Dictionary) -> Dictionary:
 
 func exploit_cost(target: Dictionary) -> int:
 	var service_id := knowledge.resolve_service_contact(target.get("contact_id", &""))
-	return 1 + int(knowledge.service_records.get(service_id, {}).get("security_level", 1))
+	var node := graph.get_node(position.current_node_id)
+	var base_difficulty := node.difficulty_rating if node != null else int(knowledge.service_records.get(service_id, {}).get("security_level", 1))
+	return maxi(1, 1 + base_difficulty - maxi(0, int(target.get("exploit_family_bonus", 0))))
 
 func execute_exploit(target: Dictionary) -> Dictionary:
 	var validation := validate_exploit(target)

@@ -35,6 +35,20 @@ mouse_default_cursor_shape = 2
 text = "CLOSE DEBUG PANEL"
 tooltip_text = "Hide this development-only overlay. F3 can show it again."
 
+[node name="TutorialStageTools" type="HBoxContainer" parent="Panel/Margin/Readout"]
+layout_mode = 2
+
+[node name="TutorialStageOption" type="OptionButton" parent="Panel/Margin/Readout/TutorialStageTools"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+tooltip_text = "First Contact stage; prerequisite graph state is initialized by the production systems."
+
+[node name="TutorialStageJump" type="Button" parent="Panel/Margin/Readout/TutorialStageTools"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "JUMP"
+
 [node name="TickLabel" type="Label" parent="Panel/Margin/Readout"]
 unique_name_in_owner = true
 layout_mode = 2
@@ -127,3 +141,11 @@ layout_mode = 2
 theme_override_colors/font_color = Color(0.282, 0.91, 1, 0.78)
 theme_override_font_sizes/font_size = 10
 text = "TRUE WORLD  |  PLAYER KNOWLEDGE\n--"
+
+[node name="NodeModeLabel" type="Label" parent="Panel/Margin/Readout"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.63, 0.95, 0.8, 1)
+theme_override_font_sizes/font_size = 9
+text = "NODE MODE AUDIT\n--"
+autowrap_mode = 2

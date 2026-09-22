@@ -3,6 +3,7 @@ extends RefCounted
 ## Converts authoritative nearby topology into sanitized, player-specific knowledge.
 ## Detected knowledge persists; the current view is recalculated from position/rating.
 signal sensor_view_changed
+signal topology_discovered(event: Dictionary)
 
 const SOURCE := &"DECK_SENSORS"
 
@@ -82,11 +83,19 @@ func recalculate() -> void:
 			queue.append({"id": destination_id, "depth": next_depth})
 			edges.append({"link_id": link.id, "source": source_id, "destination": destination_id, "depth": next_depth})
 			if next_depth == 1:
+				var node_was_known: bool = knowledge.player_knows_node_exists(destination_id)
+				var link_was_known: bool = knowledge.link_records.has(link.id)
 				knowledge.reveal_node(graph.get_node(destination_id), KnowledgeLevel.Value.IDENTIFIED)
 				knowledge.reveal_link(link, KnowledgeLevel.Value.IDENTIFIED)
+				if not node_was_known: topology_discovered.emit({"event_type": &"NODE_DISCOVERED", "target_id": destination_id, "depth": next_depth})
+				if not link_was_known: topology_discovered.emit({"event_type": &"PATH_DISCOVERED", "target_id": link.id, "source_node_id": source_id, "destination_node_id": destination_id, "depth": next_depth})
 			else:
+				var node_was_known: bool = knowledge.player_knows_node_exists(destination_id)
+				var link_was_known: bool = knowledge.link_records.has(link.id)
 				knowledge.reveal_topology_node(graph.get_node(destination_id), SOURCE)
 				knowledge.reveal_topology_link(link, SOURCE)
+				if not node_was_known: topology_discovered.emit({"event_type": &"NODE_DISCOVERED", "target_id": destination_id, "depth": next_depth, "identity_known": false})
+				if not link_was_known: topology_discovered.emit({"event_type": &"PATH_DISCOVERED", "target_id": link.id, "source_node_id": source_id, "destination_node_id": destination_id, "depth": next_depth})
 			nodes.append({"node_id": destination_id, "depth": next_depth, "knowledge": knowledge.get_node_view(destination_id)})
 	_current_view = {"nodes": nodes, "edges": edges, "depths": depths, "rating": sensors_rating, "extra_depth": get_sensor_lookahead_depth(sensors_rating), "maximum_depth": max_depth}
 	sensor_view_changed.emit()

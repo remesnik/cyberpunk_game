@@ -1,5 +1,7 @@
 extends CanvasLayer
 
+const NodeModeSnapshot := preload("res://debug/NodeModeDebugSnapshot.gd")
+
 @onready var tick_label: Label = %TickLabel
 @onready var realtime_label: Label = %RealtimeLabel
 @onready var pause_policy_label: Label = %PausePolicyLabel
@@ -8,11 +10,14 @@ extends CanvasLayer
 @onready var events_label: Label = %EventsLabel
 @onready var ice_label: Label = %IceLabel
 @onready var world_knowledge_label: Label = %WorldKnowledgeLabel
+@onready var node_mode_label: Label = %NodeModeLabel
 @onready var realtime_processes_label: Label = %RealtimeProcessesLabel
 @onready var dual_pressure_label: Label = %DualPressureLabel
 @onready var cyber_timeline_label: Label = %CyberTimelineLabel
 @onready var meatspace_timeline_label: Label = %MeatspaceTimelineLabel
 @onready var close_button: Button = %CloseButton
+@onready var tutorial_stage_option: OptionButton = %TutorialStageOption
+var tutorial_stage_ids: Array[StringName] = []
 
 
 func _ready() -> void:
@@ -23,9 +28,29 @@ func _ready() -> void:
 	EventBus.action_resolved.connect(_on_action_resolved)
 	EventBus.session_started.connect(_update_ice_debug)
 	EventBus.session_started.connect(_update_world_debug)
+	EventBus.session_started.connect(_refresh_tutorial_stages)
+	%TutorialStageJump.pressed.connect(_jump_tutorial_stage)
 	if Game.action_clock != null:
 		tick_label.text = "CYBER TICK: %03d" % Game.action_clock.current_tick
 	_update_realtime_readout()
+	_refresh_tutorial_stages()
+
+
+func _refresh_tutorial_stages() -> void:
+	tutorial_stage_ids.clear()
+	tutorial_stage_option.clear()
+	if Game.entry_guidance == null: return
+	for stage_id: StringName in Game.entry_guidance.tutorial_stage_ids():
+		tutorial_stage_ids.append(stage_id)
+		tutorial_stage_option.add_item(String(stage_id))
+
+
+func _jump_tutorial_stage() -> void:
+	var selected := tutorial_stage_option.selected
+	if selected < 0 or selected >= tutorial_stage_ids.size(): return
+	var result: Dictionary = Game.debug_jump_first_contact_stage(tutorial_stage_ids[selected])
+	action_label.text = String(result.get("reason", "STAGE JUMP FAILED")).to_upper()
+	_update_world_debug()
 
 
 func _process(_delta: float) -> void:
@@ -33,6 +58,7 @@ func _process(_delta: float) -> void:
 	_update_realtime_processes()
 	_update_dual_pressure()
 	_update_scenario_timeline()
+	_update_node_mode_debug()
 
 
 func _on_visibility_changed(is_visible: bool) -> void:
@@ -123,7 +149,10 @@ func _update_ice_debug() -> void:
 func _update_world_debug() -> void:
 	if Game.network_graph == null or Game.player_knowledge == null:
 		return
-	var lines: PackedStringArray = ["TRUE WORLD  |  PLAYER KNOWLEDGE"]
+	var tutorial_step := Game.entry_guidance.current_step_id() if Game.entry_guidance != null else &"--"
+	var traversal: Dictionary = Game.last_traversal_debug
+	var exploit: Dictionary = Game.last_exploit_debug
+	var lines: PackedStringArray = ["SCENARIO: %s  |  TUTORIAL ACTIVE: %s  |  STEP: %s" % [Game.active_content_document.document_id if Game.active_content_document != null else &"--", str(Game.entry_guidance != null and Game.entry_guidance.active), tutorial_step], "CURRENT: %s  |  SELECTED: %s  |  PATH: %s  |  ALLOWED: %s  |  REASON: %s" % [Game.player_network_position.current_node_id if Game.player_network_position != null else &"--", traversal.get("destination", &"--"), traversal.get("path_state", &"--"), traversal.get("allowed", false), traversal.get("reason", &"--")], "EXPLOIT NODE: %s  |  FAMILY: %s  |  DIFFICULTY: %s  |  UTILITY: %s  |  COMPATIBLE: %s" % [exploit.get("network_type", &"--"), exploit.get("security_family", &"--"), exploit.get("difficulty_rating", "--"), exploit.get("selected_utility", "--"), exploit.get("compatible", false)], "TRUE WORLD  |  PLAYER KNOWLEDGE"]
 	var node_ids: Array = Game.network_graph.nodes.keys()
 	node_ids.sort_custom(func(a: Variant, b: Variant) -> bool: return String(a) < String(b))
 	for node_id in node_ids:
@@ -137,3 +166,10 @@ func _update_world_debug() -> void:
 		var link := Game.network_graph.get_link(link_id)
 		lines.append("LINK %s>%s | %s" % [link.source, link.destination, KnowledgeLevel.label(Game.player_knowledge.get_link_level(link_id))])
 	world_knowledge_label.text = "\n".join(lines)
+
+func _update_node_mode_debug() -> void:
+	if node_mode_label == null: return
+	var node: NetworkNodeDefinition = null
+	if Game.network_graph != null and Game.player_network_position != null:
+		node = Game.network_graph.get_node(Game.player_network_position.current_node_id)
+	node_mode_label.text = NodeModeSnapshot.format(NodeModeSnapshot.capture(Game.program_inventory, Game.program_loadout, node, Game.last_bypass_result, Game.network_graph))

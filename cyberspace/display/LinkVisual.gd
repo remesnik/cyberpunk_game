@@ -49,7 +49,12 @@ func set_runtime_state(state: StringName) -> void:
 	runtime_state = state
 	if highlighted: return
 	match state:
-		&"BLOCKED": default_color = Color(0.55, 0.6, 0.65, 0.72); width = maxf(normal_width, 3.0)
+		&"BLOCKED", &"LOCKED": default_color = Color(1.0, 0.62, 0.16, 0.86); width = maxf(normal_width, 3.6)
+		&"HARD_GATE": default_color = Color(0.9, 0.08, 0.12, 0.9); width = maxf(normal_width, 5.5)
+		&"UNLOCKED": default_color = Color(CYAN, maxf(_base_alpha, 0.78)); width = normal_width
+		&"LOCKED_DOWN": default_color = Color(0.88, 0.12, 0.2, 0.48); width = maxf(normal_width, 5.0)
+		&"SOFT_GATE": default_color = Color(1.0, 0.3, 0.68, 0.92); width = maxf(normal_width, 3.0)
+		&"HIDDEN": default_color = Color(0.15, 0.18, 0.22, 0.12); width = maxf(0.7, normal_width * 0.5)
 		&"HOSTILE": default_color = Color(1.0, 0.2, 0.25, 0.86); width = maxf(normal_width, 3.5)
 		&"DISABLED": default_color = Color(0.25, 0.3, 0.34, 0.24); width = maxf(0.8, normal_width * 0.7)
 		&"ONE_WAY": default_color = Color(1.0, 0.78, 0.25, 0.78); width = maxf(normal_width, 2.5)

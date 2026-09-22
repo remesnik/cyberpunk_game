@@ -61,7 +61,7 @@ func validate(action_type: ActionRequest.ActionType, target: Dictionary) -> Dict
 			return {"success": true, "reason": "", "link_id": link_id}
 		&"NODE":
 			var node_id: StringName = target.get("node_id", &"")
-			var traversal := graph.validate_traversal(position, node_id, knowledge.link_records.keys())
+			var traversal := graph.can_traverse(position.current_node_id, node_id, position, knowledge.link_records.keys())
 			return {"success": traversal.error == NetworkGraph.TraversalError.OK, "reason": "Retreat route is unavailable." if traversal.error != NetworkGraph.TraversalError.OK else ""}
 	return {"success": false, "reason": "Unsupported confrontation target."}
 
@@ -110,6 +110,9 @@ func execute(action_type: ActionRequest.ActionType, target: Dictionary) -> Confr
 		ActionRequest.ActionType.BREAK_LOCK:
 			var link := graph.get_link(validation.link_id)
 			link.locked = false
+			var destination := link.destination_from(position.current_node_id)
+			var direction := link.get_direction(position.current_node_id, destination)
+			if direction != null: direction.state = TraversalDirectionDefinition.State.UNLOCKED; direction.security_resolved = true
 			knowledge.reveal_link(link, KnowledgeLevel.Value.SCANNED)
 			events.append({"type": &"LINK_LOCK_BROKEN", "link_id": link.id})
 		ActionRequest.ActionType.REDIRECT:

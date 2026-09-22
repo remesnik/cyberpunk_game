@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"CRYPT"
+display_name = "Crypt"
+description = "Encrypts and decrypts protected files and streams."
+version = "1.0"
+utility_rating = 2
+supported_operations = Array[StringName]([&"UPLOAD", &"DOWNLOAD", &"EDIT", &"ENCRYPT", &"DECRYPT"])
+supported_services = Array[StringName]([&"ENCRYPTED_DATA", &"FILESYSTEM"])
+affinity_type = &"CRYPTOGRAPHY"
+storage_cost = 1
+memory_cost = 1
+consumes_active_slot = false

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="PassiveUtilityDefinition" load_steps=2 format=3]
+[ext_resource type="Script" path="res://programs/PassiveUtilityDefinition.gd" id="1"]
+[resource]
+script = ExtResource("1")
+id = &"SHAKESPEARE"
+display_name = "Shakespeare"
+description = "Scans, modifies, deletes, and forges system logfiles."
+version = "1.0"
+utility_rating = 2
+supported_operations = Array[StringName]([&"SCAN", &"READ", &"SEARCH", &"EDIT", &"DELETE", &"SCRUB", &"FORGE"])
+supported_services = Array[StringName]([&"LOGGING"])
+affinity_type = &"LOG_MANIPULATION"
+storage_cost = 1
+memory_cost = 1
+consumes_active_slot = false

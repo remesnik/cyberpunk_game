@@ -14,11 +14,9 @@ static func build(document: CyberspaceContentDocument, entry_node_id: StringName
 		var node := NetworkNodeDefinition.new(data.id, data.get("display_name", data.id), _node_type(data.get("node_type", &"SYSTEM")), int(data.get("security_level", 0)), data.get("starting_discovery_state", &"UNKNOWN") != &"UNKNOWN", data.get("owner", data.get("faction", &"")), data.get("sphere_id", &""))
 		for service_id: StringName in data.get("services", []):
 			var definition: Dictionary = services.get(service_id, {})
-			var vulnerabilities: Array[StringName] = []
-			vulnerabilities.assign(definition.get("vulnerabilities", []))
-			var tags: Array[StringName] = []
-			tags.assign(definition.get("tags", []))
-			node.add_service(service_id, definition.get("display_name", service_id), int(definition.get("security_level", data.get("security_level", 0))), vulnerabilities, tags, definition.get("capability_types", []))
+			if not definition.is_empty(): node.add_service_record(definition)
+		for control_data: Dictionary in data.get("outbound_path_controls", data.get("path_controls", [])):
+			node.add_path_control(NodePathControl.from_authored(control_data))
 		graph.add_node(node)
 	for data: Dictionary in document.security_sleeves:
 		var members: Array[StringName] = []
@@ -27,8 +25,16 @@ static func build(document: CyberspaceContentDocument, entry_node_id: StringName
 		sleeve.metadata = (data.get("metadata", {}) as Dictionary).duplicate(true)
 		graph.add_security_sleeve(sleeve)
 	for data: Dictionary in document.network_links:
-		var link := NetworkLinkDefinition.new(data.id, data.source, data.destination, bool(data.get("one_way", false)), bool(data.get("hidden", false)), bool(data.get("locked", false)), bool(data.get("disabled", false)), bool(data.get("discovered", not bool(data.get("hidden", false)))), int(data.get("traversal_cost", 1)), int(data.get("authority_requirement", 0)), data.get("capability_requirement", &""))
+		var link := NetworkLinkDefinition.new(data.id, data.source, data.destination, bool(data.get("one_way", false)), bool(data.get("hidden", false)), bool(data.get("locked", false)) and (data.get("directions", []) as Array).is_empty(), bool(data.get("disabled", false)), bool(data.get("discovered", not bool(data.get("hidden", false)))), int(data.get("traversal_cost", 1)), int(data.get("authority_requirement", 0)), data.get("capability_requirement", &""))
+		var directions: Array = data.get("directions", [])
+		for direction_data: Dictionary in directions:
+			link.configure_direction(direction_data.get("source", data.source), direction_data.get("destination", data.destination), direction_data)
 		graph.add_link(link)
+	for data: Dictionary in document.path_security_overrides:
+		var link := graph.get_link(StringName(data.get("link_id", &"")))
+		if link == null: continue
+		var direction := link.get_direction(StringName(data.get("source", &"")), StringName(data.get("destination", &"")))
+		if direction != null: direction.apply_authored(data)
 	var position := PlayerNetworkPosition.new(entry_node_id, traversal_points)
 	var knowledge := PlayerKnowledge.new()
 	for data: Dictionary in document.network_nodes:

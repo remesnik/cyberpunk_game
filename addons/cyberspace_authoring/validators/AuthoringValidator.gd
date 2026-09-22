@@ -46,6 +46,20 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 		var gate := StringName(link.get("traversal_gate", link.get("gate", &"NONE"))).to_upper()
 		if gate not in [&"NONE", &"BLOCK_EXIT_UNTIL_RESOLVED", &"BLOCK_ENTRY_UNTIL_REQUIREMENT", &"ONE_WAY", &"SCRIPTED"]: issues.append(_issue("ERROR", "NETWORK GATES", link.id, "Unknown traversal gate type '%s'." % gate))
 		elif gate not in [&"NONE", &"ONE_WAY"] and (link.get("traversal_requirement", link.get("requirement", {})) as Dictionary).is_empty(): issues.append(_issue("ERROR", "NETWORK GATES", link.id, "Traversal gate requires an authored requirement."))
+		for direction: Dictionary in link.get("directions", []):
+			if direction.get("source", &"") not in node_ids or direction.get("destination", &"") not in node_ids: issues.append(_issue("ERROR", "TRAVERSAL DIRECTIONS", link.id, "Direction endpoints must reference existing nodes."))
+			var direction_source := StringName(direction.get("source", link.get("source", &"")))
+			var direction_destination := StringName(direction.get("destination", link.get("destination", &"")))
+			var controller := StringName(direction.get("remote_controller_node_id", direction.get("remote_controller", direction.get("controller_node_id", direction.get("controller", direction_source)))))
+			if controller not in node_ids: issues.append(_issue("ERROR", "TRAVERSAL DIRECTIONS", link.id, "Direction controller must reference an existing node."))
+			elif controller != direction_source and not _reachable_without_direction(direction_source, controller, link.id, direction_source, direction_destination, document.network_links):
+				if bool(direction.get("allow_circular_remote_gate", false)): issues.append(_issue("WARNING", "REMOTE PATH CONTROLS", link.id, "Circular remote gate override: %s controls %s -> %s but cannot be reached without that direction." % [controller, direction_source, direction_destination]))
+				else: issues.append(_issue("ERROR", "REMOTE PATH CONTROLS", link.id, "Circular dependency: controller %s cannot be reached from %s without crossing controlled path %s -> %s. Set allow_circular_remote_gate only for an intentional scripted exception." % [controller, direction_source, direction_source, direction_destination]))
+			if StringName(String(direction.get("state", &"LOCKED")).to_upper()) not in [&"HIDDEN", &"DISCOVERED", &"LOCKED", &"UNLOCKED", &"LOCKED_DOWN"]: issues.append(_issue("ERROR", "TRAVERSAL DIRECTIONS", link.id, "Unknown directional traversal state."))
+			var security_gate := StringName(String(direction.get("gate_type", &"NONE")).to_upper())
+			if security_gate not in [&"NONE", &"HARD", &"SOFT"]: issues.append(_issue("ERROR", "PATH SECURITY", link.id, "Unknown path security gate type '%s'." % security_gate))
+			if security_gate in [&"HARD", &"SOFT"] and (direction.get("controlling_security", {}) as Dictionary).is_empty(): issues.append(_issue("WARNING", "PATH SECURITY", link.id, "%s gate has no controlling security reference." % security_gate))
+			if security_gate == &"SOFT" and not direction.get("on_unauthorized_traversal", []) is Array: issues.append(_issue("ERROR", "PATH SECURITY", link.id, "Soft-gate consequences must be an array."))
 		var source := document.find_entry(link.get("source", &"")); var destination := document.find_entry(link.get("destination", &""))
 		if not source.is_empty() and not destination.is_empty():
 			var source_sphere: StringName = source.get("sphere_id", &""); var destination_sphere: StringName = destination.get("sphere_id", &"")
@@ -53,6 +67,11 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 				issues.append(_issue("INFO", "CROSS-SPHERE CONNECTIONS", link.id, "%s connects Sphere %s to %s." % [link.id, source_sphere, destination_sphere]))
 	for node_id in node_ids:
 		if node_id != &"PUBLIC_GATEWAY" and not _node_has_link(node_id, document.network_links): issues.append(_issue("WARNING", "NETWORK", node_id, "Network node is unreachable/orphaned."))
+		var node_data := document.find_entry(node_id)
+		for control: Dictionary in node_data.get("outbound_path_controls", node_data.get("path_controls", [])):
+			if StringName(control.get("interaction", control.get("trigger", &""))) == &"": issues.append(_issue("ERROR", "PATH CONTROLS", node_id, "Outbound path control requires an interaction trigger."))
+			for destination_id in control.get("destinations", control.get("destination_node_ids", [])):
+				if destination_id not in node_ids: issues.append(_issue("ERROR", "PATH CONTROLS", node_id, "Path-control destination '%s' is missing." % destination_id))
 	for endpoint: Dictionary in document.realtime_endpoints:
 		if endpoint.get("network_node_id", &"") not in node_ids: issues.append(_issue("ERROR", "MEATSPACE ENDPOINTS", endpoint.id, "Endpoint network node is missing."))
 		if endpoint.get("service_id", &"") != &"" and endpoint.get("service_id") not in service_ids: issues.append(_issue("ERROR", "MEATSPACE ENDPOINTS", endpoint.id, "Endpoint service reference is missing."))
@@ -73,6 +92,7 @@ func validate(document: CyberspaceContentDocument) -> Array[Dictionary]:
 		if reaction.get("actor_id", &"") not in _ids(document.hacker_npcs): issues.append(_issue("ERROR", "HACKER NPCS", reaction.id, "Contextual reaction actor is missing."))
 		if reaction.get("lines", []).is_empty(): issues.append(_issue("WARNING", "HACKER NPCS", reaction.id, "Contextual reaction has no dialogue."))
 	for rule: Dictionary in document.tutorial_guidance_rules:
+		if bool(rule.get("sequence_insertion", false)) or StringName(rule.get("sequence_beat_override", &"")) != &"": continue
 		if rule.get("actor_id", &"") not in _ids(document.hacker_npcs): issues.append(_issue("ERROR", "TUTORIAL", rule.id, "Tutorial guidance actor is missing."))
 		if rule.get("hints", []).is_empty(): issues.append(_issue("WARNING", "TUTORIAL", rule.id, "Tutorial guidance rule has no hints."))
 		if bool(rule.get("hard_fail", false)) and bool(rule.get("recoverable", true)): issues.append(_issue("ERROR", "TUTORIAL", rule.id, "A recovery rule cannot also hard-fail."))
@@ -201,6 +221,24 @@ func _validate_mission_event_nodes(issues: Array[Dictionary], document: Cyberspa
 		for branch: Dictionary in node.get("branches", []):
 			if branch.get("next_id", &"") not in ids: issues.append(_issue("ERROR", "MISSION SEQUENCE", node.id, "Branch outcome references a missing event node."))
 func _issue(level: String, category: String, id: StringName, message: String) -> Dictionary: return {"level": level, "category": category, "entry_id": id, "message": message}
+
+func _reachable_without_direction(start: StringName, target: StringName, excluded_link_id: StringName, excluded_source: StringName, excluded_destination: StringName, links: Array[Dictionary]) -> bool:
+	if start == target: return true
+	var visited: Dictionary = {start: true}
+	var frontier: Array[StringName] = [start]
+	while not frontier.is_empty():
+		var current: StringName = frontier.pop_front()
+		for link: Dictionary in links:
+			var source := StringName(link.get("source", &"")); var destination := StringName(link.get("destination", &""))
+			var next: StringName = &""
+			if source == current: next = destination
+			elif destination == current and not bool(link.get("one_way", false)): next = source
+			if next == &"": continue
+			if StringName(link.get("id", &"")) == excluded_link_id and current == excluded_source and next == excluded_destination: continue
+			if visited.has(next): continue
+			if next == target: return true
+			visited[next] = true; frontier.append(next)
+	return false
 
 func _validate_story_mode_authoring(issues: Array[Dictionary], document: CyberspaceContentDocument) -> void:
 	var flags := _ids(document.story_variables); var missions := _ids(document.missions); var contacts := _ids(document.contacts); var calls := _ids(document.contact_comms); var objectives := _ids(document.objectives)

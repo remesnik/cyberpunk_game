@@ -46,7 +46,12 @@ func rebuild() -> void:
 		index += 1
 	for link: Dictionary in document.network_links:
 		var source := StringName(link.get("source", &"")); var destination := StringName(link.get("destination", &""))
-		if graph.has_node(NodePath(String(source))) and graph.has_node(NodePath(String(destination))): graph.connect_node(source, 0, destination, 0)
+		if graph.has_node(NodePath(String(source))) and graph.has_node(NodePath(String(destination))):
+			graph.connect_node(source, 0, destination, 0)
+			for direction: Dictionary in link.get("directions", []):
+				var controller := StringName(direction.get("remote_controller_node_id", direction.get("remote_controller", direction.get("controller_node_id", direction.get("source", source)))))
+				if controller != StringName(direction.get("source", source)) and graph.has_node(NodePath(String(controller))):
+					(graph.get_node(NodePath(String(controller))) as GraphNode).title += "\nCONTROLS // %s -> %s" % [direction.get("source", source), direction.get("destination", destination)]
 
 
 func _add_visual(entry: Dictionary, position: Vector2) -> void:
@@ -70,14 +75,14 @@ func _add_node() -> void:
 	if document == null: return
 	var serial := document.network_nodes.size() + 1; var id := StringName("NODE_%03d" % serial)
 	while not document.find_entry(id).is_empty(): serial += 1; id = StringName("NODE_%03d" % serial)
-	document.add_entry(&"network_nodes", {"id": id, "display_name": "New Network Node", "node_type": &"SERVER", "owner": &"", "faction": &"", "security_level": 0, "sphere_id": document.spheres[0].id if not document.spheres.is_empty() else &"", "description": "", "tags": [], "region_id": &"", "services": [], "starting_discovery_state": &"UNKNOWN", "graffiti": [], "flavor_text": [], "story_hooks": [], "author_notes": ""})
+	document.add_entry(&"network_nodes", {"id": id, "display_name": "New Network Node", "node_type": &"SERVER", "owner": &"", "faction": &"", "security_level": 0, "sphere_id": document.spheres[0].id if not document.spheres.is_empty() else &"", "description": "", "tags": [], "region_id": &"", "services": [], "outbound_path_controls": [], "starting_discovery_state": &"UNKNOWN", "graffiti": [], "flavor_text": [], "story_hooks": [], "author_notes": ""})
 	editor_state.set_position(id, graph.scroll_offset + Vector2(180, 120)); rebuild(); document_changed.emit()
 
 
 func _connect_nodes(from: StringName, _from_port: int, to: StringName, _to_port: int) -> void:
 	if from == to or document == null: return
 	var id := StringName("%s_TO_%s" % [from, to])
-	if document.add_entry(&"network_links", {"id": id, "source": from, "destination": to, "one_way": false, "hidden": false, "locked": false, "disabled": false, "traversal_cost": 1, "authority_requirement": 0, "capability_requirement": &"", "tags": [], "story_hooks": [], "author_notes": ""}): rebuild(); document_changed.emit()
+	if document.add_entry(&"network_links", {"id": id, "source": from, "destination": to, "one_way": false, "hidden": false, "locked": false, "disabled": false, "traversal_cost": 1, "authority_requirement": 0, "capability_requirement": &"", "directions": [{"source": from, "destination": to, "controller_node_id": from, "state": &"LOCKED"}, {"source": to, "destination": from, "controller_node_id": to, "state": &"LOCKED"}], "tags": [], "story_hooks": [], "author_notes": ""}): rebuild(); document_changed.emit()
 
 
 func _disconnect_nodes(from: StringName, _from_port: int, to: StringName, _to_port: int) -> void:
