@@ -20,9 +20,11 @@ var camera_to := Vector3.ZERO
 var transition_progress := 1.0
 var _camera_initialized := false
 var _graph_instance_id := 0
+var _graph: NetworkGraph
 
 func configure(graph: NetworkGraph, preferred_root: StringName) -> void:
 	if graph == null: clear(); return
+	_graph = graph
 	var graph_instance_id := graph.get_instance_id()
 	if _graph_instance_id != 0 and _graph_instance_id != graph_instance_id: clear()
 	_graph_instance_id = graph_instance_id
@@ -37,6 +39,7 @@ func configure(graph: NetworkGraph, preferred_root: StringName) -> void:
 func clear() -> void:
 	anchors.clear(); depths.clear(); lanes.clear(); primary_parents.clear(); edge_endpoints.clear(); edge_lengths.clear()
 	root_id = &""; camera_anchor = Vector3.ZERO; transition_progress = 1.0; _camera_initialized = false; _graph_instance_id = 0
+	_graph = null
 
 func _build_initial_layout(graph: NetworkGraph) -> void:
 	var traversal := _rooted_traversal(graph)
@@ -102,7 +105,8 @@ func _nearest_free_lane(depth: int, preferred: float) -> float:
 	return preferred
 
 func _commit_anchor(node_id: StringName) -> void:
-	anchors[node_id] = Vector3(float(lanes[node_id]) * BRANCH_WIDTH, NODE_BASE_HEIGHT, -float(depths[node_id]) * LAYER_DEPTH)
+	var node := _graph.get_node(node_id) if _graph != null else null
+	anchors[node_id] = node.authored_position if node != null and node.has_authored_position else Vector3(float(lanes[node_id]) * BRANCH_WIDTH, NODE_BASE_HEIGHT, -float(depths[node_id]) * LAYER_DEPTH)
 
 func _cache_new_edges(graph: NetworkGraph) -> void:
 	var ids: Array = graph.links.keys(); ids.sort_custom(_sort_ids)

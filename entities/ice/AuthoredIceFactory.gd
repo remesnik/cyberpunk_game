@@ -7,7 +7,7 @@ static func create_definition(data: Dictionary) -> IceDefinition:
 		return null
 	var patrol: Array[StringName] = []
 	patrol.assign(data.get("patrol_route", []))
-	return IceDefinition.new(
+	var definition := IceDefinition.new(
 		data.id,
 		String(data.get("display_name", data.id)),
 		int(data.get("detection_capability", 1)),
@@ -17,6 +17,9 @@ static func create_definition(data: Dictionary) -> IceDefinition:
 		int(data.get("maximum_integrity", 8)),
 		int(data.get("defense", 1))
 	)
+	if StringName(String(data.get("binding_mode", &"ROAMING")).to_upper()) == &"HOST_BOUND": definition.binding_mode = IceDefinition.BindingMode.HOST_BOUND
+	definition.allowed_binding_node_ids.assign(data.get("allowed_binding_node_ids", []))
+	return definition
 
 
 static func create_instance(data: Dictionary, definitions: Dictionary) -> IceInstance:
@@ -30,6 +33,8 @@ static func create_instance(data: Dictionary, definitions: Dictionary) -> IceIns
 			state_value = candidate
 			break
 	var instance := IceInstance.new(data.id, definition, data.get("initial_node_id", &""), state_value)
+	instance.sphere_id = StringName(data.get("sphere_id", &""))
+	instance.security_sleeve_id = StringName(data.get("security_sleeve_id", &""))
 	instance.operational = bool(data.get("initially_active", true))
 	instance.alert_level = clampi(int(data.get("initial_alert_level", 0)), 0, 100)
 	return instance

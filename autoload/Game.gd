@@ -141,6 +141,8 @@ var entry_guidance: AuthoredEntryGuidance
 var last_traversal_debug: Dictionary = {}
 var last_exploit_debug: Dictionary = {}
 var last_bypass_result: Dictionary = {}
+## Debug-only gameplay adapter state. Never serialized into persistent content.
+var _debug_author_god_mode := false
 var bypass_resolver: RefCounted
 var mission: Variant
 var facility_scenario: FacilityOperationScenario
@@ -249,13 +251,13 @@ func _configure_content_availability() -> void:
 	content_availability.register_content(&"FACILITY_OPERATION_PROTOTYPE", &"STORY_ONLY")
 	content_availability.register_content(&"STORY_PROLOGUE", &"STORY_ONLY", {}, {&"kind": &"MEATSPACE_PROLOGUE", &"runtime_definition_path": "res://data/authoring/story_prologue.tres"})
 	content_availability.register_content(&"FREE_ROAM_HOME", &"FREE_ROAM_ONLY", {}, {&"kind": &"FREE_ROAM_WORLD"})
-	var first_contact := load("res://data/authoring/first_contact_current.tres") as CyberspaceContentDocument
-	content_availability.register_document(first_contact)
+	var first_contact_path := "res://data/networks/first_contact.netspace"
+	content_availability.register_content(&"FIRST_CONTACT", &"STORY_ONLY", {}, {&"kind": &"AUTHORED_NETWORK", &"runtime_document_path": first_contact_path})
 	var glasshouse := load("res://data/authoring/glasshouse_01.tres") as CyberspaceContentDocument
 	content_availability.register_document(glasshouse)
 	content_availability.register_content(&"FIRST_CONTACT_FREE_ROAM_TUTORIAL", &"FREE_ROAM_ONLY", {}, {
 		&"kind": &"AUTHORED_NETWORK",
-		&"runtime_document_path": first_contact.resource_path,
+		&"runtime_document_path": first_contact_path,
 		&"tutorial_profile": &"FREE_ROAM_OPTIONAL",
 		&"campaign_progression_enabled": false,
 		&"reuse_authored_content": true,
@@ -307,10 +309,10 @@ func enter_netspace_from_clean_room() -> Dictionary:
 	return {"success": true, "reason": "Entering Netspace."}
 
 func _ensure_first_contact_scenario_initialized() -> Dictionary:
-	var canonical_path := "res://data/authoring/first_contact_current.tres"
+	var canonical_path := "res://data/networks/first_contact.netspace"
 	var valid_runtime := active_content_document != null \
 		and active_content_document.document_id == &"FIRST_CONTACT" \
-		and active_content_document.resource_path == canonical_path \
+		and String(active_content_profile.get("runtime_document_path", "")) == canonical_path \
 		and player_network_position != null \
 		and player_network_position.current_node_id == &"SAN" \
 		and entry_guidance != null
@@ -323,7 +325,7 @@ func _ensure_first_contact_scenario_initialized() -> Dictionary:
 	if session_active: end_session()
 	start_session()
 	valid_runtime = active_content_document != null \
-		and active_content_document.resource_path == canonical_path \
+		and String(active_content_profile.get("runtime_document_path", "")) == canonical_path \
 		and player_network_position != null \
 		and player_network_position.current_node_id == &"SAN" \
 		and entry_guidance != null
@@ -702,11 +704,21 @@ func start_session() -> void:
 	if entry_content_id.is_empty(): entry_content_id = StringName(persistent_game_state.world_state.get("current_content_id", &""))
 	active_content_profile = content_availability.get_metadata(entry_content_id) if is_content_available(entry_content_id) else {}
 	if active_content_profile.get("kind", &"") == &"AUTHORED_NETWORK":
-		active_content_document = load(String(active_content_profile.get("runtime_document_path", ""))) as CyberspaceContentDocument
+		var runtime_document_path := String(active_content_profile.get("runtime_document_path", ""))
+		var network_runtime: Dictionary = {}
+		if runtime_document_path.get_extension().to_lower() == "netspace":
+			var network_load := NetworkDocumentSerializer.load_file(runtime_document_path)
+			if not bool(network_load.get("success", false)):
+				push_error("Could not load authored network '%s': %s" % [runtime_document_path, JSON.stringify(network_load.get("issues", []))])
+				return
+			network_runtime = NetworkDocumentRuntimeLoader.build(network_load.document as NetworkDocument)
+			active_content_document = network_runtime.content_document
+		else:
+			active_content_document = load(runtime_document_path) as CyberspaceContentDocument
 		var entry_filter := Callable(self, "_is_active_authored_entry_available")
-		network_graph = AuthoredNetworkRuntimeBuilderScript.build_graph(active_content_document, entry_filter)
-		player_network_position = AuthoredNetworkRuntimeBuilderScript.build_player(active_content_document, network_graph)
-		player_knowledge = AuthoredNetworkRuntimeBuilderScript.build_knowledge(active_content_document, network_graph)
+		network_graph = network_runtime.graph if not network_runtime.is_empty() else AuthoredNetworkRuntimeBuilderScript.build_graph(active_content_document, entry_filter)
+		player_network_position = network_runtime.player if not network_runtime.is_empty() else AuthoredNetworkRuntimeBuilderScript.build_player(active_content_document, network_graph)
+		player_knowledge = network_runtime.knowledge if not network_runtime.is_empty() else AuthoredNetworkRuntimeBuilderScript.build_knowledge(active_content_document, network_graph)
 	elif active_content_profile.get("kind", &"") == &"FREE_ROAM_WORLD":
 		network_graph = FreeRoamWorldFactoryScript.create_graph()
 		player_network_position = FreeRoamWorldFactoryScript.create_player()
@@ -2304,6 +2316,7 @@ func _apply_action(request: ActionRequest) -> Dictionary:
 	return {"success": false, "reason": "Unsupported action.", "events": []}
 
 func _apply_traversal_consequences(validation: Dictionary, source: StringName, destination: StringName) -> Array[Dictionary]:
+	if _debug_author_god_mode and OS.is_debug_build(): return []
 	var events: Array[Dictionary] = []
 	if not bool(validation.get("soft_gate_unauthorized", false)): return events
 	for authored: Dictionary in validation.get("consequences", []):
@@ -2347,11 +2360,16 @@ func _log_traversal_evaluation(from_node_id: StringName, to_node_id: StringName,
 	print("[Traversal] source=%s destination=%s controller=%s state=%s result=%s reason=%s requirement=%s requirement_value=%s" % [from_node_id, to_node_id, validation.get("controller_node_id", &""), validation.get("traversal_state", &""), "ALLOWED" if validation.error == NetworkGraph.TraversalError.OK else "DENIED", validation.get("reason", ""), JSON.stringify(validation.get("requirement", {})), str(validation.get("requirement_value", true))])
 
 func _update_ice(tick: int, _request: ActionRequest) -> Array[Dictionary]:
+	if _debug_author_god_mode and OS.is_debug_build(): return [{"type": &"ICE_SUPPRESSED_BY_AUTHORING", "tick": tick, "player_visible": false}]
 	var events := ice_controller.update(_request.cost, _request)
 	events.push_front({"type": &"ICE_UPDATED", "tick": tick, "player_visible": false})
 	return events
 
 func _update_trace(tick: int, _request: ActionRequest) -> Array[Dictionary]:
+	if _debug_author_god_mode and OS.is_debug_build():
+		ice_controller.pending_trace_increase = 0
+		pending_action_trace = 0
+		return [{"type": &"TRACE_SUPPRESSED_BY_AUTHORING", "tick": tick, "increase": 0, "trace": trace_level, "player_visible": false}]
 	var increase := ice_controller.pending_trace_increase + pending_action_trace
 	if security_response_controller != null: increase += security_response_controller.active_system_trace_pressure()
 	ice_controller.pending_trace_increase = 0
@@ -2434,6 +2452,7 @@ func _apply_bypass_security_event(event: Dictionary) -> Dictionary:
 	return structured
 
 func _emit_node_security_event(event_type: StringName, severity: int, noisy_action_type: StringName, tags: Array[StringName] = []) -> Dictionary:
+	if _debug_author_god_mode and OS.is_debug_build(): return {}
 	var node_id := player_network_position.current_node_id if player_network_position != null else &""
 	var marker: Variant = action_clock.current_tick if action_clock != null else 0
 	var security_event := SecurityEvent.new(node_id, event_type, severity, noisy_action_type, &"PLAYER", intrusion_run_id, tags, marker)
@@ -2442,6 +2461,39 @@ func _emit_node_security_event(event_type: StringName, severity: int, noisy_acti
 	if node != null: node.report_security_event(report)
 	EventBus.publish_tutorial_gameplay_event(event_type, node_id, report)
 	return report
+
+func set_debug_author_god_mode(enabled: bool) -> bool:
+	if enabled and not OS.is_debug_build():
+		_debug_author_god_mode = false
+		push_error("AUTHOR_GOD entry rejected outside a debug build.")
+		return false
+	_debug_author_god_mode = enabled
+	return true
+
+func debug_install_network_document(document: NetworkDocument) -> Dictionary:
+	if not OS.is_debug_build(): return {"success": false, "issues": [{"message": "Debug network loading is unavailable in release builds."}]}
+	var runtime := NetworkDocumentRuntimeLoader.build(document)
+	if not bool(runtime.get("success", false)): return runtime
+	var built_graph := runtime.graph as NetworkGraph
+	# Preserve live object identity so every gameplay system continues to point at
+	# the same graph, position, and knowledge objects after an authoring load.
+	network_graph.nodes.clear(); network_graph.links.clear(); network_graph.spheres.clear(); network_graph.security_sleeves.clear()
+	for sphere: SphereDefinition in built_graph.spheres.values(): network_graph.add_sphere(sphere)
+	for node: NetworkNodeDefinition in built_graph.nodes.values(): network_graph.add_node(node)
+	for sleeve: SecuritySleeve in built_graph.security_sleeves.values(): network_graph.add_security_sleeve(sleeve)
+	for link: NetworkLinkDefinition in built_graph.links.values(): network_graph.add_link(link)
+	var loaded_position := runtime.player as PlayerNetworkPosition
+	if player_network_position == null: player_network_position = PlayerNetworkPosition.new(loaded_position.current_node_id, loaded_position.traversal_points)
+	player_network_position.relocate(loaded_position.current_node_id); player_network_position.traversal_points = loaded_position.traversal_points
+	var loaded_knowledge := runtime.knowledge as PlayerKnowledge
+	if player_knowledge == null: player_knowledge = PlayerKnowledge.new()
+	player_knowledge.node_records = loaded_knowledge.node_records.duplicate(true); player_knowledge.link_records = loaded_knowledge.link_records.duplicate(true); player_knowledge.sphere_records = loaded_knowledge.sphere_records.duplicate(true); player_knowledge.security_sleeve_records = loaded_knowledge.security_sleeve_records.duplicate(true); player_knowledge.service_records = loaded_knowledge.service_records.duplicate(true); player_knowledge.ice_records.clear()
+	if ice_controller == null: ice_controller = IceController.new(network_graph, player_network_position, player_knowledge)
+	else: ice_controller.player_position = player_network_position; ice_controller.player_knowledge = player_knowledge
+	ice_controller.instances.clear(); NetworkDocumentRuntimeLoader.populate_ice(document, ice_controller)
+	active_content_document = runtime.content_document
+	EventBus.network_display_update_requested.emit()
+	return {"success": true, "issues": [], "document": document}
 
 func exploit_compatibility(node_id: StringName, program_instance_id: StringName) -> Dictionary:
 	var node := network_graph.get_node(node_id) if network_graph != null else null

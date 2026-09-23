@@ -13,7 +13,7 @@ func _ready() -> void:
 	Game.persistent_game_state.campaign_state["pending_entry_content_id"] = &"FIRST_CONTACT"
 	Game.persistent_game_state.campaign_state.get_or_add("story_flags", {})[&"FIRST_CONTACT_STARTED"] = true
 	Game.start_session()
-	_expect(Game.active_content_document.resource_path == "res://data/authoring/first_contact_current.tres", "Story launch selects the canonical First Contact document")
+	_expect(Game.active_content_profile.get("runtime_document_path", "") == "res://data/networks/first_contact.netspace", "Story launch selects the canonical encrypted First Contact network")
 	_expect(Game.player_network_position.current_node_id == &"SAN", "First Contact starts at SAN")
 	_expect(Game.entry_guidance != null and Game.entry_guidance.current_step_id() == &"FC_BRIEF", "one tutorial controller owns the opening step")
 	Game.game_domain = Game.GameDomain.CLEAN_ROOM

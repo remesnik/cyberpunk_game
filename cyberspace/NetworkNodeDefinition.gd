@@ -18,6 +18,8 @@ var discovered: bool
 var owner_faction: StringName
 ## Authored logical region identity. Runtime sleeve changes never rewrite this.
 var sphere_id: StringName = &""
+var authored_position := Vector3.ZERO
+var has_authored_position := false
 var connected_links: Array[StringName] = []
 var services: Array[Dictionary] = []
 var service_definitions: Array[NodeServiceDefinition] = []

@@ -10,6 +10,10 @@ var alert_level := 0
 var known_player_position: StringName = &""
 var last_known_player_position: StringName = &""
 var home_node: StringName
+## Authored roaming ownership. Stationary ICE leaves these empty; gameplay
+## movement still uses the existing graph/patrol implementation.
+var sphere_id: StringName = &""
+var security_sleeve_id: StringName = &""
 var movement_progress := 0
 var patrol_index := 0
 var integrity: int

@@ -30,6 +30,20 @@ func add_security_sleeve(sleeve: SecuritySleeve) -> bool:
 	sleeve.changed.connect(_on_security_sleeve_changed)
 	return true
 
+func remove_security_sleeve(sleeve_id: StringName) -> SecuritySleeve:
+	var sleeve := get_security_sleeve(sleeve_id)
+	if sleeve == null: return null
+	if sleeve.changed.is_connected(_on_security_sleeve_changed): sleeve.changed.disconnect(_on_security_sleeve_changed)
+	security_sleeves.erase(sleeve_id)
+	security_sleeve_changed.emit(sleeve_id); display_update_requested.emit()
+	return sleeve
+
+func remove_sphere(sphere_id: StringName) -> SphereDefinition:
+	var sphere := get_sphere(sphere_id)
+	if sphere == null or not sphere.node_ids.is_empty(): return null
+	spheres.erase(sphere_id); display_update_requested.emit()
+	return sphere
+
 func _on_security_sleeve_changed(sleeve: SecuritySleeve) -> void:
 	security_sleeve_changed.emit(sleeve.id)
 	display_update_requested.emit()
@@ -58,6 +72,28 @@ func add_link(link: NetworkLinkDefinition) -> bool:
 	(nodes[link.destination] as NetworkNodeDefinition).add_connected_link(link.id)
 	display_update_requested.emit()
 	return true
+
+func remove_link(link_id: StringName) -> NetworkLinkDefinition:
+	var link := get_link(link_id)
+	if link == null: return null
+	var source_node := get_node(link.source)
+	var destination_node := get_node(link.destination)
+	if source_node != null: source_node.connected_links.erase(link_id)
+	if destination_node != null: destination_node.connected_links.erase(link_id)
+	links.erase(link_id)
+	display_update_requested.emit()
+	return link
+
+func remove_node(node_id: StringName) -> NetworkNodeDefinition:
+	## Low-level topology removal. Callers must remove incident links and protect
+	## runtime-special references before invoking this method.
+	var node := get_node(node_id)
+	if node == null or not node.connected_links.is_empty(): return null
+	for sphere: SphereDefinition in spheres.values(): sphere.node_ids.erase(node_id)
+	for sleeve: SecuritySleeve in security_sleeves.values(): sleeve.current_members.erase(node_id)
+	nodes.erase(node_id)
+	display_update_requested.emit()
+	return node
 
 func get_node(node_id: StringName) -> NetworkNodeDefinition:
 	return nodes.get(node_id) as NetworkNodeDefinition

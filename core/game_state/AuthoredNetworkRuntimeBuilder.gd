@@ -3,6 +3,9 @@ extends RefCounted
 
 static func build_graph(document: CyberspaceContentDocument, is_available: Callable = Callable()) -> NetworkGraph:
 	var graph := NetworkGraph.new()
+	for data: Dictionary in document.spheres:
+		if not _entry_available(data, is_available): continue
+		graph.add_sphere(SphereDefinition.new(StringName(data.get("id", &"")), String(data.get("display_name", data.get("name", "Sphere"))), [], StringName(data.get("original_security_sleeve_id", &""))))
 	for data: Dictionary in document.network_nodes:
 		if not _entry_available(data, is_available): continue
 		var node := NetworkNodeDefinition.new(
@@ -19,12 +22,22 @@ static func build_graph(document: CyberspaceContentDocument, is_available: Calla
 		var family_index := NetworkNodeDefinition.SecurityFamily.keys().find(String(family_name))
 		node.security_family = (family_index as NetworkNodeDefinition.SecurityFamily) if family_index >= 0 else NetworkNodeDefinition.SecurityFamily.VIRAL
 		node.difficulty_rating = maxi(0, int(data.get("difficulty_rating", data.get("security_level", 0))))
+		var authored_position: Array = data.get("authored_position", [])
+		if authored_position.size() >= 3:
+			node.authored_position = Vector3(float(authored_position[0]), float(authored_position[1]), float(authored_position[2]))
+			node.has_authored_position = true
 		for service_id: StringName in _string_names(data.get("services", [])):
 			var service := document.find_entry(service_id)
 			if not service.is_empty() and _entry_available(service, is_available):
 				node.add_service_record(service)
 		for control_data: Dictionary in data.get("outbound_path_controls", data.get("path_controls", [])): node.add_path_control(NodePathControl.from_authored(control_data))
 		graph.add_node(node)
+	for data: Dictionary in document.security_sleeves:
+		if not _entry_available(data, is_available): continue
+		var state_name := StringName(String(data.get("state", &"INTACT")).to_upper()); var state_index := SecuritySleeve.State.keys().find(String(state_name))
+		var sleeve := SecuritySleeve.new(StringName(data.get("id", &"")), String(data.get("display_name", "Security Sleeve")), _string_names(data.get("current_members", [])), state_index as SecuritySleeve.State if state_index >= 0 else SecuritySleeve.State.INTACT)
+		sleeve.metadata = (data.get("metadata", {}) as Dictionary).duplicate(true); sleeve.security_count = int(data.get("security_count", sleeve.metadata.get("security_count", 0)))
+		graph.add_security_sleeve(sleeve)
 	for data: Dictionary in document.network_links:
 		if not _entry_available(data, is_available): continue
 		if not graph.nodes.has(StringName(data.get("source", &""))) or not graph.nodes.has(StringName(data.get("destination", &""))): continue
@@ -76,12 +89,19 @@ static func populate_ice(document: CyberspaceContentDocument, controller: IceCon
 	for data: Dictionary in document.ice_definitions:
 		if not _entry_available(data, is_available): continue
 		var definition := IceDefinition.new(StringName(data.id), String(data.get("display_name", data.id)), int(data.get("detection_capability", 1)), int(data.get("movement_cost", 1)), int(data.get("scan_capability", 1)), _string_names(data.get("patrol_route", [])), int(data.get("maximum_integrity", 6)), int(data.get("defense", 1)))
+		if StringName(String(data.get("binding_mode", &"ROAMING")).to_upper()) == &"HOST_BOUND": definition.binding_mode = IceDefinition.BindingMode.HOST_BOUND
+		definition.allowed_binding_node_ids.assign(data.get("allowed_binding_node_ids", []))
 		definitions[definition.id] = definition
 	for data: Dictionary in document.ice_instances:
 		if not _entry_available(data, is_available): continue
 		var definition: IceDefinition = definitions.get(StringName(data.get("definition_id", &"")))
 		if definition != null:
-			controller.add_ice(IceInstance.new(StringName(data.id), definition, StringName(data.get("initial_node_id", &"")), _ice_state(StringName(data.get("initial_state", &"DORMANT")))))
+			var instance := IceInstance.new(StringName(data.id), definition, StringName(data.get("initial_node_id", &"")), _ice_state(StringName(data.get("initial_state", &"DORMANT"))))
+			instance.sphere_id = StringName(data.get("sphere_id", &""))
+			instance.security_sleeve_id = StringName(data.get("security_sleeve_id", &""))
+			instance.operational = bool(data.get("initially_active", true))
+			instance.alert_level = clampi(int(data.get("initial_alert_level", 0)), 0, 100)
+			controller.add_ice(instance)
 
 static func populate_hackers(document: CyberspaceContentDocument, manager: HackerNPCManager, is_available: Callable = Callable()) -> void:
 	for data: Dictionary in document.hacker_npcs:

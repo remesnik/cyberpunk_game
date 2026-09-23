@@ -2,6 +2,7 @@ class_name NetworkDisplay
 extends Control
 
 signal actor_action_requested(actor_id: StringName, command_id: StringName)
+signal authoring_target_selected(kind: StringName, target_id: StringName)
 
 enum NetspaceViewMode { NETWORK, NODE_FOCUS }
 
@@ -138,6 +139,12 @@ var _network_view_anchor := Vector3.ZERO
 var _focus_camera_anchor := Vector3.ZERO
 var _local_target_final_positions: Dictionary = {}
 var _local_scan_levels: Dictionary = {}
+var _debug_authoring_reveal_all := false
+var _debug_show_ids := true
+var _debug_show_path_locks := true
+var _debug_show_sphere_boundaries := true
+var _debug_show_ice_assignments := true
+var _network_authoring_controller: Node
 
 func _ready() -> void:
 	security_level_legend.set_visualization_config(visualization_config)
@@ -169,6 +176,13 @@ func _ready() -> void:
 	GameplayBindings.semantic_action_triggered.connect(_on_semantic_action)
 	GameplayBindings.device_mode_changed.connect(_on_device_mode_changed)
 	_create_slot_management_ui()
+	# Release builds never instantiate the debug authoring subsystem.
+	if OS.is_debug_build():
+		var authoring_script := load("res://debug/network_authoring/NetworkAuthoringController.gd") as Script
+		if authoring_script != null:
+			_network_authoring_controller = authoring_script.new()
+			add_child(_network_authoring_controller)
+			_network_authoring_controller.configure(self)
 	if Game.game_domain == Game.GameDomain.CYBERSPACE and is_visible_in_tree():
 		GameplayBindings.set_context(GameplayBindings.Context.CYBERSPACE)
 	scan_button.pressed.connect(_on_scan_pressed)
@@ -395,6 +409,8 @@ func _rebuild_neighborhood() -> void:
 		var known_position := _spatial_screen_position(known_id, map_rect)
 		if bool(known_view.get("identity_known", false)): _add_node_visual(known_view, known_position, false, false)
 		else: _add_sensor_unknown_visual(known_position, known_id, int(_spatial_layout.depths.get(known_id, 0)))
+	if _debug_authoring_reveal_all:
+		_merge_debug_authoring_truth(map_rect, current_id)
 	var discovered_ids := _discovered_node_ids()
 	if spatial_world != null: spatial_world.set_discovered_nodes(discovered_ids, graph)
 
@@ -473,6 +489,109 @@ func _add_node_visual(node_view: Dictionary, center: Vector2, current: bool, sel
 		visual.play_knowledge_resolution(_knowledge_view_history[node_id])
 	_knowledge_view_history[node_id] = node_view.duplicate(true)
 	_apply_spatial_scale(visual, node_id)
+
+func set_debug_authoring_reveal_all(enabled: bool) -> bool:
+	if enabled and not OS.is_debug_build():
+		push_error("Network authoring reveal rejected outside a debug build.")
+		return false
+	_debug_authoring_reveal_all = enabled
+	if is_node_ready(): _rebuild_neighborhood()
+	return true
+
+func reset_debug_authoring_runtime() -> void:
+	if not OS.is_debug_build(): return
+	_spatial_layout.clear()
+	set_models(Game.network_graph, Game.player_network_position, Game.player_knowledge, Game.sensor_topology)
+
+func debug_authored_world_position(node_id: StringName) -> Vector3:
+	return _spatial_layout.world_position(node_id) if OS.is_debug_build() else Vector3.ZERO
+
+func _merge_debug_authoring_truth(map_rect: Rect2, current_id: StringName) -> void:
+	if not OS.is_debug_build() or graph == null: return
+	_visible_node_count = graph.nodes.size()
+	var radius: float = visualization_config.radius_for_lod(false, visualization_config.detail_level_for(_graph_zoom, _visible_node_count))
+	for node: NetworkNodeDefinition in graph.nodes.values():
+		var shown_name := "%s [%s]" % [node.display_name, node.id] if _debug_show_ids else node.display_name
+		var view := {"id": node.id, "display_name": shown_name, "node_type": node.node_type, "network_type": node.network_type, "security_family": node.security_family_name(), "security_family_known": true, "difficulty_rating": node.difficulty_rating, "difficulty_rating_known": true, "identity_known": true, "owner_faction": node.owner_faction, "ice_presence_known": true, "ice_present": _debug_node_has_ice(node.id)}
+		_add_node_visual(view, _spatial_screen_position(node.id, map_rect), node.id == current_id, true)
+		var visual := node_visuals.get(node.id) as NodeVisual
+		if visual != null:
+			visual.modulate = _debug_sphere_tint(node.sphere_id) if _debug_show_sphere_boundaries else Color.WHITE
+			var sphere := graph.get_sphere(node.sphere_id)
+			visual.tooltip_text = "SPHERE // %s // %s" % [node.sphere_id, sphere.display_name if sphere != null else "UNASSIGNED"]
+			if _debug_show_ice_assignments: visual.tooltip_text += "\nICE // %s" % _debug_ice_assignments(node.id)
+		target_views[node.id] = {"kind": &"NODE", "title": node.display_name, "node": view, "current": node.id == current_id, "enterable": true}
+		if not target_order.has(node.id): target_order.append(node.id)
+	for link: NetworkLinkDefinition in graph.links.values():
+		_add_link_visual(link.id, _spatial_screen_position(link.source, map_rect), _spatial_screen_position(link.destination, map_rect), false, radius, radius, link.source, link.destination)
+		if _debug_show_path_locks and link_visuals.has(link.id): (link_visuals[link.id] as LinkVisual).set_runtime_state(&"LOCKED" if link.locked else &"UNLOCKED")
+		target_views[link.id] = {"kind": &"LINK", "title": "PATH // %s" % link.id, "link": {"id": link.id, "source": link.source, "destination": link.destination, "locked": link.locked, "hidden": link.hidden, "disabled": link.disabled}}
+		if not target_order.has(link.id): target_order.append(link.id)
+
+func _debug_sphere_tint(sphere_id: StringName) -> Color:
+	if sphere_id == &"": return Color.WHITE
+	var hue := float(absi(hash(String(sphere_id))) % 360) / 360.0
+	return Color.WHITE.lerp(Color.from_hsv(hue, 0.38, 1.0), 0.22)
+
+func _debug_node_has_ice(node_id: StringName) -> bool:
+	if Game.ice_controller == null: return false
+	for ice: IceInstance in Game.ice_controller.instances.values():
+		if ice.current_node_id == node_id: return true
+	return false
+
+func _debug_ice_assignments(node_id: StringName) -> String:
+	var ids: PackedStringArray = []
+	if Game.ice_controller != null:
+		for ice: IceInstance in Game.ice_controller.instances.values():
+			if ice.current_node_id == node_id: ids.append(String(ice.instance_id))
+	return ", ".join(ids) if not ids.is_empty() else "None"
+
+func set_debug_authoring_overlay(name: StringName, enabled: bool) -> void:
+	if not OS.is_debug_build(): return
+	match name:
+		&"IDS": _debug_show_ids = enabled
+		&"PATH_LOCKS": _debug_show_path_locks = enabled
+		&"SPHERE_BOUNDARIES": _debug_show_sphere_boundaries = enabled
+		&"ICE_ASSIGNMENTS": _debug_show_ice_assignments = enabled
+	if _debug_authoring_reveal_all: _rebuild_neighborhood()
+
+func set_debug_authoring_node_selection(node_ids: Array[StringName]) -> void:
+	if not OS.is_debug_build(): return
+	for node_id: StringName in node_visuals:
+		(node_visuals[node_id] as NodeVisual).set_destination_emphasis(node_ids.has(node_id))
+	for link_id: StringName in link_visuals: (link_visuals[link_id] as LinkVisual).set_highlighted(false)
+
+func set_debug_authoring_selection(kind: int, object_id: StringName) -> void:
+	if not OS.is_debug_build(): return
+	var owning_node_id := _debug_authoring_owner_node(kind, object_id)
+	for node_id: StringName in node_visuals:
+		var emphasize := (kind == NetworkSelectionState.Kind.NODE and node_id == object_id) or node_id == owning_node_id
+		if kind == NetworkSelectionState.Kind.SPHERE and graph != null:
+			var sphere := graph.get_sphere(object_id); emphasize = sphere != null and sphere.contains_node(node_id)
+		elif kind == NetworkSelectionState.Kind.SECURITY_SLEEVE and graph != null:
+			var sleeve := graph.get_security_sleeve(object_id); emphasize = sleeve != null and sleeve.contains_node(node_id)
+		(node_visuals[node_id] as NodeVisual).set_destination_emphasis(emphasize)
+	for link_id: StringName in link_visuals:
+		(link_visuals[link_id] as LinkVisual).set_highlighted(kind == NetworkSelectionState.Kind.PATH and link_id == object_id)
+	# Services and ICE only have local visuals while their host is focused. Keep
+	# those transient controls highlighted without writing selection into graph data.
+	for target_id: StringName in local_target_visuals:
+		var target := target_views.get(target_id, {}) as Dictionary
+		var matches := (kind == NetworkSelectionState.Kind.SERVICE and StringName(target.get("service_id", target_id)) == object_id) or (kind == NetworkSelectionState.Kind.ICE and StringName(target.get("actor_id", target_id)) == object_id)
+		var control := local_target_visuals[target_id] as Control
+		if is_instance_valid(control):
+			control.modulate = Color("ffe083") if matches else Color.WHITE
+
+func _debug_authoring_owner_node(kind: int, object_id: StringName) -> StringName:
+	if graph == null: return &""
+	if kind == NetworkSelectionState.Kind.SERVICE:
+		for node: NetworkNodeDefinition in graph.nodes.values():
+			for service: NodeServiceDefinition in node.service_definitions:
+				if service.id == object_id: return node.id
+	elif kind == NetworkSelectionState.Kind.ICE and Game.ice_controller != null:
+		var ice := Game.ice_controller.get_ice(object_id)
+		if ice != null: return ice.current_node_id
+	return &""
 
 func _add_unknown_visual(center: Vector2, unknown_title: String, contact_id: StringName, stable_node_id: StringName = &"") -> void:
 	var visual := _ensure_node_visual(stable_node_id) if stable_node_id != &"" else NODE_SCENE.instantiate() as NodeVisual
@@ -1065,6 +1184,10 @@ func _on_node_selected(node_id: StringName) -> void:
 	if not target_views.has(node_id) or (target_views[node_id] as Dictionary).get("kind") != &"NODE": return
 	focused_node_id = node_id
 	_select_target(node_id)
+	if _network_authoring_controller != null and _network_authoring_controller.state.is_authoring():
+		_network_authoring_controller.select_object(NetworkSelectionState.Kind.NODE, node_id)
+		if _network_authoring_controller.is_god_mode() and node_id != position_model.current_node_id: _network_authoring_controller.move_author_to_node(node_id)
+		return
 	if node_id == position_model.current_node_id:
 		if netspace_view_mode == NetspaceViewMode.NETWORK: _enter_node_focus_mode()
 		else: focused_local_target_id = node_id
@@ -1321,6 +1444,9 @@ func _execute_selected_contextual_command() -> void:
 		return
 	match _selected_contextual_command:
 		&"ENTER":
+			if _network_authoring_controller != null and _network_authoring_controller.is_god_mode():
+				_network_authoring_controller.move_author_to_node(selected_target_id)
+				return
 			var move_result := Game.request_traversal(selected_target_id)
 			_set_action_feedback(move_result)
 		&"SCAN", &"PROBE": _scan_selected_target()
@@ -1535,6 +1661,11 @@ func _select_target(target_id: StringName) -> void:
 	var view := target_views[target_id] as Dictionary
 	target_title.text = String(view.get("title", "UNKNOWN")).to_upper()
 	var kind: StringName = view.get("kind", &"UNKNOWN")
+	authoring_target_selected.emit(kind, target_id)
+	if _network_authoring_controller != null and _network_authoring_controller.state.is_authoring():
+		if kind == &"LINK": _network_authoring_controller.select_object(NetworkSelectionState.Kind.PATH, target_id)
+		elif kind == &"SERVICE": _network_authoring_controller.select_object(NetworkSelectionState.Kind.SERVICE, StringName(view.get("service_id", target_id)))
+		elif kind == &"ICE": _network_authoring_controller.select_object(NetworkSelectionState.Kind.ICE, StringName(view.get("actor_id", target_id)))
 	var details: PackedStringArray = ["CLASS // %s" % kind]
 	if kind == &"NODE":
 		var node: Dictionary = view.node
@@ -1968,6 +2099,9 @@ func _confirm_selected_target() -> void:
 		return
 	var view := target_views[selected_target_id] as Dictionary
 	if view.get("kind") == &"NODE":
+		if _network_authoring_controller != null and _network_authoring_controller.is_god_mode():
+			_network_authoring_controller.move_author_to_node(selected_target_id)
+			return
 		var result := Game.request_traversal(selected_target_id)
 		if not result.success:
 			status_label.text = "ACCESS DENIED  //  %s" % result.reason.to_upper()
